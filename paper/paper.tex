@@ -26,7 +26,7 @@
 \usepackage{microtype}
 
 %bib
-\usepackage[maxnames=3,maxbibnames=99,mincrossrefs=5,backend=bibtex]{biblatex}
+\usepackage[maxnames=3,maxbibnames=99,mincrossrefs=5,style=ieee,sortcites,backend=bibtex]{biblatex}
 %\addbibresource{papers-off.bib}
 %\addbibresource{confs-off.bib}
 %\addbibresource{rfc.bib}
@@ -50,10 +50,14 @@
 	filecolor=black,
 	linkcolor=black,
 	urlcolor=black,
-	pdftitle={Literature + Ideas},
+	pdftitle={Dynamically Annealed Reinforcement Learning for Intrusion Prevention},
 	pdfauthor={Kyle A. Simpson}
 }
 \newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
+
+\usepackage{titling}
+\settowidth{\thanksmarkwidth}{*}
+\setlength{\thanksmargin}{-\thanksmarkwidth}
 
 %% Enable /thanks
 \IEEEoverridecommandlockouts
@@ -71,11 +75,12 @@
 \author{Kyle A. Simpson\thanks{This work was supported by the Engineering and Physical Sciences
 		Research Council [grant number EP/M508056/1]},\\\emph{University of Glasgow, Glasgow, Scotland},\\
 		\email{k.simpson.1@research.gla.ac.uk}}
+\date{}
 
 \begin{document}
 
 %% If needed, make urls typewritery
-\urlstyle{tt}
+%\urlstyle{tt}
 
 \maketitle
 
@@ -90,5 +95,7 @@ Okay here is a... paper?
 \section{Initial Definitions}
 
 Testing to see if I get the right header behaviour.
+
+\printbibliography
 
 \end{document}
