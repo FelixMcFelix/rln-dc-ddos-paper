@@ -75,6 +75,10 @@
 \author{Kyle A. Simpson\thanks{This work was supported by the Engineering and Physical Sciences
 		Research Council [grant number EP/M508056/1]},\\\emph{University of Glasgow, Glasgow, Scotland},\\
 		\email{k.simpson.1@research.gla.ac.uk}}
+
+% Remove date, leave no spacing.
+\predate{}
+\postdate{}
 \date{}
 
 \begin{document}
@@ -95,6 +99,19 @@ Okay here is a... paper?
 \section{Initial Definitions}
 
 Testing to see if I get the right header behaviour.
+Another sentence to bring out the edge cases in this style.
+
+Does next paragraph have proper indent? Please!
+
+\section{A Plan, of Sorts}
+
+\begin{enumerate}
+	\item Establish criteria used to inform system temp---what could make my system increase $\epsilon$ again late into training?
+	\item What are my chosen features? Reward Function?
+	\item Test against MARL and others---probably essential.
+	\item Model at least three scenarios: standard (under attack), normality shifts, attack changes.
+	\item \textsc{Ideally:} test adversarial work (what do such examples look like for my classifier, can an attacker actually operate on them?). How do results change with/without pretraining?
+\end{enumerate}
 
 \printbibliography
 
