@@ -1,0 +1,94 @@
+\documentclass[conference,10pt]{IEEEtran}
+
+%% IEEE CNS addition:
+\makeatletter
+\def\ps@headings{%
+	\def\@oddhead{\mbox{}\scriptsize\rightmark \hfil \thepage}%
+	\def\@evenhead{\scriptsize\thepage \hfil \leftmark\mbox{}}%
+	\def\@oddfoot{}%
+	\def\@evenfoot{}}
+\makeatother
+\pagestyle{empty}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage{graphicx}
+
+\usepackage[binary-units]{siunitx}
+\sisetup{range-phrase=--, range-units=single}
+
+\usepackage[basic]{complexity}
+\usepackage[super,negative]{nth}
+
+\usepackage{cleveref}
+\newcommand{\crefrangeconjunction}{--}
+
+\usepackage{booktabs}
+\usepackage{microtype}
+
+%bib
+\usepackage[maxnames=3,maxbibnames=99,mincrossrefs=5,backend=bibtex]{biblatex}
+%\addbibresource{papers-off.bib}
+%\addbibresource{confs-off.bib}
+%\addbibresource{rfc.bib}
+
+%picky abt et al.
+\usepackage{xpatch}
+
+\xpatchbibmacro{name:andothers}{%
+	\bibstring{andothers}%
+}{%
+	\bibstring[\emph]{andothers}%
+}{}{}
+
+%opening!
+
+\usepackage{hyperref}
+\usepackage{url}
+\hypersetup{
+	colorlinks,
+	citecolor=black,
+	filecolor=black,
+	linkcolor=black,
+	urlcolor=black,
+	pdftitle={Literature + Ideas},
+	pdfauthor={Kyle A. Simpson}
+}
+\newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
+
+%% Enable /thanks
+\IEEEoverridecommandlockouts
+\makeatletter
+\def\footnoterule{\relax%
+	\kern-5pt
+	\hbox to \columnwidth{\hfill\vrule width 0.5\columnwidth height 0.4pt\hfill}
+	\kern4.6pt}
+\makeatother
+
+%-------------------------------------%
+%-------------------------------------%
+
+\title{Dynamically Annealed Reinforcement Learning for Intrusion Prevention}
+\author{Kyle A. Simpson\thanks{This work was supported by the Engineering and Physical Sciences
+		Research Council [grant number EP/M508056/1]},\\\emph{University of Glasgow, Glasgow, Scotland},\\
+		\email{k.simpson.1@research.gla.ac.uk}}
+
+\begin{document}
+
+%% If needed, make urls typewritery
+\urlstyle{tt}
+
+\maketitle
+
+\begin{abstract}
+	Make it look convincing!
+\end{abstract}
+
+\section{Introduction}
+
+Okay here is a... paper?
+
+\section{Initial Definitions}
+
+Testing to see if I get the right header behaviour.
+
+\end{document}
