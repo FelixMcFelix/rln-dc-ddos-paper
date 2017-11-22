@@ -35,7 +35,7 @@ links = []
 
 def trackedLink(src, target):
 	links.append(net.addLink(src, target, **linkopts))
-	print "New link between {} and {}!".format(src.name, target.name)
+	# print "New link between {} and {}!".format(src.name, target.name)
 
 def maybeLink(target):
 	if target <= len(switches):
@@ -52,20 +52,17 @@ for i, el in enumerate(switches):
 for i in xrange(3):
 	trackedLink(hosts[i], switches[i])
 
-print links
-
 net.start()
 
 net.waitConnected()
 
-# net.pingAll()
-
-# print hosts[0].cmd("iperf")
-
 for i, sw in enumerate(switches):
-	sw.sendCmd("python", "agent.py", i, linkopts["bw"], "|", "{}.txt".format(i))
+	sw.sendCmd("python", "agent.py", i, linkopts["bw"], ">", "{}.txt".format(i))
 
-# net.iperf((hosts[1],hosts[2]))
+net.iperf((hosts[1],hosts[2]))
+net.iperf((hosts[0],hosts[1]))
+net.iperf((hosts[0],hosts[2]))
 
 CLI(net)
+
 net.stop()
