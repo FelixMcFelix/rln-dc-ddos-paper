@@ -29,6 +29,8 @@ types['ovs_be64'] = {"size": 8, "align": 8, "ntoh": "ntohll", "hton": "htonll"}
 types['uint16_t'] = {"size": 2, "align": 2, "ntoh": None,     "hton": None}
 types['uint32_t'] = {"size": 4, "align": 4, "ntoh": None,     "hton": None}
 types['uint64_t'] = {"size": 8, "align": 8, "ntoh": None,     "hton": None}
+types['float'] =    {"size": 4, "align": 4, "ntoh": None,     "hton": None}
+types['double'] =   {"size": 8, "align": 8, "ntoh": None,     "hton": None}
 
 line = ""
 

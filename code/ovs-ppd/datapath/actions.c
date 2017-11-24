@@ -1221,6 +1221,16 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		case OVS_ACTION_ATTR_POP_ETH:
 			err = pop_eth(skb, key);
 			break;
+
+		case OVS_ACTION_ATTR_PROBDROP:
+			/* No need to free, taken care of for us
+			   This function just reads the attribute to
+			   hard convert to a float. */
+			if(prob_drop(nla_get_u32(a)))
+			{
+				rem = 0;
+			}
+			break;
 		}
 
 		if (unlikely(err)) {

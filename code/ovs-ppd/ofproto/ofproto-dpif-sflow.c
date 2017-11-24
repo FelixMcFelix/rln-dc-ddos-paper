@@ -1202,6 +1202,7 @@ dpif_sflow_read_actions(const struct flow *flow,
         case OVS_ACTION_ATTR_ENCAP_NSH:
         case OVS_ACTION_ATTR_DECAP_NSH:
 	case OVS_ACTION_ATTR_UNSPEC:
+    case OVS_ACTION_ATTR_PROBDROP:
 	case __OVS_ACTION_ATTR_MAX:
 	default:
 	    break;

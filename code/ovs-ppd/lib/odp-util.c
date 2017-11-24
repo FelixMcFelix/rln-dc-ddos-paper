@@ -122,6 +122,7 @@ odp_action_len(uint16_t type)
     case OVS_ACTION_ATTR_CLONE: return ATTR_LEN_VARIABLE;
     case OVS_ACTION_ATTR_ENCAP_NSH: return ATTR_LEN_VARIABLE;
     case OVS_ACTION_ATTR_DECAP_NSH: return 0;
+    case OVS_ACTION_ATTR_PROBDROP: return sizeof(float);
 
     case OVS_ACTION_ATTR_UNSPEC:
     case __OVS_ACTION_ATTR_MAX:
@@ -1054,6 +1055,11 @@ format_odp_action(struct ds *ds, const struct nlattr *a,
     case OVS_ACTION_ATTR_DECAP_NSH:
         ds_put_cstr(ds, "decap_nsh()");
         break;
+    case OVS_ACTION_ATTR_PROBDROP: {
+        uint32_t p = nl_attr_get_u32(a);
+        ds_put_format(ds, "pdrop(%.2f)", *(float*)&p);
+        break;
+    }
     case OVS_ACTION_ATTR_UNSPEC:
     case __OVS_ACTION_ATTR_MAX:
     default:

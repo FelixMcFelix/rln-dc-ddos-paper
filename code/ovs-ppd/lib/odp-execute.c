@@ -655,6 +655,7 @@ requires_datapath_assistance(const struct nlattr *a)
     case OVS_ACTION_ATTR_CLONE:
     case OVS_ACTION_ATTR_ENCAP_NSH:
     case OVS_ACTION_ATTR_DECAP_NSH:
+    case OVS_ACTION_ATTR_PROBDROP:
         return false;
 
     case OVS_ACTION_ATTR_UNSPEC:
@@ -833,6 +834,19 @@ odp_execute_actions(void *dp, struct dp_packet_batch *batch, bool steal,
 
             DP_PACKET_BATCH_REFILL_FOR_EACH (i, num, packet, batch) {
                 if (decap_nsh(packet)) {
+                    dp_packet_batch_refill(batch, packet, i);
+                } else {
+                    dp_packet_delete(packet);
+                }
+            }
+            break;
+        }
+        case OVS_ACTION_ATTR_PROBDROP: {
+            size_t i;
+            const size_t num = dp_packet_batch_size(batch);
+
+            DP_PACKET_BATCH_REFILL_FOR_EACH (i, num, packet, batch) {
+                if (!prob_drop(nl_attr_get_u32(a))) {
                     dp_packet_batch_refill(batch, packet, i);
                 } else {
                     dp_packet_delete(packet);

@@ -100,6 +100,29 @@ str_to_u32(const char *str, uint32_t *valuep)
     return NULL;
 }
 
+/* Parses 'str' as a 32-bit float into '*valuep'.
+ *
+ * Returns NULL if successful, otherwise a malloc()'d string describing the
+ * error.  The caller is responsible for freeing the returned string. */
+char * OVS_WARN_UNUSED_RESULT
+str_to_f(const char *str, float *valuep)
+{
+    char *tail;
+    float value;
+
+    if (!str[0]) {
+        return xstrdup("missing required numeric argument");
+    }
+
+    errno = 0;
+    value = strtof(str, &tail);
+    if (errno == EINVAL || errno == ERANGE || *tail) {
+        return xasprintf("invalid numeric format %s", str);
+    }
+    *valuep = value;
+    return NULL;
+}
+
 /* Parses 'str' as an 64-bit unsigned integer into '*valuep'.
  *
  * Returns NULL if successful, otherwise a malloc()'d string describing the

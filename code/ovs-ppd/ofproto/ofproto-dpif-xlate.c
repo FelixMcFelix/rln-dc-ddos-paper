@@ -6554,6 +6554,16 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             ctx_trigger_freeze(ctx);
             a = ofpact_next(a);
             break;
+
+        case OFPACT_PROBDROP: {
+            /* Get the probability, if we need to drop set self to last action. */
+            struct ofpact_probdrop *ofpd = ofpact_get_PROBDROP(a);
+            float prob = ofpd->prob;
+
+            nl_msg_put_u32(ctx->odp_actions, OVS_ACTION_ATTR_PROBDROP, *(uint32_t*)&prob);
+
+            break;
+        }
         }
 
         /* Check if need to store this and the remaining actions for later

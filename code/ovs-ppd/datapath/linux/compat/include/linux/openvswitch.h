@@ -902,6 +902,7 @@ enum ovs_nat_attr {
  * tunnel header.
  * @OVS_ACTION_ATTR_METER: Run packet through a meter, which may drop the
  * packet, or modify the packet (e.g., change the DSCP field).
+ * @OVS_ACTION_ATTR_PROBDROP: Drop packet, given some known probability.
  */
 
 enum ovs_action_attr {
@@ -933,6 +934,8 @@ enum ovs_action_attr {
 	OVS_ACTION_ATTR_ENCAP_NSH,    /* struct ovs_action_encap_nsh. */
 	OVS_ACTION_ATTR_DECAP_NSH,    /* No argument. */
 #endif
+	OVS_ACTION_ATTR_PROBDROP,     /* float32, probability in (0,1] */
+
 	__OVS_ACTION_ATTR_MAX,	      /* Nothing past this will be accepted
 				       * from userspace. */
 
