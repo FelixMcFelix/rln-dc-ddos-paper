@@ -1097,6 +1097,14 @@ static int execute_recirc(struct datapath *dp, struct sk_buff *skb,
 	return clone_execute(dp, skb, key, recirc_id, NULL, 0, last, true);
 }
 
+static bool prob_drop(uint32_t prob)
+{
+	unsigned int roll_i;
+	get_random_bytes(&roll_i, sizeof(roll_i));
+
+	return roll_i > prob;
+}
+
 /* Execute a list of actions against 'skb'. */
 static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 			      struct sw_flow_key *key,
@@ -1225,7 +1233,7 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		case OVS_ACTION_ATTR_PROBDROP:
 			/* No need to free, taken care of for us
 			   This function just reads the attribute to
-			   hard convert to a float. */
+			   know if we should drop. */
 			if(prob_drop(nla_get_u32(a)))
 			{
 				rem = 0;

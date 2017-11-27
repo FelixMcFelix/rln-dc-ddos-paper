@@ -1441,6 +1441,6 @@ BUILD_ASSERT_DECL(DNS_HEADER_LEN == sizeof(struct dns_header));
 #define DNS_CLASS_IN            0x01
 #define DNS_DEFAULT_RR_TTL      3600
 
-bool prob_drop(uint32_t almost_prob);
+bool prob_drop(uint32_t prob);
 
 #endif /* packets.h */

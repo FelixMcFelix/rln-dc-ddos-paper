@@ -1785,13 +1785,13 @@ IP_ECN_set_ce(struct dp_packet *pkt, bool is_ipv6)
     }
 }
 
-/* Hard cast the attribute to float, then ask for a random number.
+/* Ask for a random number.
    "p" is the amount we should let through, here true means drop,
    false means let it pass on */
 bool
-prob_drop(uint32_t almost_prob)
+prob_drop(uint32_t prob)
 {
-    float p = *(float*)&almost_prob;
-    float roll = rand()/(float)RAND_MAX;
-    return roll > p;
+    unsigned int roll_i;
+    random_bytes(&roll_i, sizeof(roll_i));
+    return roll_i > prob;
 }

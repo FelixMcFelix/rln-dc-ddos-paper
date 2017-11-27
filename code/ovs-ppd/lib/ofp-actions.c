@@ -348,7 +348,7 @@ enum ofp_raw_action_type {
     /* NX1.3+(47): struct nx_action_decap, ... */
     NXAST_RAW_DECAP,
 
-    /* OF1.0+(29): float. */
+    /* OF1.0+(29): uint32_t. */
     OFPAT_RAW_PROBDROP,
 
 /* ## ------------------ ## */
@@ -6970,14 +6970,14 @@ encode_PROBDROP(const struct ofpact_probdrop *prob,
                     enum ofp_version ofp_version OVS_UNUSED,
                     struct ofpbuf *out)
 {
-    float p = prob->prob;
+    uint32_t p = prob->prob;
 
     put_OFPAT_PROBDROP(out, p);
 }
 
 /* Hmm. */
 static enum ofperr
-decode_OFPAT_RAW_PROBDROP(float prob,
+decode_OFPAT_RAW_PROBDROP(uint32_t prob,
                             enum ofp_version ofp_version OVS_UNUSED,
                             struct ofpbuf *out)
 {
@@ -6990,7 +6990,7 @@ static char * OVS_WARN_UNUSED_RESULT
 parse_prob(char *arg, struct ofpbuf *ofpacts)
 {
     struct ofpact_probdrop *probdrop;
-    float prob;
+    uint32_t prob;
     char *error;
 
     /* Simple key-value walker. Useful for complex actions. */
@@ -6998,7 +6998,7 @@ parse_prob(char *arg, struct ofpbuf *ofpacts)
     char *value;
     while (ofputil_parse_key_value(&arg, &key, &value)) {
         if (!strcmp(key, "P_send")) {
-            error = str_to_f(value, &prob);
+            error = str_to_u32(value, &prob);
         } else {
             return xasprintf("invalid key '%s' in probdrop argument",
                                 key);
@@ -7028,7 +7028,7 @@ format_PROBDROP(const struct ofpact_probdrop *a,
                     const struct ofputil_port_map *port_map OVS_UNUSED,
                     struct ds *s)
 {
-    ds_put_format(s, "%sP_send:%s%.2f",
+    ds_put_format(s, "%sP_send:%s%"PRIu32,
                     colors.param, colors.end, a->prob);
 }
 

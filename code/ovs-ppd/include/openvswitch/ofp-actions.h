@@ -1019,7 +1019,7 @@ struct ofpact_decap {
  * Used for OFPAT_PROBDROP */
 struct ofpact_probdrop {
     struct ofpact ofpact;
-    float prob;           /* Float probability, punned to int on receipt. */
+    uint32_t prob;           /* Uint probability, "covers" 0->1 range. */
 };
 
 /* Converting OpenFlow to ofpacts. */
