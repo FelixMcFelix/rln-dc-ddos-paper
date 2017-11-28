@@ -6993,19 +6993,8 @@ parse_prob(char *arg, struct ofpbuf *ofpacts)
     uint32_t prob;
     char *error;
 
-    /* Simple key-value walker. Useful for complex actions. */
-    char *key;
-    char *value;
-    while (ofputil_parse_key_value(&arg, &key, &value)) {
-        if (!strcmp(key, "P_send")) {
-            error = str_to_u32(value, &prob);
-        } else {
-            return xasprintf("invalid key '%s' in probdrop argument",
-                                key);
-        }
-
-        if (error) return error;
-    }
+    error = str_to_u32(arg, &prob);
+    if (error) return error;
 
     probdrop = ofpact_put_PROBDROP(ofpacts);
     probdrop->prob = prob;
@@ -7028,7 +7017,7 @@ format_PROBDROP(const struct ofpact_probdrop *a,
                     const struct ofputil_port_map *port_map OVS_UNUSED,
                     struct ds *s)
 {
-    ds_put_format(s, "%sP_send:%s%"PRIu32,
+    ds_put_format(s, "%"PRIu32,
                     colors.param, colors.end, a->prob);
 }
 
