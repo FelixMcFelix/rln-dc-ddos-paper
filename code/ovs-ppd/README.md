@@ -5,6 +5,6 @@ Open vSwitch modified to support a new action, "probdrop" (on some integer proba
 To get it going in mininet:
 ```sh
 ./premake.sh
-make install
-sudo kernupdate.sh
+sudo make install
+sudo sh kernupdate.sh
 ```
