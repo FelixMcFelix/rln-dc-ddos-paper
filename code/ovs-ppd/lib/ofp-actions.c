@@ -7017,8 +7017,7 @@ format_PROBDROP(const struct ofpact_probdrop *a,
                     const struct ofputil_port_map *port_map OVS_UNUSED,
                     struct ds *s)
 {
-    ds_put_format(s, "%"PRIu32,
-                    colors.param, colors.end, a->prob);
+    ds_put_format(s, "%"PRIu32, a->prob);
 }
 
 static void
