@@ -1,2 +1,2 @@
 ./boot.sh
-./configure --prefix=/usr --with-linux=/lib/modules/`uname -r`/build
+./configure --prefix=/usr --with-linux=/lib/modules/`uname -r`/build CFLAGS="-g"

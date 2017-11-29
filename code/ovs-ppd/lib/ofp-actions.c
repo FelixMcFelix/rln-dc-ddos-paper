@@ -6981,7 +6981,10 @@ decode_OFPAT_RAW_PROBDROP(uint32_t prob,
                             enum ofp_version ofp_version OVS_UNUSED,
                             struct ofpbuf *out)
 {
-    ofpact_put_PROBDROP(out)->prob = prob;
+    struct ofpact_probdrop *op;
+    op = ofpact_put_PROBDROP(out);
+    op->prob = prob;
+    
     return 0;
 }
 
