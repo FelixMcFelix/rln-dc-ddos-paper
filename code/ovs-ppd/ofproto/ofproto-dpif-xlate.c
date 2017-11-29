@@ -6559,11 +6559,13 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             a = ofpact_next(a);
             break;
 
-        case OFPACT_PROBDROP:
-            nl_msg_put_u32(ctx->odp_actions, OVS_ACTION_ATTR_PROBDROP,
-                ofpact_get_PROBDROP(a)->prob);
+        case OFPACT_PROBDROP: {
+            struct ofpact_probdrop *op = ofpact_get_PROBDROP(a);
+            uint32_t prob = op-> prob;
+            nl_msg_put_u32(ctx->odp_actions, OVS_ACTION_ATTR_PROBDROP, prob);
 
             break;
+	}
         }
 
         /* Check if need to store this and the remaining actions for later
