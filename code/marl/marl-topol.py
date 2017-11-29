@@ -1,5 +1,5 @@
 from mininet.topo import Topo
-from mininet.node import OVSSwitch
+from mininet.node import OVSSwitch, RemoteController
 from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.net import Mininet
@@ -25,7 +25,7 @@ Cleanup.cleanup()
 net = Mininet(link=TCLink)#, autoStaticArp=True)
 
 # Turns out this is real important. Whoooops...
-net.addController()
+net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
 
 # Okay, switches exist and have a tree like topology (s1 is the "head")
 # Suppose for now hat they all have the same (low) bandwidth.
@@ -55,13 +55,14 @@ for i in xrange(3):
 net.start()
 
 net.waitConnected()
+#CLI(net)
 
 for i, sw in enumerate(switches):
 	sw.sendCmd("python", "agent.py", i, linkopts["bw"], ">", "{}.txt".format(i))
 
-net.iperf((hosts[1],hosts[2]))
-net.iperf((hosts[0],hosts[1]))
-net.iperf((hosts[0],hosts[2]))
+#net.iperf((hosts[1],hosts[2]))
+#net.iperf((hosts[0],hosts[1]))
+#net.iperf((hosts[0],hosts[2]))
 
 CLI(net)
 
