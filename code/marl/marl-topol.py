@@ -25,7 +25,7 @@ Cleanup.cleanup()
 net = Mininet(link=TCLink)#, autoStaticArp=True)
 
 # Turns out this is real important. Whoooops...
-net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
+#net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
 
 # Okay, switches exist and have a tree like topology (s1 is the "head")
 # Suppose for now hat they all have the same (low) bandwidth.
@@ -54,11 +54,28 @@ for i in xrange(3):
 
 net.start()
 
-net.waitConnected()
+#net.waitConnected()
 #CLI(net)
 
 for i, sw in enumerate(switches):
 	sw.sendCmd("python", "agent.py", i, linkopts["bw"], ">", "{}.txt".format(i))
+
+ports = {0: (2,3), 2:(1,2)}
+
+for i in [0,2]:
+	for p in [ports[i]] + [reversed(ports[i])]:
+		net.cmd(
+			"ovs-ofctl addflow s{0} in_port=\"s{0}-eth{1}\",actions=\"s{0}-eth{2}\""
+			.format(i, *p)
+		)
+
+def pdrop(prob):
+	return int(prob * 0xffffffff)
+
+#now corrupt one flow for testing.
+net.cmd("ovs-ofctl addflow s2 in_port=\"s2-eth2\",actions=probdrop:{},\"s2-eth1\"".format(
+	pdrop(0.75)
+))
 
 #net.iperf((hosts[1],hosts[2]))
 #net.iperf((hosts[0],hosts[1]))
