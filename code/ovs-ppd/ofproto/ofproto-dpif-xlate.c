@@ -5798,6 +5798,19 @@ compose_conntrack_action(struct xlate_ctx *ctx, struct ofpact_conntrack *ofc,
 }
 
 static void
+compose_probdrop_action(struct xlate_ctx *ctx, struct ofpact_probdrop *op)
+{
+    uint32_t prob = op->prob;
+    size_t pdrop_offset;
+
+    pdrop_offset = nl_msg_start_nested(
+        ctx->odp_actions,
+        OVS_ACTION_ATTR_PROBDROP);
+    nl_msg_put_u32(ctx->odp_actions, OVS_ACTION_ATTR_PROBDROP, prob);
+    nl_msg_end_nested(ctx->odp_actions, pdrop_offset);
+}
+
+static void
 rewrite_flow_encap_ethernet(struct xlate_ctx *ctx,
                             struct flow *flow,
                             struct flow_wildcards *wc)
@@ -6559,13 +6572,9 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
             a = ofpact_next(a);
             break;
 
-        case OFPACT_PROBDROP: {
-            struct ofpact_probdrop *op = ofpact_get_PROBDROP(a);
-            uint32_t prob = op-> prob;
-            nl_msg_put_u32(ctx->odp_actions, OVS_ACTION_ATTR_PROBDROP, prob);
-
+        case OFPACT_PROBDROP:
+            compose_probdrop_action(ctx, ofpact_get_PROBDROP(a);)
             break;
-	}
         }
 
         /* Check if need to store this and the remaining actions for later
