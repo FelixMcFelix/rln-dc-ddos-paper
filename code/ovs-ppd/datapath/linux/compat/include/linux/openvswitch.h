@@ -934,7 +934,7 @@ enum ovs_action_attr {
 	OVS_ACTION_ATTR_ENCAP_NSH,    /* struct ovs_action_encap_nsh. */
 	OVS_ACTION_ATTR_DECAP_NSH,    /* No argument. */
 #endif
-	OVS_ACTION_ATTR_PROBDROP,     /* unit32_t, probability in [0,2^32 -1] */
+	OVS_ACTION_ATTR_PROBDROP=22,     /* unit32_t, probability in [0,2^32 -1] */
 
 	__OVS_ACTION_ATTR_MAX,	      /* Nothing past this will be accepted
 				       * from userspace. */

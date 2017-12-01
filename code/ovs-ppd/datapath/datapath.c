@@ -974,7 +974,7 @@ static int ovs_flow_cmd_new(struct sk_buff *skb, struct genl_info *info)
 	error = ovs_nla_copy_actions(net, a[OVS_FLOW_ATTR_ACTIONS],
 				     &new_flow->key, &acts, log);
 	if (error) {
-		OVS_NLERR(log, "Flow actions may not be safe on all matching packets.");
+		OVS_NLERR(log, "Flow actions may not be safe on all matching packets: err %d", error);
 		goto err_kfree_flow;
 	}
 
@@ -1094,7 +1094,7 @@ static struct sw_flow_actions *get_flow_actions(struct net *net,
 	error = ovs_nla_copy_actions(net, a, &masked_key, &acts, log);
 	if (error) {
 		OVS_NLERR(log,
-			  "Actions may not be safe on all matching packets");
+			  "Actions may not be safe on all matching packets: err code %d", error);
 		return ERR_PTR(error);
 	}
 
