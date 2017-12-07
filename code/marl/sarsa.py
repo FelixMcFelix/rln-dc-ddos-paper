@@ -85,8 +85,3 @@ class SarsaLearner:
 		self._last_act = (state, new_action, new_value)
 
 		return new_action
-
-
-test = SarsaLearner(20, 3, [0.1*(i) for i in xrange(10)])
-
-print test.bootstrap(tuple(test.tc(np.array([15,10,4]))))
