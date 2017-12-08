@@ -59,12 +59,6 @@ def trackedLink(src, target, extras=None):
 	# links.append(l)
 	return l
 
-def maybeLink(target):
-	if target <= len(switches):
-		si = int(target/2)-1
-		ti = target-1
-		trackedLink(switches[si], switches[ti])
-
 def addHosts(extern, hosts_per_learner, hosts_upper=None):
 	host_count = np.random.randint(hosts_per_learner, hosts_upper)
 
