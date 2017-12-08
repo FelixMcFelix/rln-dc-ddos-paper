@@ -62,13 +62,13 @@ class SarsaLearner:
 		# Select an action:
 		(action, value) = self._select_action(state)
 
-		self._last_act = (state, action, value)
+		self.last_act = (state, action, value)
 
 		return action
 
 	# Ditto. run self.tc(...) on state observation
 	def update(self, state, reward):
-		(last_state, last_action, last_value) = self._last_act
+		(last_state, last_action, last_value) = self.last_act
 
 		# First, what is the value of the action would we choose in the new state w/ old model
 		(new_action, new_value) = self._select_action(state)
@@ -82,6 +82,6 @@ class SarsaLearner:
 		self._curr_epsilon = (1 - self._step_count/float(self.epsilon_falloff)) * self.epsilon
 		self._step_count += 1
 
-		self._last_act = (state, new_action, new_value)
+		self.last_act = (state, new_action, new_value)
 
 		return new_action
