@@ -83,21 +83,26 @@ def routedSwitch(upstreamNode, **args):
 	updateUpstreamRoute(sw)
 	return sw
 
-def enactAction(learners):
+def enactActions(learners):
 	for (node, sarsa) in learners:
 		(_, action, _) = sarsa.last_act
 		updateUpstreamRoute(node, ac_prob=action)
 
-def addHosts(extern, hosts_per_learner, hosts_upper=None):
+def addHosts(extern, hosts_per_learner, hosts_upper):
 	host_count = np.random.randint(hosts_per_learner, hosts_upper)
 
 	hosts = []
 
 	for i in xrange(host_count):
 		new_host = net.addHost()
-		trackedLink(extern, new_host)
-		hosts.append(new_host)
+		good = np.random.uniform() < P_good
+		bw = (np.random.uniform(*(good_range if good else bad_range)))
 
+		trackedLink(extern, new_host, {"bw": bw})
+
+		hosts.append(
+			(new_host, good, bw)
+		)
 	return hosts
 
 def makeTeam(parent, inter_count, learners_per_inter):
@@ -187,16 +192,6 @@ for ep in xrange(episodes):
 		l_teams.append(n_team)
 	teams = l_teams
 
-	# per-host stuff
-	good = []
-	bw = []
-	for host in allhosts:
-		good_host = np.random.uniform() < P_good
-		good.append(good_host)
-		bw.append(
-			np.random.uniform(*(good_range if good_host else bad_range))
-		)
-
 	# reset network model to default rules.
 	for (_, _, learners, _, _) in teams:
 		for (node, sarsa) in learners:
@@ -207,27 +202,37 @@ for ep in xrange(episodes):
 
 	# TODO: pypcap monitor elected switches for reward functions.
 	# TODO: gen traffic at each host
-	# TODO: update master link's bandwidth limit after host init.
+	
+	# Update master link's bandwidth limit after host init.
+	core_link.config(bw=calc_max_capacity(len(all_hosts)))
 
+	# Begin the new episode!
 	net.start()
 
 	for i in xrange(episode_length):
 		# Make the last actions a reality!
 		for (_, _, learners, _, _) in teams:
-			enactAction(learners)
+			enactActions(learners)
 
 		# Wait, somehow
 		time.sleep(dt)
 
 		for (leader, intermediates, learners, _, _) in teams:
-			# Measure state!
+			# Measure good/bad loads!
 			# TODO
 
 			# Compute reward!
 			# TODO
+			reward = 0
 
-			# Learn!
-			# TODO
+			for (node, sarsa) in learners:
+				# Encode state (as seen by this learner)
+				# TODO
+				statevec = np.zeros(sarsaParams[vec_size])
+				state = sarsa.tc(statevec)
+
+				# Learn!
+				sarsa.update(state, reward)
 
 	net.stop()
 
