@@ -8,6 +8,7 @@ from mininet.clean import Cleanup
 import numpy as np
 import pypcap
 from sarsa import SarsaLearner
+import time
 
 # config
 linkopts = {"bw": 10}
@@ -34,6 +35,8 @@ alpha = 0.05
 epsilon = 0.3
 discount = 0
 
+dt = 0.05
+
 # gen
 
 sarsaParams = {
@@ -59,6 +62,32 @@ def trackedLink(src, target, extras=None):
 	# links.append(l)
 	return l
 
+def updateUpstreamRoute(switch, out_port=0, ac_prob=0.0):
+	# Turn from prob_drop into prob_send!
+	prob = ac_prob - 1
+	name = switch.name
+	p_drop = "" if ac_prob == 0.0 else "probdrop:{},".format(pdrop(prob))
+
+	# really lazy -- big one-directional route. But that's all we need for now.
+	net.cmd(
+		"sh",
+		"ovs-ofctl",
+		"addflow",
+		name,
+		"in_port=*,actions={}\"{}-eth{}\"".format(p_drop, name, out_port)
+	)
+
+def routedSwitch(upstreamNode, **args):
+	sw = net.addSwitch(**args)
+	trackedLink(upstreamNode, sw)
+	updateUpstreamRoute(sw)
+	return sw
+
+def enactAction(learners):
+	for (node, sarsa) in learners:
+		(_, action, _) = sarsa.last_act
+		updateUpstreamRoute(node, ac_prob=action)
+
 def addHosts(extern, hosts_per_learner, hosts_upper=None):
 	host_count = np.random.randint(hosts_per_learner, hosts_upper)
 
@@ -75,8 +104,7 @@ def makeTeam(parent, inter_count, learners_per_inter):
 	if hosts_upper is None:
 		hosts_upper = hosts_per_learner
 
-	leader = net.addSwitch()
-	trackedLink(parent, leader)
+	leader = routedSwitch(parent)
 
 	intermediates = []
 	learners = []
@@ -84,29 +112,22 @@ def makeTeam(parent, inter_count, learners_per_inter):
 	hosts = []
 
 	for i in xrange(inter_count):
-		new_interm = net.addSwitch()
-		trackedLink(leader, new_interm)
+		new_interm = routedSwitch(leader)
 		intermediates.append(new_interm)
 
 		for j in xrange(learners_per_inter):
-			new_learn = net.addSwitch()
-			trackedLink(new_interm, new_learn)
+			new_learn = routedSwitch(new_interm)
 
 			# Init and pair the actual learning agent here, too!
-			# Assume initial state is all zeroes
-			# Use the "last_act" so we know what to expect.
+			# Bootstrapping happens later -- per-episode, in the 0-load state.
 			sar = SarsaLearner(**sarsaParams)
-			sar.bootstrap(sar.tc(np.zeros(sarsaParams[vec_size])))
 			
 			learners.append(
 				(new_learn, SarsaLearner(**sarsaParams))
 			)
 
-			new_extern = net.addSwitch()
-			trackedLink(new_extern, new_learn)
+			new_extern = routedSwitch(new_learn)
 			extern_switches.append(new_extern)
-
-	# TODO: put in rules w/ dpctl for routing
 
 	return (leader, intermediates, learners, extern_switches, hosts)
 
@@ -123,8 +144,6 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 
 	for extern in extern_switches:
 		new_hosts += addHosts(extern, hosts_per_learner, hosts_upper)
-
-	# TODO: dpctl routing from extern inwards.
 
 	return (leader, intermediates, learners, extern_switches, new_hosts)
 
@@ -143,9 +162,6 @@ def buildNet(n_teams):
 
 def pdrop(prob):
 	return int(prob * 0xffffffff)
-
-def enactAction(learners):
-	pass # TODO
 
 ### THE EXPERIMENT? ###
 
@@ -177,22 +193,31 @@ for ep in xrange(episodes):
 	for host in allhosts:
 		good_host = np.random.uniform() < P_good
 		good.append(good_host)
-		bw.append(np.random.uniform(
-			*(good_range if good_host else bad_range)
+		bw.append(
+			np.random.uniform(*(good_range if good_host else bad_range))
 		)
 
 	# reset network model to default rules.
-	# TODO -- dpctl?
+	for (_, _, learners, _, _) in teams:
+		for (node, sarsa) in learners:
+			updateUpstreamRoute(node)
 
-	# TODO: map each switch to its upstream link. (s*-eth0 should always be "upstream")
+			# Assume initial state is all zeroes (new network)
+			sarsa.bootstrap(sar.tc(np.zeros(sarsaParams[vec_size])))
+
 	# TODO: pypcap monitor elected switches for reward functions.
 	# TODO: gen traffic at each host
+	# TODO: update master link's bandwidth limit after host init.
 
 	net.start()
 
 	for i in xrange(episode_length):
+		# Make the last actions a reality!
+		for (_, _, learners, _, _) in teams:
+			enactAction(learners)
+
 		# Wait, somehow
-		# TODO
+		time.sleep(dt)
 
 		for (leader, intermediates, learners, _, _) in teams:
 			# Measure state!
@@ -206,41 +231,4 @@ for ep in xrange(episodes):
 
 	net.stop()
 
-# for i, el in enumerate(switches):
-# 	ti = i + 1
-# 	maybeLink(2*ti)
-# 	maybeLink(2*ti + 1)
-
-# # Fix this later to target head, then leaves.
-# for i in xrange(3):
-# 	trackedLink(hosts[i], switches[i])
-
-# net.start()
-
-#net.waitConnected()
-#CLI(net)
-
-# for i, sw in enumerate(switches):
-# 	sw.sendCmd("python", "agent.py", i, linkopts["bw"], ">", "{}.txt".format(i))
-
-# ports = {0: (2,3), 2:(1,2)}
-
-# for i in [0,2]:
-# 	for p in [ports[i]] + [reversed(ports[i])]:
-# 		net.cmd(
-# 			"ovs-ofctl addflow s{0} in_port=\"s{0}-eth{1}\",actions=\"s{0}-eth{2}\""
-# 			.format(i, *p)
-# 		)
-
-#now corrupt one flow for testing.
-# net.cmd("ovs-ofctl addflow s2 in_port=\"s2-eth2\",actions=probdrop:{},\"s2-eth1\"".format(
-# 	pdrop(0.75)
-# ))
-
-#net.iperf((hosts[1],hosts[2]))
-#net.iperf((hosts[0],hosts[1]))
-#net.iperf((hosts[0],hosts[2]))
-
-# CLI(net)
-
-# net.stop()
+# Run intersting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
