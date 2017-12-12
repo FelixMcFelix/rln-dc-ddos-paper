@@ -11,7 +11,9 @@ from sarsa import SarsaLearner
 import time
 
 # config
-linkopts = {"bw": 10}
+linkopts = {
+#	"bw": 10
+}
 
 n_teams = 1
 # per-team options
@@ -155,7 +157,7 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 def buildNet(n_teams):
 	server = host.addHost()
 	server_switch = host.addSwitch()
-	core_link = trackedLink(server, server_switch, {"bw": 10}) # TODO: set accurately.
+	core_link = trackedLink(server, server_switch)
 
 	teams = []
 	for i in xrange(n_teams):
@@ -203,7 +205,7 @@ for ep in xrange(episodes):
 	# TODO: pypcap monitor elected switches for reward functions.
 	# TODO: gen traffic at each host
 	
-	# Update master link's bandwidth limit after host init.
+	# Update master link's bandwidth limit after hosts init.
 	core_link.config(bw=calc_max_capacity(len(all_hosts)))
 
 	# Begin the new episode!
@@ -222,7 +224,7 @@ for ep in xrange(episodes):
 			# TODO
 
 			# Compute reward!
-			# TODO
+			# TODO - relies on good/bad loads...
 			reward = 0
 
 			for (node, sarsa) in learners:
@@ -236,4 +238,4 @@ for ep in xrange(episodes):
 
 	net.stop()
 
-# Run intersting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
+# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
