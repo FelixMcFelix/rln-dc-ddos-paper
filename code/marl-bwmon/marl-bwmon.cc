@@ -82,8 +82,8 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 	PcapLoopParams *params = reinterpret_cast<PcapLoopParams *>(user);
 
 	// Look at the packet, decide good/bad, then increment!
-	
-	
+	// Establish the facts: HERE.
+
 	params->stats.incrementStat(params->index, true, h->len);
 
 	if (params->stats.finished())
