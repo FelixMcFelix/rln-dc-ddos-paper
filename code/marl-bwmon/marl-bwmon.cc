@@ -8,6 +8,9 @@
 #include <thread>
 #include <vector>
 
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 #include <pcap/pcap.h>
 
 class InterfaceStats
@@ -69,22 +72,50 @@ private:
 };
 
 struct PcapLoopParams {
-	PcapLoopParams(InterfaceStats &s, pcap_t *p, int i)
-		: stats(s), iface(p), index(i)
+	PcapLoopParams(InterfaceStats &s, pcap_t *p, int i, int link)
+		: stats(s), iface(p), index(i), linkType(link)
 	{
 	}
 	InterfaceStats &stats;
 	pcap_t *iface;
 	const int index;
+	const int linkType;
 };
 
-static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
+static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_char *data) {
 	PcapLoopParams *params = reinterpret_cast<PcapLoopParams *>(user);
 
 	// Look at the packet, decide good/bad, then increment!
 	// Establish the facts: HERE.
+	// Okay, we can read up to h->caplen bytes from data.
+	bool good = false;
 
-	params->stats.incrementStat(params->index, true, h->len);
+	switch (params->linkType) {
+		case DLT_NULL:
+			std::cout << "null linktype (?)" << std::endl;
+			break;
+		case DLT_EN10MB: {
+			// jump in 14 bytes, hope for IPv4. Only do v4 because LAZY.
+			// Source addr is 12 further octets in.
+			auto ip = *reinterpret_cast<const uint32_t *>(data + 26);
+
+			// Another assumption, we're little endian.
+			good = ((ip & 0xff000000) >> 24 % 2) == 0;
+
+			// struct in_addr addr { s_addr: ip };
+			// char *ip_str = inet_ntoa(addr);
+			// std::cout << "message from: " << ip_str << " " << good << std::endl;
+			break;
+		}
+		case DLT_RAW:
+			std::cout << "ip linktype" << std::endl;
+			break;
+		default:
+			std::cerr << "Unknown linktype for iface "
+				<< params->index << ": saw " << params->linkType << std::endl;
+	}
+
+	params->stats.incrementStat(params->index, good, h->len);
 
 	if (params->stats.finished())
 		pcap_breakloop(params->iface);
@@ -109,7 +140,8 @@ static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &sta
 		std::cerr << std::endl;
 	}
 
-	auto params = PcapLoopParams(stats, iface, index);
+	int linkType = pcap_datalink(iface);
+	auto params = PcapLoopParams(stats, iface, index, linkType);
 
 	pcap_loop(iface, -1, perPacketHandle, reinterpret_cast<u_char *>(&params));
 
