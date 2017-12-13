@@ -5,9 +5,11 @@ from mininet.cli import CLI
 from mininet.net import Mininet
 from mininet.clean import Cleanup
 
+import itertools
 import numpy as np
 import pypcap
 from sarsa import SarsaLearner
+from subprocess import PIPE
 import time
 
 # config
@@ -184,6 +186,16 @@ net = Mininet(link=TCLink)
 # build network model once, remove/reattach/reclassify hosts per-episode
 (server, server_switch, core_link, teams) = buildNet(n_teams)
 
+tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
+	[leader] + intermediates + [l[0] for l in learners] for (leader, intermediates, learners, _, _) in teams
+]))
+
+tracked_interfaces = ["{}-eth0".format(el.name) for el in tracked_switches]
+
+switch_list_indices = {}
+for i, name in enumerate(tracked_switches):
+	switch_list_indices[name] = i
+
 for ep in xrange(episodes):
 	# remake/reclassify hosts
 	all_hosts = []
@@ -201,15 +213,21 @@ for ep in xrange(episodes):
 
 			# Assume initial state is all zeroes (new network)
 			sarsa.bootstrap(sar.tc(np.zeros(sarsaParams[vec_size])))
-
-	# TODO: pypcap monitor elected switches for reward functions.
-	# TODO: gen traffic at each host
 	
 	# Update master link's bandwidth limit after hosts init.
 	core_link.config(bw=calc_max_capacity(len(all_hosts)))
 
 	# Begin the new episode!
 	net.start()
+
+	# Spool up the monitoring tool.
+	mon_cmd = server_switch.popen(
+		["sudo", "../marl-bwmon/marl-bwmon"] + tracked_interfaces,
+		stdin=PIPE
+	)
+
+	# TODO: write reward functions.
+	# TODO: gen traffic at each host.
 
 	for i in xrange(episode_length):
 		# Make the last actions a reality!
@@ -221,7 +239,12 @@ for ep in xrange(episodes):
 
 		for (leader, intermediates, learners, _, _) in teams:
 			# Measure good/bad loads!
-			# TODO
+			mon_cmd.stdin.write("\n")
+			data = mon_cmd.stout.readline().strip().split(",")
+			load_bytes = [int(el.strip().split(" ")) for el in data[1:]]
+
+			time_ns = int(data[0][:-2])
+			# TODO - parse, get ratios, get speeds, categorise by e.g. team
 
 			# Compute reward!
 			# TODO - relies on good/bad loads...
@@ -235,6 +258,9 @@ for ep in xrange(episodes):
 
 				# Learn!
 				sarsa.update(state, reward)
+
+	# End this monitoring instance.
+	mon_cmd.stdin.close()
 
 	net.stop()
 
