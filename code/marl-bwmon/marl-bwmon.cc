@@ -14,34 +14,40 @@ class InterfaceStats
 {
 public:
 	InterfaceStats(int numInterfaces) {
-		bad_byte_counts_ = std::vector<uint64_t>(numInterfaces, 0);
-		good_byte_counts_ = std::vector<uint64_t>(numInterfaces, 0);
+		badByteCounts_ = std::vector<uint64_t>(numInterfaces, 0);
+		goodByteCounts_ = std::vector<uint64_t>(numInterfaces, 0);
 	}
 
 	void incrementStat(int interface, bool good, uint32_t packetSize) {
 		std::shared_lock<std::shared_mutex> lock(mutex_);
 
 		if (good) 
-			good_byte_counts_[interface] += packetSize;
+			goodByteCounts_[interface] += packetSize;
 		else
-			bad_byte_counts_[interface] += packetSize;
+			badByteCounts_[interface] += packetSize;
 	}
 
-	void clearAndPrintStats() {
+	void clearAndPrintStats(std::chrono::high_resolution_clock::time_point startTime) {
 		std::unique_lock<std::shared_mutex> lock(mutex_);
-		
-		for (unsigned int i = 0; i < bad_byte_counts_.size(); ++i)
-		{
-			if (i > 0) std::cout << ", ";
 
-			std::cout << good_byte_counts_[i] << " " << bad_byte_counts_[i];
+		auto endTime = std::chrono::high_resolution_clock::now();
+		auto duration = endTime - startTime;
+
+		std::cout << std::chrono::nanoseconds(duration).count() << "ns";
+		
+		for (unsigned int i = 0; i < badByteCounts_.size(); ++i)
+		{
+			std::cout << ", ";
+
+			std::cout << goodByteCounts_[i] << " " << badByteCounts_[i];
 		}
 
 		std::cout << std::endl;
 
-		for (auto &el: good_byte_counts_)
+		// Empty the stats.
+		for (auto &el: goodByteCounts_)
 			el = 0;
-		for (auto &el: bad_byte_counts_)
+		for (auto &el: badByteCounts_)
 			el = 0;
 	}
 
@@ -56,20 +62,54 @@ public:
 	}
 
 private:
-	std::vector<uint64_t> bad_byte_counts_;
-	std::vector<uint64_t> good_byte_counts_;
+	std::vector<uint64_t> badByteCounts_;
+	std::vector<uint64_t> goodByteCounts_;
 	bool end_ = false;
 	mutable std::shared_mutex mutex_;
 };
 
-static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &stats) {
-	pcap_activate(iface);
-
-	while (not stats.finished()) {
-		// Something. Read pcaps I guess.
-		stats.incrementStat(index, true, 64);
-		stats.incrementStat(index, false, 32);
+struct PcapLoopParams {
+	PcapLoopParams(InterfaceStats &s, pcap_t *p, int i)
+		: stats(s), iface(p), index(i)
+	{
 	}
+	InterfaceStats &stats;
+	pcap_t *iface;
+	const int index;
+};
+
+static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_char *bytes) {
+	PcapLoopParams *params = reinterpret_cast<PcapLoopParams *>(user);
+
+	// Look at the packet, decide good/bad, then increment!
+	params->stats.incrementStat(params->index, true, h->len);
+
+	if (params->stats.finished())
+		pcap_breakloop(params->iface);
+}
+
+static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &stats) {
+	int err = 0;
+	if((err = pcap_activate(iface))) {
+		std::cerr << "iface " << index << " could not be initialised: ";
+
+		switch (err) {
+			case PCAP_ERROR_NO_SUCH_DEVICE:
+				std::cerr << "no such device.";
+				break;
+			case PCAP_ERROR_PERM_DENIED:
+				std::cerr << "bad permissions; run as sudo?";
+				break;
+			default:
+				std::cerr << "something unknown.";
+		}
+
+		std::cerr << std::endl;
+	}
+
+	auto params = PcapLoopParams(stats, iface, index);
+
+	pcap_loop(iface, -1, perPacketHandle, reinterpret_cast<u_char *>(&params));
 
 	pcap_close(iface);
 	std::this_thread::yield();
@@ -80,6 +120,22 @@ void do_join(std::thread& t)
 	t.join();
 }
 
+void listDevices(char *errbuf) {
+	pcap_if_t *devs = nullptr;
+	pcap_findalldevs(&devs, errbuf);
+
+	while (devs != nullptr) {
+		std::cout << devs->name;
+		if (devs->description != nullptr)
+			std::cout << ": " << devs->description;
+
+		std::cout << std::endl;
+		devs = devs->next;
+	}
+
+	pcap_freealldevs(devs);
+}
+
 int main(int argc, char const *argv[])
 {
 	char errbuf[PCAP_ERRBUF_SIZE];
@@ -88,10 +144,25 @@ int main(int argc, char const *argv[])
 
 	std::vector<std::thread> workers;
 
+	if (numInterfaces == 0) {
+		listDevices(errbuf);
+		return 0;
+	}
+
+	auto startTime = std::chrono::high_resolution_clock::now();
+
+	bool err = false;
+
 	for (int i = 0; i < numInterfaces; ++i)
 	{
 		/* iterate over iface names, spawn threads! */
 		auto p = pcap_create(argv[i+1], errbuf);
+
+		if (p == nullptr) {
+			err = true;
+			std::cerr << errbuf << std::endl;
+			break;
+		}
 
 		// Can't copy or move these for whatever reason, so must emplace.
 		// i.e. init RIGHT IN THE VECTOR
@@ -99,13 +170,19 @@ int main(int argc, char const *argv[])
 	}
 
 	// Now block on next user input.
+	std::string lineInput;
 
-	// Sleep for now while I figure out the best way to do that.
-	{
-		using namespace std::chrono_literals;
-		std::this_thread::sleep_for(5s);
+	if (!err){
+		while (1) {
+			// Any (non-EOF) line will produce more output.
+			std::getline(std::cin, lineInput);
+
+			if (std::cin.eof()) break;
+
+			stats.clearAndPrintStats(startTime);
+			startTime = std::chrono::high_resolution_clock::now();
+		}
 	}
-	stats.clearAndPrintStats();
 
 	// Kill and cleanup if they send a signal or whatever.
 	stats.signalEnd();
