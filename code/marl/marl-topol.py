@@ -41,6 +41,29 @@ discount = 0
 
 dt = 0.05
 
+# reward functions: choose wisely!
+
+def std_marl(total_svr_load, legit_svr_load, true_legit_svr_load,
+		total_leader_load, legit_leader_load, true_legit_leader_load,
+		num_teams, max_load):
+	svr_fail = total_svr_load > max_load
+	return -1 if svr_fail else legit_svr_load/true_legit_svr_load
+
+def itl(total_svr_load, legit_svr_load, true_legit_svr_load,
+		total_leader_load, legit_leader_load, true_legit_leader_load,
+		num_teams, max_load):
+	leader_fail = total_leader_load > (float(max_load)/num_teams)
+	return -1 if leader_fail else legit_leader_load/true_legit_leader_load
+
+def ctl(total_svr_load, legit_svr_load, true_legit_svr_load,
+		total_leader_load, legit_leader_load, true_legit_leader_load,
+		num_teams, max_load):
+	svr_fail = total_svr_load > max_load
+	leader_fail = total_leader_load > (float(max_load)/num_teams)
+	return -1 if (svr_fail and leader_fail) else legit_leader_load/true_legit_leader_load
+
+reward_func = ctl
+
 # gen
 
 sarsaParams = {
@@ -146,7 +169,7 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 
 	(leader, intermediates, learners, extern_switches, hosts) = team
 
-	for host in hosts:
+	for (host, _, _) in hosts:
 		net.delHost(host)
 
 	new_hosts = []
@@ -193,29 +216,53 @@ tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
 tracked_interfaces = ["{}-eth0".format(el.name) for el in tracked_switches]
 
 switch_list_indices = {}
-for i, name in enumerate(tracked_switches):
-	switch_list_indices[name] = i
+for i, sw in enumerate(tracked_switches):
+	switch_list_indices[sw.name] = i
 
 for ep in xrange(episodes):
 	# remake/reclassify hosts
 	all_hosts = []
 	l_teams = []
+
+	bw_teams = []
+	# good, bad, total
+	bw_all = [0.0 for i in xrange(3)]
+
+	# Assign hosts again, and memorise the load they intend to push.
 	for team in teams:
-		n_team = makeHosts(team, *host_range)
-		all_hosts += n_team[4]
-		l_teams.append(n_team)
+		new_team = makeHosts(team, *host_range)
+		new_hosts = new_team[4]
+
+		# need to know the intended loads of each class (overall and per-team).
+		# good, bad, total
+		bw_stats = [0.0 for i in xrange(3)]
+		for (host, good, bw) in new_hosts:
+			if good:
+				bw_stats[0] += bw
+				bw_all[0] += bw
+			else:
+				bw_stats[1] += bw
+				bw_all[1] += bw
+			bw_stats[2] += bw
+			bw_all[2] += bw
+
+		bw_teams.append(bw_stats)
+		all_hosts += new_hosts
+
+		l_teams.append(new_team)
 	teams = l_teams
 
-	# reset network model to default rules.
+	# Per team stuff - 
 	for (_, _, learners, _, _) in teams:
 		for (node, sarsa) in learners:
+			# reset network model to default rules.
 			updateUpstreamRoute(node)
 
 			# Assume initial state is all zeroes (new network)
 			sarsa.bootstrap(sar.tc(np.zeros(sarsaParams[vec_size])))
 	
 	# Update master link's bandwidth limit after hosts init.
-	core_link.config(bw=calc_max_capacity(len(all_hosts)))
+	# core_link.config(bw=calc_max_capacity(len(all_hosts)))
 
 	# Begin the new episode!
 	net.start()
@@ -226,7 +273,6 @@ for ep in xrange(episodes):
 		stdin=PIPE
 	)
 
-	# TODO: write reward functions.
 	# TODO: gen traffic at each host.
 
 	for i in xrange(episode_length):
@@ -237,24 +283,37 @@ for ep in xrange(episodes):
 		# Wait, somehow
 		time.sleep(dt)
 
-		for (leader, intermediates, learners, _, _) in teams:
-			# Measure good/bad loads!
-			mon_cmd.stdin.write("\n")
-			data = mon_cmd.stout.readline().strip().split(",")
-			load_bytes = [int(el.strip().split(" ")) for el in data[1:]]
+		# Measure good/bad loads!
+		mon_cmd.stdin.write("\n")
+		data = mon_cmd.stout.readline().strip().split(",")
 
-			time_ns = int(data[0][:-2])
-			# TODO - parse, get ratios, get speeds, categorise by e.g. team
+		time_ns = int(data[0][:-2])
+		load_mbps = [map(
+				lambda bytes: (8000*float(bytes))/time_ns,
+				el.strip().split(" ")
+			) for el in data[1:]
+		]
+
+		total_mbps = [good+bad for (good, bad) in load_mbps]
+
+		for team_no, (leader, intermediates, learners, _, _) in enumerate(teams):
+			team_true_loads = bw_teams[team_no]
+
+			leader_index = switch_list_indices[leader.name]
 
 			# Compute reward!
-			# TODO - relies on good/bad loads...
-			reward = 0
+			reward = reward_func(total_mbps[0], load_mbps[0][0], bw_all[0],
+				total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no],
+				n_teams, len(all_hosts))
 
-			for (node, sarsa) in learners:
+			for learner_no, (node, sarsa) in enumerate(learners):
 				# Encode state (as seen by this learner)
-				# TODO
-				statevec = np.zeros(sarsaParams[vec_size])
-				state = sarsa.tc(statevec)
+				important_indices = [switch_list_indices[name] for name in [
+					intermediates[learner_no/n_learners].name, node.name
+				]]
+
+				state_vec = np.array([total_mbps[index] for index in [0, leader_index]+important_indices])
+				state = sarsa.tc(state_vec)
 
 				# Learn!
 				sarsa.update(state, reward)
