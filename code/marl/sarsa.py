@@ -85,3 +85,6 @@ class SarsaLearner:
 		self.last_act = (state, new_action, new_value)
 
 		return new_action
+
+	def to_state(self, *args):
+		return tuple(self.tc(*args))

@@ -83,10 +83,12 @@ sarsaParams = {
 initd_host_count = 0
 initd_switch_count = 0
 def newNamedHost(**kw_args):
-	initd_o = net.addHost("h{}".format(host_count), **kw_args)
+	global initd_host_count
+	o = net.addHost("h{}".format(initd_host_count), **kw_args)
 	initd_host_count += 1
 	return o
 def newNamedSwitch(**kw_args):
+	global initd_switch_count
 	o = net.addSwitch("s{}".format(initd_switch_count), **kw_args)
 	initd_switch_count += 1
 	return o
@@ -106,7 +108,7 @@ def updateUpstreamRoute(switch, out_port=0, ac_prob=0.0):
 	p_drop = "" if ac_prob == 0.0 else "probdrop:{},".format(pdrop(prob))
 
 	# really lazy -- big one-directional route. But that's all we need for now.
-	net.cmd(
+	switch.cmd(
 		"sh",
 		"ovs-ofctl",
 		"addflow",
@@ -126,14 +128,16 @@ def enactActions(learners):
 		updateUpstreamRoute(node, ac_prob=action)
 
 def addHosts(extern, hosts_per_learner, hosts_upper):
-	host_count = np.random.randint(hosts_per_learner, hosts_upper)
+	host_count = (hosts_per_learner if hosts_per_learner == hosts_upper
+		else np.random.randint(hosts_per_learner, hosts_upper)
+	)
 
 	hosts = []
 
 	for i in xrange(host_count):
 		new_host = newNamedHost()
 		good = np.random.uniform() < P_good
-		bw = (np.random.uniform(*(good_range if good else bad_range)))
+		bw = (np.random.uniform(*(good_range if good else evil_range)))
 
 		trackedLink(extern, new_host, {"bw": bw})
 
@@ -143,9 +147,6 @@ def addHosts(extern, hosts_per_learner, hosts_upper):
 	return hosts
 
 def makeTeam(parent, inter_count, learners_per_inter):
-	if hosts_upper is None:
-		hosts_upper = hosts_per_learner
-
 	leader = routedSwitch(parent)
 
 	intermediates = []
@@ -269,7 +270,7 @@ for ep in xrange(episodes):
 			updateUpstreamRoute(node)
 
 			# Assume initial state is all zeroes (new network)
-			sarsa.bootstrap(sar.tc(np.zeros(sarsaParams[vec_size])))
+			sarsa.bootstrap(sarsa.to_state(np.zeros(sarsaParams["vec_size"])))
 	
 	# Update master link's bandwidth limit after hosts init.
 	# core_link.config(bw=calc_max_capacity(len(all_hosts)))
@@ -323,7 +324,7 @@ for ep in xrange(episodes):
 				]]
 
 				state_vec = np.array([total_mbps[index] for index in [0, leader_index]+important_indices])
-				state = sarsa.tc(state_vec)
+				state = sarsa.to_state(state_vec)
 
 				# Learn!
 				sarsa.update(state, reward)
