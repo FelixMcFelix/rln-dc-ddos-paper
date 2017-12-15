@@ -7,7 +7,6 @@ from mininet.clean import Cleanup
 
 import itertools
 import numpy as np
-import pypcap
 from sarsa import SarsaLearner
 from subprocess import PIPE
 import time
@@ -180,8 +179,8 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 	return (leader, intermediates, learners, extern_switches, new_hosts)
 
 def buildNet(n_teams):
-	server = host.addHost()
-	server_switch = host.addSwitch()
+	server = net.addHost()
+	server_switch = net.addSwitch()
 	core_link = trackedLink(server, server_switch)
 
 	teams = []
