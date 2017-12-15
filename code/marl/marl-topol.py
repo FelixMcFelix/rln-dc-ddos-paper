@@ -80,6 +80,17 @@ sarsaParams = {
 
 # helpers
 
+host_count = 0
+switch_count = 0
+def newNamedHost(**kw_args):
+	o = net.addHost("h{}".format(host_count), **kw_args)
+	host_count += 1
+	return o
+def newNamedSwitch(**kw_args):
+	o = net.addSwitch("s{}".format(switch_count), **kw_args)
+	switch_count += 1
+	return o
+
 def trackedLink(src, target, extras=None):
 	if extras is None:
 		extras = linkopts
@@ -104,7 +115,7 @@ def updateUpstreamRoute(switch, out_port=0, ac_prob=0.0):
 	)
 
 def routedSwitch(upstreamNode, **args):
-	sw = net.addSwitch(**args)
+	sw = newNamedSwitch(**args)
 	trackedLink(upstreamNode, sw)
 	updateUpstreamRoute(sw)
 	return sw
@@ -120,7 +131,7 @@ def addHosts(extern, hosts_per_learner, hosts_upper):
 	hosts = []
 
 	for i in xrange(host_count):
-		new_host = net.addHost()
+		new_host = newNamedHost()
 		good = np.random.uniform() < P_good
 		bw = (np.random.uniform(*(good_range if good else bad_range)))
 
@@ -179,8 +190,8 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 	return (leader, intermediates, learners, extern_switches, new_hosts)
 
 def buildNet(n_teams):
-	server = net.addHost()
-	server_switch = net.addSwitch()
+	server = newNamedHost()
+	server_switch = newNamedSwitch()
 	core_link = trackedLink(server, server_switch)
 
 	teams = []
