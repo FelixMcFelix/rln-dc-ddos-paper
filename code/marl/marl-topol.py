@@ -231,6 +231,7 @@ for i, sw in enumerate(tracked_switches):
 	switch_list_indices[sw.name] = i
 
 for ep in xrange(episodes):
+	print "beginning episode {} of {}".format(ep+1, episodes)
 	# remake/reclassify hosts
 	all_hosts = []
 	l_teams = []
@@ -287,6 +288,8 @@ for ep in xrange(episodes):
 	# TODO: gen traffic at each host.
 
 	for i in xrange(episode_length):
+		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
+		print "\t"
 		# Make the last actions a reality!
 		for (_, _, learners, _, _) in teams:
 			enactActions(learners)
