@@ -281,7 +281,7 @@ for ep in xrange(episodes):
 
 	# Spool up the monitoring tool.
 	mon_cmd = server_switch.popen(
-		["sudo", "../marl-bwmon/marl-bwmon"] + tracked_interfaces,
+		["../marl-bwmon/marl-bwmon"] + tracked_interfaces,
 		stdin=PIPE
 	)
 
@@ -289,7 +289,6 @@ for ep in xrange(episodes):
 
 	for i in xrange(episode_length):
 		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
-		print "\t"
 		# Make the last actions a reality!
 		for (_, _, learners, _, _) in teams:
 			enactActions(learners)
@@ -299,6 +298,7 @@ for ep in xrange(episodes):
 
 		# Measure good/bad loads!
 		mon_cmd.stdin.write("\n")
+		mon_cmd.stdin.flush()
 		data = mon_cmd.stout.readline().strip().split(",")
 
 		time_ns = int(data[0][:-2])
