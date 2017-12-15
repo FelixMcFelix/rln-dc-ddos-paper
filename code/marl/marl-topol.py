@@ -80,15 +80,15 @@ sarsaParams = {
 
 # helpers
 
-host_count = 0
-switch_count = 0
+initd_host_count = 0
+initd_switch_count = 0
 def newNamedHost(**kw_args):
-	o = net.addHost("h{}".format(host_count), **kw_args)
-	host_count += 1
+	initd_o = net.addHost("h{}".format(host_count), **kw_args)
+	initd_host_count += 1
 	return o
 def newNamedSwitch(**kw_args):
-	o = net.addSwitch("s{}".format(switch_count), **kw_args)
-	switch_count += 1
+	o = net.addSwitch("s{}".format(initd_switch_count), **kw_args)
+	initd_switch_count += 1
 	return o
 
 def trackedLink(src, target, extras=None):
