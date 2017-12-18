@@ -99,7 +99,6 @@ def trackedLink(src, target, extras=None):
 		extras = linkopts
 	# print src.name, target.name
 	l = net.addLink(src, target, **extras)
-	# links.append(l)
 	return l
 
 def updateUpstreamRoute(switch, out_port=0, ac_prob=0.0):
@@ -140,20 +139,22 @@ def addHosts(extern, hosts_per_learner, hosts_upper):
 		good = np.random.uniform() < P_good
 		bw = (np.random.uniform(*(good_range if good else evil_range)))
 
-		trackedLink(extern, new_host, {"bw": bw})
+		link = trackedLink(extern, new_host, {"bw": bw})
 
 		hosts.append(
-			(new_host, good, bw)
+			(new_host, good, bw, link)
 		)
 	return hosts
 
-def makeTeam(parent, inter_count, learners_per_inter):
+def makeTeam(parent, inter_count, learners_per_inter, sarsas=[]):
 	leader = routedSwitch(parent)
 
 	intermediates = []
 	learners = []
 	extern_switches = []
 	hosts = []
+
+	newSarsas = len(sarsas) == 0
 
 	for i in xrange(inter_count):
 		new_interm = routedSwitch(leader)
@@ -164,42 +165,45 @@ def makeTeam(parent, inter_count, learners_per_inter):
 
 			# Init and pair the actual learning agent here, too!
 			# Bootstrapping happens later -- per-episode, in the 0-load state.
-			sar = SarsaLearner(**sarsaParams)
+			if newSarsas:
+				sar = SarsaLearner(**sarsaParams)
+				sarsas.append(sar)
 			
 			learners.append(
-				(new_learn, SarsaLearner(**sarsaParams))
+				(new_learn, sarsas[j + learners_per_interm*i]))
 			)
 
 			new_extern = routedSwitch(new_learn)
 			extern_switches.append(new_extern)
 
-	return (leader, intermediates, learners, extern_switches, hosts)
+	return (leader, intermediates, learners, extern_switches, hosts, sarsas)
 
 def makeHosts(team, hosts_per_learner, hosts_upper=None):
 	if hosts_upper is None:
 		hosts_upper = hosts_per_learner
 
-	(leader, intermediates, learners, extern_switches, hosts) = team
+	(leader, intermediates, learners, extern_switches, hosts, sarsas) = team
 
-	for (host, _, _) in hosts:
+	for (host, _, _, link) in hosts:
 		# print "killing", host.name
-		host.stop()
+		host.stop()#deleteIntfs=True)
+		link.delete()
 
 	new_hosts = []
 
 	for extern in extern_switches:
 		new_hosts += addHosts(extern, hosts_per_learner, hosts_upper)
 
-	return (leader, intermediates, learners, extern_switches, new_hosts)
+	return (leader, intermediates, learners, extern_switches, new_hosts, sarsas)
 
-def buildNet(n_teams):
+def buildNet(n_teams, sarsas=[]):
 	server = newNamedHost()
 	server_switch = newNamedSwitch()
 	core_link = trackedLink(server, server_switch)
 
 	teams = []
 	for i in xrange(n_teams):
-		t = makeTeam(server_switch, n_inters, n_learners)
+		t = makeTeam(server_switch, n_inters, n_learners, sarsas=sarsas)
 		trackedLink(server_switch, t[0])
 		teams.append(t)
 
@@ -223,7 +227,7 @@ net = Mininet(link=TCLink)
 (server, server_switch, core_link, teams) = buildNet(n_teams)
 
 tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
-	[leader] + intermediates + [l[0] for l in learners] for (leader, intermediates, learners, _, _) in teams
+	[leader] + intermediates + [l[0] for l in learners] for (leader, intermediates, learners, _, _, _) in teams
 ]))
 
 tracked_interfaces = ["{}-eth1".format(el.name) for el in tracked_switches]
@@ -250,7 +254,7 @@ for ep in xrange(episodes):
 		# need to know the intended loads of each class (overall and per-team).
 		# good, bad, total
 		bw_stats = [0.0 for i in xrange(3)]
-		for (host, good, bw) in new_hosts:
+		for (host, good, bw, _) in new_hosts:
 			if good:
 				bw_stats[0] += bw
 				bw_all[0] += bw
@@ -267,7 +271,7 @@ for ep in xrange(episodes):
 	teams = l_teams
 
 	# Per team stuff - 
-	for (_, _, learners, _, _) in teams:
+	for (_, _, learners, _, _, _) in teams:
 		for (node, sarsa) in learners:
 			# reset network model to default rules.
 			updateUpstreamRoute(node)
