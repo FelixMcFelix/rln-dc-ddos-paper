@@ -230,7 +230,8 @@ for ep in xrange(episodes):
 	# May be useful to keep around
 	#net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
 
-	# build network model once, remove/reattach/reclassify hosts per-episode
+	# build the network model...
+	# EVERY TIME, because scorched-earth is the only language mininet speaks
 	(server, server_switch, core_link, teams, team_sarsas) = buildNet(n_teams, team_sarsas=store_sarsas)
 
 	tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
