@@ -97,7 +97,7 @@ def newNamedSwitch(**kw_args):
 def trackedLink(src, target, extras=None):
 	if extras is None:
 		extras = linkopts
-
+	# print src.name, target.name
 	l = net.addLink(src, target, **extras)
 	# links.append(l)
 	return l
@@ -182,7 +182,7 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 	(leader, intermediates, learners, extern_switches, hosts) = team
 
 	for (host, _, _) in hosts:
-		print "killing", host.name
+		# print "killing", host.name
 		host.stop()
 
 	new_hosts = []
