@@ -8,7 +8,8 @@ from mininet.clean import Cleanup
 import itertools
 import numpy as np
 from sarsa import SarsaLearner
-from subprocess import PIPE
+from subprocess import PIPE, Popen
+import sys
 import time
 
 # config
@@ -38,7 +39,7 @@ alpha = 0.05
 epsilon = 0.3
 discount = 0
 
-dt = 0.05
+dt = 0.001
 
 # reward functions: choose wisely!
 
@@ -181,7 +182,8 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 	(leader, intermediates, learners, extern_switches, hosts) = team
 
 	for (host, _, _) in hosts:
-		net.delHost(host)
+		print "killing", host.name
+		host.stop()
 
 	new_hosts = []
 
@@ -224,7 +226,7 @@ tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
 	[leader] + intermediates + [l[0] for l in learners] for (leader, intermediates, learners, _, _) in teams
 ]))
 
-tracked_interfaces = ["{}-eth0".format(el.name) for el in tracked_switches]
+tracked_interfaces = ["{}-eth1".format(el.name) for el in tracked_switches]
 
 switch_list_indices = {}
 for i, sw in enumerate(tracked_switches):
@@ -279,10 +281,13 @@ for ep in xrange(episodes):
 	# Begin the new episode!
 	net.start()
 
+#	net.interact()
+
 	# Spool up the monitoring tool.
 	mon_cmd = server_switch.popen(
 		["../marl-bwmon/marl-bwmon"] + tracked_interfaces,
-		stdin=PIPE
+		stdin=PIPE,
+		stderr=sys.stderr
 	)
 
 	# TODO: gen traffic at each host.
@@ -299,7 +304,7 @@ for ep in xrange(episodes):
 		# Measure good/bad loads!
 		mon_cmd.stdin.write("\n")
 		mon_cmd.stdin.flush()
-		data = mon_cmd.stout.readline().strip().split(",")
+		data = mon_cmd.stdout.readline().strip().split(",")
 
 		time_ns = int(data[0][:-2])
 		load_mbps = [map(
@@ -317,7 +322,7 @@ for ep in xrange(episodes):
 
 			# Compute reward!
 			reward = reward_func(total_mbps[0], load_mbps[0][0], bw_all[0],
-				total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no],
+				total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
 				n_teams, len(all_hosts))
 
 			for learner_no, (node, sarsa) in enumerate(learners):

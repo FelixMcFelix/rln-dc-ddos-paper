@@ -74,7 +74,7 @@ class SarsaLearner:
 		(new_action, new_value) = self._select_action(state)
 
 		# Update value accordingly
-		self._update_state_value(last_state, last_action,
+		self._update_state_value(last_state, self.actions.index(last_action),
 			last_value + self.learn_rate*(reward + self.discount*new_value - last_value)
 		)
 
