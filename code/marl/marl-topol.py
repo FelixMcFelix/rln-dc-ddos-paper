@@ -290,7 +290,7 @@ for ep in xrange(episodes):
 		stderr=sys.stderr
 	)
 
-	# TODO: gen traffic at each host.
+	# TODO: gen traffic at each host. This MUST happen after the bootstrap.
 
 	for i in xrange(episode_length):
 		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
@@ -340,6 +340,6 @@ for ep in xrange(episodes):
 	# End this monitoring instance.
 	mon_cmd.stdin.close()
 
-	net.stop()
+	# net.stop()
 
 # Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
