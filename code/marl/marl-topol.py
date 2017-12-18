@@ -168,7 +168,7 @@ def makeTeam(parent, inter_count, learners_per_inter, sarsas=[]):
 			if newSarsas:
 				sarsas.append(SarsaLearner(**sarsaParams))
 			
-			learners.append(new_learn, sarsas[j + learners_per_interm*i])
+			learners.append(new_learn)
 
 			new_extern = routedSwitch(new_learn)
 			extern_switches.append(new_extern)
@@ -202,7 +202,8 @@ def buildNet(n_teams, team_sarsas=[]):
 
 	teams = []
 	for i in xrange(n_teams):
-		t = makeTeam(server_switch, n_inters, n_learners, sarsas=team_sarsas[i])
+		t = makeTeam(server_switch, n_inters, n_learners,
+			sarsas=[] if make_sarsas else team_sarsas[i])
 		trackedLink(server_switch, t[0])
 		teams.append(t)
 		if make_sarsas: team_sarsas.append(t[-1])
@@ -275,7 +276,7 @@ for ep in xrange(episodes):
 	teams = l_teams
 
 	# Per team stuff - 
-	for (_, _, learners, _, _, _) in teams:
+	for (_, _, learners, _, _, sarsas) in teams:
 		for (node, sarsa) in zip(learners, sarsas):
 			# reset network model to default rules.
 			updateUpstreamRoute(node)
