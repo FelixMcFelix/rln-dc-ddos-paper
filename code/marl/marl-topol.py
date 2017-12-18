@@ -122,8 +122,8 @@ def routedSwitch(upstreamNode, **args):
 	updateUpstreamRoute(sw)
 	return sw
 
-def enactActions(learners):
-	for (node, sarsa) in learners:
+def enactActions(learners, sarsas):
+	for (node, sarsa) in zip(learners, sarsas):
 		(_, action, _) = sarsa.last_act
 		updateUpstreamRoute(node, ac_prob=action)
 
@@ -166,12 +166,9 @@ def makeTeam(parent, inter_count, learners_per_inter, sarsas=[]):
 			# Init and pair the actual learning agent here, too!
 			# Bootstrapping happens later -- per-episode, in the 0-load state.
 			if newSarsas:
-				sar = SarsaLearner(**sarsaParams)
-				sarsas.append(sar)
+				sarsas.append(SarsaLearner(**sarsaParams))
 			
-			learners.append(
-				(new_learn, sarsas[j + learners_per_interm*i]))
-			)
+			learners.append(new_learn, sarsas[j + learners_per_interm*i])
 
 			new_extern = routedSwitch(new_learn)
 			extern_switches.append(new_extern)
@@ -196,18 +193,21 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 
 	return (leader, intermediates, learners, extern_switches, new_hosts, sarsas)
 
-def buildNet(n_teams, sarsas=[]):
+def buildNet(n_teams, team_sarsas=[]):
 	server = newNamedHost()
 	server_switch = newNamedSwitch()
 	core_link = trackedLink(server, server_switch)
 
+	make_sarsas = len(team_sarsas) == 0
+
 	teams = []
 	for i in xrange(n_teams):
-		t = makeTeam(server_switch, n_inters, n_learners, sarsas=sarsas)
+		t = makeTeam(server_switch, n_inters, n_learners, sarsas=team_sarsas[i])
 		trackedLink(server_switch, t[0])
 		teams.append(t)
+		if make_sarsas: team_sarsas.append(t[-1])
 
-	return (server, server_switch, core_link, teams)
+	return (server, server_switch, core_link, teams, team_sarsas)
 
 def pdrop(prob):
 	return int(prob * 0xffffffff)
@@ -218,26 +218,30 @@ def pdrop(prob):
 
 Cleanup.cleanup()
 
-net = Mininet(link=TCLink)
-
-# May be useful to keep around
-#net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
-
-# build network model once, remove/reattach/reclassify hosts per-episode
-(server, server_switch, core_link, teams) = buildNet(n_teams)
-
-tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
-	[leader] + intermediates + [l[0] for l in learners] for (leader, intermediates, learners, _, _, _) in teams
-]))
-
-tracked_interfaces = ["{}-eth1".format(el.name) for el in tracked_switches]
-
-switch_list_indices = {}
-for i, sw in enumerate(tracked_switches):
-	switch_list_indices[sw.name] = i
+net = None
+store_sarsas = []
 
 for ep in xrange(episodes):
 	print "beginning episode {} of {}".format(ep+1, episodes)
+
+	net = Mininet(link=TCLink)
+
+	# May be useful to keep around
+	#net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
+
+	# build network model once, remove/reattach/reclassify hosts per-episode
+	(server, server_switch, core_link, teams, team_sarsas) = buildNet(n_teams, team_sarsas=store_sarsas)
+
+	tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
+		[leader] + intermediates + learners for (leader, intermediates, learners, _, _, _) in teams
+	]))
+
+	tracked_interfaces = ["{}-eth1".format(el.name) for el in tracked_switches]
+
+	switch_list_indices = {}
+	for i, sw in enumerate(tracked_switches):
+		switch_list_indices[sw.name] = i
+
 	# remake/reclassify hosts
 	all_hosts = []
 	l_teams = []
@@ -272,7 +276,7 @@ for ep in xrange(episodes):
 
 	# Per team stuff - 
 	for (_, _, learners, _, _, _) in teams:
-		for (node, sarsa) in learners:
+		for (node, sarsa) in zip(learners, sarsas):
 			# reset network model to default rules.
 			updateUpstreamRoute(node)
 
@@ -299,8 +303,8 @@ for ep in xrange(episodes):
 	for i in xrange(episode_length):
 		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
 		# Make the last actions a reality!
-		for (_, _, learners, _, _) in teams:
-			enactActions(learners)
+		for (_, _, learners, _, _, sarsas) in teams:
+			enactActions(learners, sarsas)
 
 		# Wait, somehow
 		time.sleep(dt)
@@ -319,7 +323,7 @@ for ep in xrange(episodes):
 
 		total_mbps = [good+bad for (good, bad) in load_mbps]
 
-		for team_no, (leader, intermediates, learners, _, _) in enumerate(teams):
+		for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
 			team_true_loads = bw_teams[team_no]
 
 			leader_index = switch_list_indices[leader.name]
@@ -329,7 +333,7 @@ for ep in xrange(episodes):
 				total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
 				n_teams, len(all_hosts))
 
-			for learner_no, (node, sarsa) in enumerate(learners):
+			for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
 				# Encode state (as seen by this learner)
 				important_indices = [switch_list_indices[name] for name in [
 					intermediates[learner_no/n_learners].name, node.name
@@ -344,6 +348,8 @@ for ep in xrange(episodes):
 	# End this monitoring instance.
 	mon_cmd.stdin.close()
 
-	# net.stop()
+	net.stop()
+
+	store_sarsas = team_sarsas
 
 # Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
