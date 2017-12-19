@@ -92,7 +92,7 @@ def newNamedHost(**kw_args):
 	return o
 def newNamedSwitch(**kw_args):
 	global initd_switch_count
-	o = net.addSwitch("s{}".format(initd_switch_count), **kw_args)
+	o = net.addSwitch("s{}".format(initd_switch_count), listenPort=7000+initd_switch_count, **kw_args)
 	initd_switch_count += 1
 	return o
 
@@ -103,6 +103,14 @@ def trackedLink(src, target, extras=None):
 	l = net.addLink(src, target, **extras)
 	return l
 
+route_commands = []
+
+def executeRouteQueue():
+	global route_commands
+	for (switch, cmd_list) in route_commands:
+		switch.dpctl(*cmd_list)
+	route_commands = []
+
 def updateUpstreamRoute(switch, out_port=0, ac_prob=0.0):
 	# Turn from prob_drop into prob_send!
 	prob = ac_prob - 1
@@ -110,13 +118,21 @@ def updateUpstreamRoute(switch, out_port=0, ac_prob=0.0):
 	p_drop = "" if ac_prob == 0.0 else "probdrop:{},".format(pdrop(prob))
 
 	# really lazy -- big one-directional route. But that's all we need for now.
-	switch.cmd(
-		"sh",
-		"ovs-ofctl",
-		"addflow",
-		name,
-		"in_port=*,actions={}\"{}-eth{}\"".format(p_drop, name, out_port)
-	)
+	if not switch.listenPort:
+		listenAddr = "unix:/tmp/{}.listen".format(switch.name)
+	else:
+		listenAddr = "tcp:127.0.0.1:{}".format(switch.listenPort)
+
+	cmd_list = [
+#		"ovs-ofctl",
+		"add-flow",
+#		listenAddr,
+		"actions={}\"{}-eth{}\"".format(p_drop, name, out_port)
+	]
+	if alive:
+		switch.dpctl(*cmd_list)
+	else:
+		route_commands.append((switch, cmd_list))
 
 def routedSwitch(upstreamNode, **args):
 	sw = newNamedSwitch(**args)
@@ -223,8 +239,12 @@ Cleanup.cleanup()
 
 net = None
 store_sarsas = []
+alive = False
 
 for ep in xrange(episodes):
+	initd_switch_count = 0
+	initd_host_count = 0
+	alive = False
 	print "beginning episode {} of {}".format(ep+1, episodes)
 
 	net = Mininet(link=TCLink)
@@ -292,8 +312,10 @@ for ep in xrange(episodes):
 
 	# Begin the new episode!
 	net.start()
+	alive = True
+	executeRouteQueue()
 
-#	net.interact()
+	net.interact()
 
 	# Spool up the monitoring tool.
 	mon_cmd = server_switch.popen(
@@ -309,7 +331,7 @@ for ep in xrange(episodes):
 				"-i", host.intfNames()[0]],
 				"-l", str(999),
 				"-t",
-				good_file if good else bad_file
+				(good_file if good else bad_file)
 			)
 
 	for i in xrange(episode_length):
