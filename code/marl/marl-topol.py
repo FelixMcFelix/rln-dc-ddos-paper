@@ -28,6 +28,8 @@ calc_max_capacity = lambda hosts: good_range[1]*hosts + 2
 P_good = 0.6
 good_range = [0, 1]
 evil_range = [2.5, 6]
+good_file = "../../data/pcaps/bigFlows.pcap"
+bad_file = good_file
 
 episodes = 80000
 episode_length = 1000
@@ -301,6 +303,14 @@ for ep in xrange(episodes):
 	)
 
 	# TODO: gen traffic at each host. This MUST happen after the bootstrap.
+	for (_, _, _, _, hosts, _) in teams:
+		for (host, good, bw, link) in hosts:
+			host.sendCmd(["tcpreplay", 
+				"-i", host.intfNames()[0]],
+				"-l", str(999),
+				"-t",
+				good_file if good else bad_file
+			)
 
 	for i in xrange(episode_length):
 		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
@@ -322,6 +332,9 @@ for ep in xrange(episodes):
 				el.strip().split(" ")
 			) for el in data[1:]
 		]
+
+		# curious
+		print data 
 
 		total_mbps = [good+bad for (good, bad) in load_mbps]
 
