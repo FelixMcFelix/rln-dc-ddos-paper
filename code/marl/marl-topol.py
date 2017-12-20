@@ -99,7 +99,6 @@ def newNamedSwitch(**kw_args):
 def trackedLink(src, target, extras=None):
 	if extras is None:
 		extras = linkopts
-	# print src.name, target.name
 	l = net.addLink(src, target, **extras)
 	return l
 
@@ -108,10 +107,10 @@ route_commands = []
 def executeRouteQueue():
 	global route_commands
 	for (switch, cmd_list) in route_commands:
-		switch.dpctl(*cmd_list)
+		switch.cmd(*cmd_list)
 	route_commands = []
 
-def updateUpstreamRoute(switch, out_port=0, ac_prob=0.0):
+def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
 	# Turn from prob_drop into prob_send!
 	prob = ac_prob - 1
 	name = switch.name
@@ -124,13 +123,13 @@ def updateUpstreamRoute(switch, out_port=0, ac_prob=0.0):
 		listenAddr = "tcp:127.0.0.1:{}".format(switch.listenPort)
 
 	cmd_list = [
-#		"ovs-ofctl",
+		"ovs-ofctl",
 		"add-flow",
-#		listenAddr,
+		listenAddr,
 		"actions={}\"{}-eth{}\"".format(p_drop, name, out_port)
 	]
 	if alive:
-		switch.dpctl(*cmd_list)
+		switch.cmd(*cmd_list)
 	else:
 		route_commands.append((switch, cmd_list))
 
@@ -200,7 +199,6 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 	(leader, intermediates, learners, extern_switches, hosts, sarsas) = team
 
 	for (host, _, _, link) in hosts:
-		# print "killing", host.name
 		host.stop()#deleteIntfs=True)
 		link.delete()
 
@@ -315,7 +313,7 @@ for ep in xrange(episodes):
 	alive = True
 	executeRouteQueue()
 
-	net.interact()
+#	net.interact()
 
 	# Spool up the monitoring tool.
 	mon_cmd = server_switch.popen(
@@ -327,12 +325,16 @@ for ep in xrange(episodes):
 	# TODO: gen traffic at each host. This MUST happen after the bootstrap.
 	for (_, _, _, _, hosts, _) in teams:
 		for (host, good, bw, link) in hosts:
-			host.sendCmd(["tcpreplay", 
-				"-i", host.intfNames()[0]],
+			host.sendCmd(
+				"tcpreplay", 
+				"-i", host.intfNames()[0],
 				"-l", str(999),
-				"-t",
+				#"-t",
 				(good_file if good else bad_file)
 			)
+
+	# Let the pcaps come to life.
+	time.sleep(0.5)
 
 	for i in xrange(episode_length):
 		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
@@ -354,9 +356,6 @@ for ep in xrange(episodes):
 				el.strip().split(" ")
 			) for el in data[1:]
 		]
-
-		# curious
-		print data 
 
 		total_mbps = [good+bad for (good, bad) in load_mbps]
 
