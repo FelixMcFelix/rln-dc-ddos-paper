@@ -144,6 +144,20 @@ def enactActions(learners, sarsas):
 		(_, action, _) = sarsa.last_act
 		updateUpstreamRoute(node, ac_prob=action)
 
+def moralise(value, good, max_val=255, no_goods=[0, 255]):
+	target_mod = 0 if good else 1
+	god_mod = max_val + 1
+
+	if (value % 2) != target_mod:
+		value += 1
+		value %= god_mod
+
+	if value in no_goods:
+		value += 2
+		value %= god_mod
+
+	return value		
+
 def addHosts(extern, hosts_per_learner, hosts_upper):
 	host_count = (hosts_per_learner if hosts_per_learner == hosts_upper
 		else np.random.randint(hosts_per_learner, hosts_upper)
@@ -158,8 +172,15 @@ def addHosts(extern, hosts_per_learner, hosts_upper):
 
 		link = trackedLink(extern, new_host, {"bw": bw})
 
+		# Make up a wonderful IP.
+		# Last byte => goodness. Even = good.
+		ip_bytes = list(np.randint(256, size=4))
+		ip_bytes[-1] = moralise(ip_bytes[-1], good)
+
+		ip = "{}.{}.{}.{}".format(*ip_bytes)
+
 		hosts.append(
-			(new_host, good, bw, link)
+			(new_host, good, bw, link, ip)
 		)
 	return hosts
 
@@ -198,7 +219,7 @@ def makeHosts(team, hosts_per_learner, hosts_upper=None):
 
 	(leader, intermediates, learners, extern_switches, hosts, sarsas) = team
 
-	for (host, _, _, link) in hosts:
+	for (host, _, _, link, _) in hosts:
 		host.stop()#deleteIntfs=True)
 		link.delete()
 
@@ -324,11 +345,12 @@ for ep in xrange(episodes):
 
 	# TODO: gen traffic at each host. This MUST happen after the bootstrap.
 	for (_, _, _, _, hosts, _) in teams:
-		for (host, good, bw, link) in hosts:
+		for (host, good, bw, link, ip) in hosts:
 			host.sendCmd(
 				"tcpreplay", 
 				"-i", host.intfNames()[0],
 				"-l", str(999),
+				"-S", "0.0.0.0/0:{}/32".format(ip),
 				#"-t",
 				(good_file if good else bad_file)
 			)
