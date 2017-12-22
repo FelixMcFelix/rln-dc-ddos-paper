@@ -179,6 +179,8 @@ def addHosts(extern, hosts_per_learner, hosts_upper):
 
 		ip = "{}.{}.{}.{}".format(*ip_bytes)
 
+		#print ip
+
 		hosts.append(
 			(new_host, good, bw, link, ip)
 		)
