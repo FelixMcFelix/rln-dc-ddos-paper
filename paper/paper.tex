@@ -47,6 +47,9 @@
 
 %opening!
 
+\newcommand{\mytitle}{%Dynamically Annealed Reinforcement Learning for Intrusion Prevention
+Dynamic Exploration via the Wavelet Transform}
+
 \usepackage{hyperref}
 \usepackage{url}
 \hypersetup{
@@ -55,7 +58,7 @@
 	filecolor=black,
 	linkcolor=black,
 	urlcolor=black,
-	pdftitle={Dynamically Annealed Reinforcement Learning for Intrusion Prevention},
+	pdftitle={\mytitle{}},
 	pdfauthor={Kyle A. Simpson}
 }
 \newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
@@ -76,7 +79,7 @@
 %-------------------------------------%
 %-------------------------------------%
 
-\title{Dynamically Annealed Reinforcement Learning for Intrusion Prevention}
+\title{\mytitle{}}
 \author{Kyle A. Simpson\thanks{This work was supported by the Engineering and Physical Sciences
 		Research Council [grant number EP/M508056/1]},\\\emph{University of Glasgow, Glasgow, Scotland},\\
 		\email{k.simpson.1@research.gla.ac.uk}}
@@ -112,6 +115,13 @@ Does next paragraph have proper indent? Please!
 
 \begin{enumerate}
 	\item Establish criteria used to inform system temp---what could make my system increase $\epsilon$ again late into training?
+	\begin{enumerate}
+		\item Current thoughts: Wavelet analysis of the reward signal.
+		\item Intuition: multiscale representation of variation in reward.
+		\item What do we see? Hopefully, state-to-state variation as well as longer-term characteristics.
+		\item Expect that overall worsening on the coarsest scales should indicate pressing, global need for exploration  (i.e., non-stationarity, changing problem).
+		\item We can perhaps derive a different uncertainty for each scale -- how do we choose? Combine answers, or (in turn) randomly select an $\epsilon$ from the derived set?
+	\end{enumerate}
 	\item What are my chosen features? Reward Function?
 	\item What actions do I give the agents? Just more probabilistic packet dropping?
 	\item Test against MARL and others---probably essential.
