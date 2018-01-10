@@ -100,11 +100,12 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 			auto ip = *reinterpret_cast<const uint32_t *>(data + 26);
 
 			// Another assumption, we're little endian.
-			good = ((ip & 0xff000000) >> 24 % 2) == 0;
+			good = !(((ip>>24)&0xff) % 2);
 
-			// struct in_addr addr { s_addr: ip };
-			// char *ip_str = inet_ntoa(addr);
-			// std::cout << "message from: " << ip_str << " " << good << std::endl;
+			//struct in_addr addr { s_addr: ip };
+			//char ip_str[INET_ADDRSTRLEN];
+			//inet_ntop(AF_INET, &addr, ip_str, INET_ADDRSTRLEN);
+			//std::cout << "message from: " << ip_str << " " << good << " " << ((ip>>24)&0xff) <<std::endl;
 			break;
 		}
 		case DLT_RAW:

@@ -174,10 +174,12 @@ def addHosts(extern, hosts_per_learner, hosts_upper):
 
 		# Make up a wonderful IP.
 		# Last byte => goodness. Even = good.
-		ip_bytes = list(np.randint(256, size=4))
+		ip_bytes = list(np.random.randint(256, size=4))
 		ip_bytes[-1] = moralise(ip_bytes[-1], good)
 
 		ip = "{}.{}.{}.{}".format(*ip_bytes)
+
+		#print ip
 
 		hosts.append(
 			(new_host, good, bw, link, ip)
@@ -234,6 +236,7 @@ def buildNet(n_teams, team_sarsas=[]):
 	server = newNamedHost()
 	server_switch = newNamedSwitch()
 	core_link = trackedLink(server, server_switch)
+	updateUpstreamRoute(server_switch)
 
 	make_sarsas = len(team_sarsas) == 0
 
@@ -301,7 +304,7 @@ for ep in xrange(episodes):
 		# need to know the intended loads of each class (overall and per-team).
 		# good, bad, total
 		bw_stats = [0.0 for i in xrange(3)]
-		for (host, good, bw, _) in new_hosts:
+		for (host, good, bw, _, _) in new_hosts:
 			if good:
 				bw_stats[0] += bw
 				bw_all[0] += bw
@@ -334,7 +337,7 @@ for ep in xrange(episodes):
 	alive = True
 	executeRouteQueue()
 
-#	net.interact()
+	#net.interact()
 
 	# Spool up the monitoring tool.
 	mon_cmd = server_switch.popen(
@@ -347,7 +350,7 @@ for ep in xrange(episodes):
 	for (_, _, _, _, hosts, _) in teams:
 		for (host, good, bw, link, ip) in hosts:
 			host.sendCmd(
-				"tcpreplay", 
+				"tcpreplay-edit",
 				"-i", host.intfNames()[0],
 				"-l", str(999),
 				"-S", "0.0.0.0/0:{}/32".format(ip),
@@ -371,6 +374,7 @@ for ep in xrange(episodes):
 		mon_cmd.stdin.write("\n")
 		mon_cmd.stdin.flush()
 		data = mon_cmd.stdout.readline().strip().split(",")
+		#print data
 
 		time_ns = int(data[0][:-2])
 		load_mbps = [map(
