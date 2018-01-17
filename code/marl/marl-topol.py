@@ -31,7 +31,8 @@ evil_range = [2.5, 6]
 good_file = "../../data/pcaps/bigFlows.pcap"
 bad_file = good_file
 
-episodes = 80000
+explore_episodes = 80000
+episodes = 100000
 episode_length = 1000
 
 max_bw = n_teams * n_inters * n_learners * host_range[1] * evil_range[1]
@@ -78,7 +79,7 @@ sarsaParams = {
 	# "tile_c": 16,
 	# "tilings_c": 3,
 	# "default_q": 0,
-	# "epsilon_falloff": 1000
+	"epsilon_falloff": explore_episodes * episode_length
 }
 
 # helpers
@@ -259,6 +260,9 @@ def pdrop(prob):
 
 Cleanup.cleanup()
 
+rewards = []
+good_traffic_percents = []
+
 net = None
 store_sarsas = []
 alive = False
@@ -361,6 +365,9 @@ for ep in xrange(episodes):
 	# Let the pcaps come to life.
 	time.sleep(0.5)
 
+	last_traffic_ratio = 0.0
+	g_reward = 0.0
+
 	for i in xrange(episode_length):
 		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
 		# Make the last actions a reality!
@@ -385,6 +392,8 @@ for ep in xrange(episodes):
 
 		total_mbps = [good+bad for (good, bad) in load_mbps]
 
+		last_traffic_ratio = load_mbps[0][0]/bw_all[0]
+
 		for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
 			team_true_loads = bw_teams[team_no]
 
@@ -392,6 +401,10 @@ for ep in xrange(episodes):
 
 			# Compute reward!
 			reward = reward_func(total_mbps[0], load_mbps[0][0], bw_all[0],
+				total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
+				n_teams, len(all_hosts))
+
+			g_reward = std_marl(total_mbps[0], load_mbps[0][0], bw_all[0],
 				total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
 				n_teams, len(all_hosts))
 
@@ -406,6 +419,10 @@ for ep in xrange(episodes):
 
 				# Learn!
 				sarsa.update(state, reward)
+
+		print("good: {:.2f}, g_reward: {.2f}".format(last_traffic_ratio, g_reward))
+		good_traffic_percents.append(last_traffic_ratio)
+		rewards.append(g_reward)
 
 	# End this monitoring instance.
 	mon_cmd.stdin.close()
