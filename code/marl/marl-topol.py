@@ -67,6 +67,12 @@ def ctl(total_svr_load, legit_svr_load, true_legit_svr_load,
 
 reward_func = ctl
 
+def safe_reward_func(f, total_svr_load, legit_svr_load, true_legit_svr_load,
+		total_leader_load, legit_leader_load, true_legit_leader_load,
+		num_teams, max_load):
+	return f(total_svr_load, min(legit_svr_load,true_legit_svr_load), true_legit_svr_load,
+		total_leader_load, min(legit_leader_load,true_legit_leader_load), true_legit_leader_load,
+		num_teams, max_load)
 # gen
 
 sarsaParams = {
@@ -367,6 +373,9 @@ for ep in xrange(episodes):
 
 	last_traffic_ratio = 0.0
 	g_reward = 0.0
+	capacity = calc_max_capacity(len(all_hosts))
+	print capacity
+	print bw_all
 
 	for i in xrange(episode_length):
 		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
@@ -392,7 +401,7 @@ for ep in xrange(episodes):
 
 		total_mbps = [good+bad for (good, bad) in load_mbps]
 
-		last_traffic_ratio = load_mbps[0][0]/bw_all[0]
+		last_traffic_ratio = min(load_mbps[0][0]/bw_all[0], 1.0)
 
 		for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
 			team_true_loads = bw_teams[team_no]
@@ -400,13 +409,13 @@ for ep in xrange(episodes):
 			leader_index = switch_list_indices[leader.name]
 
 			# Compute reward!
-			reward = reward_func(total_mbps[0], load_mbps[0][0], bw_all[0],
+			reward = safe_reward_func(reward_func, total_mbps[0], load_mbps[0][0], bw_all[0],
 				total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
-				n_teams, len(all_hosts))
+				n_teams, capacity)
 
-			g_reward = std_marl(total_mbps[0], load_mbps[0][0], bw_all[0],
+			g_reward = safe_reward_func(std_marl, total_mbps[0], load_mbps[0][0], bw_all[0],
 				total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
-				n_teams, len(all_hosts))
+				n_teams, capacity)
 
 			for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
 				# Encode state (as seen by this learner)
@@ -420,9 +429,9 @@ for ep in xrange(episodes):
 				# Learn!
 				sarsa.update(state, reward)
 
-		print("good: {:.2f}, g_reward: {.2f}".format(last_traffic_ratio, g_reward))
-		good_traffic_percents.append(last_traffic_ratio)
-		rewards.append(g_reward)
+	print "good:", last_traffic_ratio, ", g_reward:", g_reward
+	good_traffic_percents.append(last_traffic_ratio)
+	rewards.append(g_reward)
 
 	# End this monitoring instance.
 	mon_cmd.stdin.close()
