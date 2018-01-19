@@ -17,7 +17,7 @@ linkopts = {
 #	"bw": 10
 }
 
-n_teams = 1
+n_teams = 5#1
 # per-team options
 n_inters = 2
 n_learners = 3
@@ -32,8 +32,9 @@ good_file = "../../data/pcaps/bigFlows.pcap"
 bad_file = good_file
 
 explore_episodes = 80000
-episodes = 100000
-episode_length = 1000
+episodes = 1000#100000
+episode_length = 5000#1000
+seperate_episodes = False
 
 max_bw = n_teams * n_inters * n_learners * host_range[1] * evil_range[1]
 pdrop_magnitudes = [0.1*n for n in xrange(10)]
@@ -339,8 +340,10 @@ for ep in xrange(episodes):
 			# Assume initial state is all zeroes (new network)
 			sarsa.bootstrap(sarsa.to_state(np.zeros(sarsaParams["vec_size"])))
 	
+	capacity = calc_max_capacity(len(all_hosts))
 	# Update master link's bandwidth limit after hosts init.
-	# core_link.config(bw=calc_max_capacity(len(all_hosts)))
+	core_link.intf1.config(bw=capacity)
+	core_link.intf2.config(bw=capacity)
 
 	# Begin the new episode!
 	net.start()
@@ -356,7 +359,7 @@ for ep in xrange(episodes):
 		stderr=sys.stderr
 	)
 
-	# TODO: gen traffic at each host. This MUST happen after the bootstrap.
+	# gen traffic at each host. This MUST happen after the bootstrap.
 	for (_, _, _, _, hosts, _) in teams:
 		for (host, good, bw, link, ip) in hosts:
 			host.sendCmd(
@@ -373,18 +376,18 @@ for ep in xrange(episodes):
 
 	last_traffic_ratio = 0.0
 	g_reward = 0.0
-	capacity = calc_max_capacity(len(all_hosts))
-	print capacity
-	print bw_all
 
 	for i in xrange(episode_length):
-		if not (i % 10): print "\titer {}/{}".format(i, episode_length)
 		# Make the last actions a reality!
 		for (_, _, learners, _, _, sarsas) in teams:
 			enactActions(learners, sarsas)
 
+		#presleep = time.time()
+
 		# Wait, somehow
 		time.sleep(dt)
+
+		#postsleep = time.time()
 
 		# Measure good/bad loads!
 		mon_cmd.stdin.write("\n")
@@ -402,6 +405,7 @@ for ep in xrange(episodes):
 		total_mbps = [good+bad for (good, bad) in load_mbps]
 
 		last_traffic_ratio = min(load_mbps[0][0]/bw_all[0], 1.0)
+		if not (i % 10): print "\titer {}/{}, good:{}".format(i, episode_length, last_traffic_ratio)
 
 		for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
 			team_true_loads = bw_teams[team_no]
