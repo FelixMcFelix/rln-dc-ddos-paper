@@ -5,6 +5,9 @@ from mininet.cli import CLI
 from mininet.net import Mininet
 from mininet.clean import Cleanup
 
+import twink.ofp4 as ofp
+import twink.ofp4.build as ofpb
+
 import itertools
 import numpy as np
 from sarsa import SarsaLearner
@@ -17,7 +20,7 @@ linkopts = {
 #	"bw": 10
 }
 
-n_teams = 5#1
+n_teams = 1
 # per-team options
 n_inters = 2
 n_learners = 3
@@ -120,9 +123,10 @@ def executeRouteQueue():
 
 def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
 	# Turn from prob_drop into prob_send!
-	prob = ac_prob - 1
+	prob = 1 - ac_prob
 	name = switch.name
-	p_drop = "" if ac_prob == 0.0 else "probdrop:{},".format(pdrop(prob))
+	p_drop_num = pdrop(prob)
+	p_drop = "" if ac_prob == 0.0 else "probdrop:{},".format(p_drop_num)
 
 	# really lazy -- big one-directional route. But that's all we need for now.
 	if not switch.listenPort:
@@ -140,6 +144,20 @@ def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
 		switch.cmd(*cmd_list)
 	else:
 		route_commands.append((switch, cmd_list))
+
+	# Try building that message from scratch, here.
+	msg = ofpb.ofp_flow_mod(
+		None, 0, 0, 0, ofp.OFPFC_ADD,
+		0, 0, 1, None, None, None, 0,
+		ofpb.ofp_match(None, None, None),
+		ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+			# Looks like 29 is the number I picked for Pdrop.
+			ofpb._pack("HHI", 29, 8, p_drop_num),
+			ofpb.ofp_action_output(None, 16, 1, 65535)
+		])
+	)
+	#For now
+	#print msg
 
 def routedSwitch(upstreamNode, **args):
 	sw = newNamedSwitch(**args)
