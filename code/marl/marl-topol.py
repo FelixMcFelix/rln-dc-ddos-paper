@@ -5,12 +5,14 @@ from mininet.cli import CLI
 from mininet.net import Mininet
 from mininet.clean import Cleanup
 
-import twink.ofp4 as ofp
-import twink.ofp4.build as ofpb
+import twink.ofp5 as ofp
+import twink.ofp5.build as ofpb
+import twink.ofp5.parse as ofpp
 
 import itertools
 import numpy as np
 from sarsa import SarsaLearner
+import socket
 from subprocess import PIPE, Popen
 import sys
 import time
@@ -115,10 +117,24 @@ def trackedLink(src, target, extras=None):
 
 route_commands = []
 
+def updateOneRoute(switch, cmd_list, msg):
+	if not switch.listenPort:
+		switch.cmd(*cmd_list)
+	else:
+		#TODO: cache connections to each switch
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		s.connect(("127.0.0.1", switch.listenPort))
+		s.send(ofpb.ofp_hello(None, None))
+		s.send(msg)
+		#t= s.recv(4096)
+		#(version, type, length, xid) = ofpb._unpack("BBHI", t, 0)
+		#print version		
+		s.close()
+
 def executeRouteQueue():
 	global route_commands
-	for (switch, cmd_list) in route_commands:
-		switch.cmd(*cmd_list)
+	for el in route_commands:
+		updateOneRoute(*el)
 	route_commands = []
 
 def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
@@ -140,15 +156,11 @@ def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
 		listenAddr,
 		"actions={}\"{}-eth{}\"".format(p_drop, name, out_port)
 	]
-	if alive:
-		switch.cmd(*cmd_list)
-	else:
-		route_commands.append((switch, cmd_list))
 
 	# Try building that message from scratch, here.
 	msg = ofpb.ofp_flow_mod(
 		None, 0, 0, 0, ofp.OFPFC_ADD,
-		0, 0, 1, None, None, None, 0,
+		0, 0, 1, None, None, None, 0, 1,
 		ofpb.ofp_match(None, None, None),
 		ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
 			# Looks like 29 is the number I picked for Pdrop.
@@ -158,6 +170,11 @@ def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
 	)
 	#For now
 	#print msg
+	
+	if alive:
+		updateOneRoute(switch, cmd_list, msg)
+	else:
+		route_commands.append((switch, cmd_list, msg))
 
 def routedSwitch(upstreamNode, **args):
 	sw = newNamedSwitch(**args)
