@@ -116,20 +116,35 @@ def trackedLink(src, target, extras=None):
 	return l
 
 route_commands = []
+switch_sockets = {}
+
+def openSwitchSocket(switch):
+	s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	s.connect(("127.0.0.1", switch.listenPort))
+	s.send(ofpb.ofp_hello(None, None))
+	ofpp.parse(s.recv(8))
+	switch.control_socket = s
+
+	global switch_sockets
+	switch_sockets[switch.name] = s
+	return s
+
+def removeAllSockets():
+	global switch_sockets
+	for _, sock in switch_sockets.viewitems():
+		sock.close()
+	switch_sockets = {}
 
 def updateOneRoute(switch, cmd_list, msg):
 	if not switch.listenPort:
 		switch.cmd(*cmd_list)
 	else:
-		#TODO: cache connections to each switch
-		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		s.connect(("127.0.0.1", switch.listenPort))
-		s.send(ofpb.ofp_hello(None, None))
+		s = (switch_sockets[switch.name]
+			if switch.name in switch_sockets
+			else openSwitchSocket(switch)
+		)
 		s.send(msg)
-		#t= s.recv(4096)
-		#(version, type, length, xid) = ofpb._unpack("BBHI", t, 0)
-		#print version		
-		s.close()
+		#s.close()
 
 def executeRouteQueue():
 	global route_commands
@@ -474,6 +489,8 @@ for ep in xrange(episodes):
 
 	# End this monitoring instance.
 	mon_cmd.stdin.close()
+
+	removeAllSockets()
 
 	net.stop()
 
