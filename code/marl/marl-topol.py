@@ -152,6 +152,17 @@ def executeRouteQueue():
 		updateOneRoute(*el)
 	route_commands = []
 
+flow_pdrop_msg = ofpb.ofp_flow_mod(
+	None, 0, 0, 0, ofp.OFPFC_ADD,
+	0, 0, 1, None, None, None, 0, 1,
+	ofpb.ofp_match(None, None, None),
+	ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+		# Looks like 29 is the number I picked for Pdrop.
+		ofpb._pack("HHI", 29, 8, 0xffffffff),
+		ofpb.ofp_action_output(None, 16, 1, 65535)
+	])
+)
+
 def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
 	# Turn from prob_drop into prob_send!
 	prob = 1 - ac_prob
@@ -173,16 +184,7 @@ def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
 	]
 
 	# Try building that message from scratch, here.
-	msg = ofpb.ofp_flow_mod(
-		None, 0, 0, 0, ofp.OFPFC_ADD,
-		0, 0, 1, None, None, None, 0, 1,
-		ofpb.ofp_match(None, None, None),
-		ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
-			# Looks like 29 is the number I picked for Pdrop.
-			ofpb._pack("HHI", 29, 8, p_drop_num),
-			ofpb.ofp_action_output(None, 16, 1, 65535)
-		])
-	)
+	msg = flow_pdrop_msg[:-24] + ofbp._pack("I", p_drop_num) + flow_pdrop_msg[-16:]
 	#For now
 	#print msg
 	
