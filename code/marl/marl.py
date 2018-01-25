@@ -196,7 +196,7 @@ def marl_experiment(
 		]
 
 		# Try building that message from scratch, here.
-		msg = flow_pdrop_msg[:-24] + ofbp._pack("I", p_drop_num) + flow_pdrop_msg[-16:]
+		msg = flow_pdrop_msg[:-20] + ofpb._pack("I", p_drop_num) + flow_pdrop_msg[-16:]
 		#For now
 		#print msg
 		
