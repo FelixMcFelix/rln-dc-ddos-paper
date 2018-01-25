@@ -39,7 +39,7 @@ bad_file = good_file
 explore_episodes = 80000
 episodes = 1000#100000
 episode_length = 5000#1000
-seperate_episodes = False
+separate_episodes = False
 
 max_bw = n_teams * n_inters * n_learners * host_range[1] * evil_range[1]
 pdrop_magnitudes = [0.1*n for n in xrange(10)]
@@ -330,6 +330,9 @@ for ep in xrange(episodes):
 	initd_switch_count = 0
 	initd_host_count = 0
 	alive = False
+	if separate_episodes:
+		store_sarsas = []
+
 	print "beginning episode {} of {}".format(ep+1, episodes)
 
 	net = Mininet(link=TCLink)
