@@ -12,6 +12,7 @@ import twink.ofp5.parse as ofpp
 import itertools
 import numpy as np
 from sarsa import SarsaLearner
+import signal
 import socket
 from subprocess import PIPE, Popen
 import sys
@@ -339,7 +340,18 @@ def marlExperiment(
 	store_sarsas = []
 	alive = False
 
+	interrupted = False
+	def sigint_handle(signum, frame):
+		print "Interrupted, cleaning up."
+		Cleanup.cleanup()
+		interrupted = True
+
+	signal.signal(signal.SIGINT, sigint_handle)
+
 	for ep in xrange(episodes):
+		if interrupted:
+			break
+
 		initd_switch_count = 0
 		initd_host_count = 0
 		alive = False

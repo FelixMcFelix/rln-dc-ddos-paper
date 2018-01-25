@@ -22,4 +22,4 @@ results = marlExperiment(
 	rf = "ctl"
 )
 
-writeResults("../../results/", results)
+writeResults("../../results/online-standard.csv", results)

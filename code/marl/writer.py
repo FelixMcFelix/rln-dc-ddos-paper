@@ -30,4 +30,3 @@ def writeResults(results_file, results, sarsa_dir=None):
 	# Okay, now output the sarsa learners' state.
 	if sarsa_dir is not None:
 		pass
-	pass
