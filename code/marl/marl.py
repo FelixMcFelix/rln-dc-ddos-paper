@@ -29,13 +29,13 @@ def marlExperiment(
 		n_learners = 3,
 		host_range = [2, 2],
 
-		calc_max_capacity = lambda hosts: good_range[1]*hosts + 2,
+		calc_max_capacity = None, 
 
 		P_good = 0.6,
 		good_range = [0, 1],
 		evil_range = [2.5, 6],
 		good_file = "../../data/pcaps/bigFlows.pcap",
-		bad_file = good_file,
+		bad_file = None,
 
 		explore_episodes = 80000,
 		episodes = 1000,#100000
@@ -56,6 +56,12 @@ def marlExperiment(
 
 	if max_bw is None:
 		max_bw = n_teams * n_inters * n_learners * host_range[1] * evil_range[1]
+
+	if bad_file is None:
+		bad_file = good_file
+
+	if calc_max_capacity is None:
+		calc_max_capacity = lambda hosts: good_range[1]*hosts + 2
 
 	# reward functions: choose wisely!
 
@@ -109,17 +115,15 @@ def marlExperiment(
 
 	# helpers
 
-	initd_host_count = 0
-	initd_switch_count = 0
+	initd_host_count = [0]
+	initd_switch_count = [0]
 	def newNamedHost(**kw_args):
-		global initd_host_count
-		o = net.addHost("h{}".format(initd_host_count), **kw_args)
-		initd_host_count += 1
+		o = net.addHost("h{}".format(initd_host_count[0]), **kw_args)
+		initd_host_count[0] += 1
 		return o
 	def newNamedSwitch(**kw_args):
-		global initd_switch_count
-		o = net.addSwitch("s{}".format(initd_switch_count), listenPort=7000+initd_switch_count, **kw_args)
-		initd_switch_count += 1
+		o = net.addSwitch("s{}".format(initd_switch_count[0]), listenPort=7000+initd_switch_count[0], **kw_args)
+		initd_switch_count[0] += 1
 		return o
 
 	def trackedLink(src, target, extras=None):
@@ -128,8 +132,8 @@ def marlExperiment(
 		l = net.addLink(src, target, **extras)
 		return l
 
-	route_commands = []
-	switch_sockets = {}
+	route_commands = [[]]
+	switch_sockets = [{}]
 
 	def openSwitchSocket(switch):
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -138,32 +142,28 @@ def marlExperiment(
 		ofpp.parse(s.recv(8))
 		switch.control_socket = s
 
-		global switch_sockets
-		switch_sockets[switch.name] = s
+		switch_sockets[0][switch.name] = s
 		return s
 
 	def removeAllSockets():
-		global switch_sockets
-		for _, sock in switch_sockets.viewitems():
+		for _, sock in switch_sockets[0].viewitems():
 			sock.close()
-		switch_sockets = {}
+		switch_sockets[0] = {}
 
 	def updateOneRoute(switch, cmd_list, msg):
 		if not switch.listenPort:
 			switch.cmd(*cmd_list)
 		else:
-			s = (switch_sockets[switch.name]
-				if switch.name in switch_sockets
+			s = (switch_sockets[0][switch.name]
+				if switch.name in switch_sockets[0]
 				else openSwitchSocket(switch)
 			)
 			s.send(msg)
-			#s.close()
 
 	def executeRouteQueue():
-		global route_commands
-		for el in route_commands:
+		for el in route_commands[0]:
 			updateOneRoute(*el)
-		route_commands = []
+		route_commands[0] = []
 
 	flow_pdrop_msg = ofpb.ofp_flow_mod(
 		None, 0, 0, 0, ofp.OFPFC_ADD,
@@ -204,7 +204,7 @@ def marlExperiment(
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
 		else:
-			route_commands.append((switch, cmd_list, msg))
+			route_commands[0].append((switch, cmd_list, msg))
 
 	def routedSwitch(upstreamNode, **args):
 		sw = newNamedSwitch(**args)
@@ -340,20 +340,19 @@ def marlExperiment(
 	store_sarsas = []
 	alive = False
 
-	interrupted = False
+	interrupted = [False]
 	def sigint_handle(signum, frame):
 		print "Interrupted, cleaning up."
-		Cleanup.cleanup()
-		interrupted = True
+		interrupted[0] = True
 
 	signal.signal(signal.SIGINT, sigint_handle)
 
 	for ep in xrange(episodes):
-		if interrupted:
+		if interrupted[0]:
 			break
 
-		initd_switch_count = 0
-		initd_host_count = 0
+		initd_switch_count = [0]
+		initd_host_count = [0]
 		alive = False
 		if separate_episodes:
 			store_sarsas = []
@@ -463,6 +462,9 @@ def marlExperiment(
 		g_reward = 0.0
 
 		for i in xrange(episode_length):
+			# May need to early exit
+			if interrupted[0]:
+				break
 			# Make the last actions a reality!
 			for (_, _, learners, _, _, sarsas) in teams:
 				enactActions(learners, sarsas)
@@ -533,5 +535,7 @@ def marlExperiment(
 
 		store_sarsas = team_sarsas
 
+	# Okay, done!
+	Cleanup.cleanup()
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
 	return (rewards, good_traffic_percents, total_loads, store_sarsas)
