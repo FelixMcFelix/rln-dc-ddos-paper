@@ -17,7 +17,7 @@ from subprocess import PIPE, Popen
 import sys
 import time
 
-def marl_experiment(
+def marlExperiment(
 		linkopts = {
 		#	"bw": 10
 		},

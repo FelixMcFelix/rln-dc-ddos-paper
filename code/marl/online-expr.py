@@ -1,6 +1,7 @@
 from marl import *
+from writer import writeResults
 
-(rewards, good_traffic_percents, total_loads, store_sarsas) = marl_experiment(
+results = marlExperiment(
 	n_teams = 5,
 
 	n_inters = 2,
@@ -20,3 +21,5 @@ from marl import *
 
 	rf = "ctl"
 )
+
+writeResults("../../results/", results)
