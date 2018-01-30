@@ -329,9 +329,6 @@ def marlExperiment(
 	### THE EXPERIMENT? ###
 
 	# initialisation
-
-	Cleanup.cleanup()
-
 	rewards = []
 	good_traffic_percents = []
 	total_loads = []
@@ -348,6 +345,7 @@ def marlExperiment(
 	signal.signal(signal.SIGINT, sigint_handle)
 
 	for ep in xrange(episodes):
+		Cleanup.cleanup()
 		if interrupted[0]:
 			break
 
@@ -536,6 +534,5 @@ def marlExperiment(
 		store_sarsas = team_sarsas
 
 	# Okay, done!
-	Cleanup.cleanup()
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
 	return (rewards, good_traffic_percents, total_loads, store_sarsas)
