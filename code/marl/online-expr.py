@@ -1,5 +1,5 @@
 from marl import *
-from writer import writeResults
+from writer import writeResults, makeResultsAverage
 
 results = marlExperiment(
 	n_teams = 5,
@@ -23,3 +23,5 @@ results = marlExperiment(
 )
 
 writeResults("../../results/online-standard.csv", results)
+
+makeResultsAverage("../../results/online-standard.csv", "../../results/online-standard-avg.csv")

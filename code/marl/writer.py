@@ -2,6 +2,8 @@ import csv
 import errno    
 import os
 
+import numpy as np
+
 # thanks, https://stackoverflow.com/questions/600268/
 def mkdir_p(path):
     try:
@@ -30,3 +32,31 @@ def writeResults(results_file, results, sarsa_dir=None):
 	# Okay, now output the sarsa learners' state.
 	if sarsa_dir is not None:
 		pass
+
+def makeResultsAverage(in_path, out_path):
+	with open(in_path, "r") as f_in:
+		with open(out_path, "w") as f_out:
+			c_in = csv.reader(f_in)
+			c_out = csv.writer(f_out)
+
+			# Headery stuff
+			_ = c_in.next()
+			c_out.writerow(["episode", "av_g_reward", "av_legit_traffic", "av_total_load"])
+
+			stats = []
+
+			for row in c_in:
+				t = int(row[1])
+				to_track = [float(x) for x in row[-3:]]
+				# print row
+
+				if len(stats) <= t:
+					stats.append([[],[],[]])
+
+				for target, entry in zip(stats[t], to_track):
+					target.append(entry)
+
+			# print stats
+
+			for i, row in enumerate(stats):
+				c_out.writerow([i] + [np.mean(np.array(c)) for c in row])
