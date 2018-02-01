@@ -136,6 +136,9 @@ def marlExperiment(
 	switch_sockets = [{}]
 
 	def openSwitchSocket(switch):
+		if switch.name in switch_sockets[0]:
+			killsock(switch_sockets[0][switch.name])
+			
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		s.connect(("127.0.0.1", switch.listenPort))
 		s.send(ofpb.ofp_hello(None, None))
@@ -145,9 +148,13 @@ def marlExperiment(
 		switch_sockets[0][switch.name] = s
 		return s
 
+	def killsock(s):
+		sock.shutdown(socket.SHUT_RDWR)
+		sock.close()
+
 	def removeAllSockets():
 		for _, sock in switch_sockets[0].viewitems():
-			sock.close()
+			killsock(sock)
 		switch_sockets[0] = {}
 
 	def updateOneRoute(switch, cmd_list, msg):
@@ -158,7 +165,15 @@ def marlExperiment(
 				if switch.name in switch_sockets[0]
 				else openSwitchSocket(switch)
 			)
-			s.send(msg)
+
+			# seems like pipes can randomly break. oops!
+			sent = False
+			while not sent:
+				try:
+					s.send(msg)
+					sent = True
+				except Error as err:
+					s = openSwitchSocket(switch)
 
 	def executeRouteQueue():
 		for el in route_commands[0]:
