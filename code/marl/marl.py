@@ -149,7 +149,10 @@ def marlExperiment(
 		return s
 
 	def killsock(s):
-		s.shutdown(socket.SHUT_RDWR)
+		try:
+			s.shutdown(socket.SHUT_RDWR)
+		except:
+			pass
 		s.close()
 
 	def removeAllSockets():
