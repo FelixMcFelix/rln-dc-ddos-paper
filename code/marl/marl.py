@@ -141,7 +141,7 @@ def marlExperiment(
 			
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		s.connect(("127.0.0.1", switch.listenPort))
-		s.send(ofpb.ofp_hello(None, None))
+		s.sendall(ofpb.ofp_hello(None, None))
 		ofpp.parse(s.recv(8))
 		switch.control_socket = s
 
@@ -149,8 +149,8 @@ def marlExperiment(
 		return s
 
 	def killsock(s):
-		sock.shutdown(socket.SHUT_RDWR)
-		sock.close()
+		s.shutdown(socket.SHUT_RDWR)
+		s.close()
 
 	def removeAllSockets():
 		for _, sock in switch_sockets[0].viewitems():
@@ -170,9 +170,9 @@ def marlExperiment(
 			sent = False
 			while not sent:
 				try:
-					s.send(msg)
+					s.sendall(msg)
 					sent = True
-				except Error as err:
+				except:
 					s = openSwitchSocket(switch)
 
 	def executeRouteQueue():
