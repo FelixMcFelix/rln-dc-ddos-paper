@@ -261,7 +261,7 @@ def marlExperiment(
 			good = np.random.uniform() < P_good
 			bw = (np.random.uniform(*(good_range if good else evil_range)))
 
-			link = trackedLink(extern, new_host, {"bw": bw})
+			link = trackedLink(extern, new_host, {})#"bw": bw})
 
 			# Make up a wonderful IP.
 			# Last byte => goodness. Even = good.
@@ -465,9 +465,9 @@ def marlExperiment(
 				host.sendCmd(
 					"tcpreplay-edit",
 					"-i", host.intfNames()[0],
-					"-l", str(999),
+					"-l", str(0),
 					"-S", "0.0.0.0/0:{}/32".format(ip),
-					#"-t",
+					"-M", str(bw),
 					(good_file if good else bad_file)
 				)
 

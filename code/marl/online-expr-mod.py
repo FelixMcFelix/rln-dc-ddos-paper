@@ -26,4 +26,4 @@ results = marlExperiment(
 
 writeResults("../../results/online-mod.csv", results)
 
-makeResultsAverage("../../results/online-mod.csv", "../../results/online-mod-avg.csv")
+makeResultsAverage("../../results/online-mod.csv", "../../results/online-mod-avg.csv", drop_zeroes=True)

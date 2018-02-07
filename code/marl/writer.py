@@ -33,7 +33,7 @@ def writeResults(results_file, results, sarsa_dir=None):
 	if sarsa_dir is not None:
 		pass
 
-def makeResultsAverage(in_path, out_path):
+def makeResultsAverage(in_path, out_path, drop_zeroes=False):
 	with open(in_path, "r") as f_in:
 		with open(out_path, "w") as f_out:
 			c_in = csv.reader(f_in)
@@ -52,6 +52,9 @@ def makeResultsAverage(in_path, out_path):
 
 				if len(stats) <= t:
 					stats.append([[],[],[]])
+
+				if drop_zeroes and to_track[-1]==0.0:
+					continue;
 
 				for target, entry in zip(stats[t], to_track):
 					target.append(entry)
