@@ -1,0 +1,148 @@
+\documentclass[10pt, a4paper]{article}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage{graphicx}
+
+\usepackage[binary-units]{siunitx}
+\sisetup{range-phrase=--, range-units=single}
+
+\usepackage[basic]{complexity}
+\usepackage[super,negative]{nth}
+
+\usepackage{booktabs}
+\usepackage{microtype}
+
+%% Fix indent in new section...
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{1.5ex}{0.7ex}
+
+%bib
+\usepackage[maxnames=3,maxbibnames=99,mincrossrefs=5,style=ieee,sortcites,backend=bibtex]{biblatex}
+\addbibresource{report.bib}
+
+%picky abt et al.
+\usepackage{xpatch}
+
+\xpatchbibmacro{name:andothers}{%
+	\bibstring{andothers}%
+}{%
+	\bibstring[\emph]{andothers}%
+}{}{}
+
+%opening!
+
+\newcommand{\mytitle}{Lab Report on reimplementation of MARL}
+
+\usepackage{varioref}
+\usepackage{hyperref}
+\usepackage{url}
+\hypersetup{
+	colorlinks,
+	citecolor=black,
+	filecolor=black,
+	linkcolor=black,
+	urlcolor=black,
+	pdftitle={\mytitle{}},
+	pdfauthor={Kyle A. Simpson}
+}
+\usepackage{cleveref}
+\newcommand{\crefrangeconjunction}{--}
+
+\newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
+
+\usepackage{titling}
+\settowidth{\thanksmarkwidth}{*}
+\setlength{\thanksmargin}{-\thanksmarkwidth}
+
+%-------------------------------------%
+%-------------------------------------%
+
+\title{\mytitle{}}
+\author{Kyle A. Simpson}
+
+\begin{document}
+
+%% If needed, make urls typewritery
+%\urlstyle{tt}
+
+\maketitle
+
+\section{Introduction}
+
+Goal: reimplementation of \textcite{DBLP:journals/eaai/MalialisK15}.
+
+\section{Empirical study}
+
+Rough hypotheses:
+\begin{itemize}
+	\item The findings of \citeauthor{DBLP:journals/eaai/MalialisK15} are replicable in a `real' network environment.
+	
+	\item Distributed MARL is tested against an abnormal (ISP-like) network where the network administrator is assumed to have control of nodes which are local to few hosts.
+	DDoS mitigation via a `direct-control' reinforcement learning approach over blanket pushback will be expected to cause significant collateral damage, and accordingly have significantly lower performance.
+	
+	\item Learners taught with a gradually/linearly annealed $\epsilon$ in this problem domain will be unable to generalise to the case where host distribution, connection patterns etc.\ exhibit explicit non-stationarity.
+	\begin{itemize}
+		\item For instance, changepoints at later episodes concerning attacker distribution, host distribution, load profiles...
+	\end{itemize}
+\end{itemize}
+
+\subsection{Methodology}
+
+Yeahh..
+
+\paragraph{Network topology.}
+As in the paper. (describe here? TikZ graph?)
+
+?? Simple enough flow rules, just send up the tree indiscriminately. The model doesn't concern the server having to reply to its clients, mysteriously. Oh well.
+
+\paragraph{Traffic generation.}
+Traffic is generated using \emph{TCPReplay} at each host, playing back traffic indefinitely from a predefined Pcap file.
+??Control over the send rate is managed by either TC, or tcpreplay. I'm having trouble with both at the moment!
+
+The MARL network model requires that hosts be designated `good' or `bad'.
+Calculating the reward function for the current network state requires knowledge of which traffic is (il)legitimate, by heuristic or otherwise.
+As \citeauthor{DBLP:journals/eaai/MalialisK15} assume perfect knowledge in their training process, I rewrite the traffic from each host to encode this in the last octet of the source IP address.
+The scheme is simple: if the octet is even, the packet is `good' (and vice versa).
+
+\paragraph{Pushback.}
+Mininet's switches run \emph{Open vSwitch} (OvS), allowing them to be remotely configured via \emph{OpenFlow} messages.
+To enable pushback via probabilistic packet dropping as in the original experiment, OvS was modified to include a custom action to do just this for any given flow.
+
+Typically, OvS switches register with a single controller: when a packet which can't be routed arrives, the switch forwards this to the controller, which is responsible for replying with new rules to make delivery possible.
+The control application acts outside of the typical Switch--Controller relationship: given that rule updates must be periodically posted \emph{at the control application's discretion}, the flow updates are manually composed and sent directly.
+
+\paragraph{Load monitoring.}
+All switches in Mininet appear to occupy the same namespace, and so a daemon running on any Mininet switch is allowed to monitor the interfaces of any other.
+This fact is used to easily monitor each interface in a centralised manner.
+
+The monitoring daemon spawns one thread for each interface it's told to subscribe to.
+Each of these threads then handles the \emph{libpcap} events attached to that interface, determining whether a packet is `good' or `bad' and appending the packet length to a dedicated location in a shared store.
+Every timestep, the calling program locks the shared store and reads out the time difference, traffic counts, and classifications for each interface.
+These statistics enable a rough calculation of the current load in \si{\mega\bit\per\second}.
+
+\paragraph{Reinforcement learning.} Opportunistic SARSA! ($\gamma = 0$, no discounting)
+
+For an action $a-t$ chosen by the current value function $Q_t$ while in state $s_t$ ??CLEANUP:
+
+$$ Q_{t+1}(s_t,a_t) = Q_t(s_t,a_t) + \alpha [R_{t+1} + \gamma Q_t(s_{t+1},a_{t+1}) - Q_t(s_t,a_t)] $$
+Actions received from each learner cause a different level of throttling to be applied within the network.
+
+?? Tabular approximation, tile coding, maybe list the params here?!
+
+\paragraph{Changes for experiments 2... 3...} Undecided.
+
+\subsection{Results}
+
+TBA. Currently awaiting debugging of anomalous mininet behaviour.
+
+\section{Discussion}
+
+Yeah, those sure were some results huh.
+
+\section{Conclusion}
+
+Yikes!
+
+\printbibliography
+
+\end{document}
