@@ -51,6 +51,15 @@ def marlExperiment(
 
 		dt = 0.001,
 
+		# These should govern tc on the links at various points in the network.
+		#
+		# Final hop is just what you'd think, old_style governs
+		# whether sender rates are mediated by tcpreplay or by tc on the link
+		# over from said host.
+		old_style = False,
+		force_host_tc = False,
+		protect_final_hop = True,
+
 		rf = "ctl"
 	):
 
@@ -261,7 +270,7 @@ def marlExperiment(
 			good = np.random.uniform() < P_good
 			bw = (np.random.uniform(*(good_range if good else evil_range)))
 
-			link = trackedLink(extern, new_host, {})#"bw": bw})
+			link = trackedLink(extern, new_host, {"bw": bw} if (old_style or force_host_tc) else {})
 
 			# Make up a wonderful IP.
 			# Last byte => goodness. Even = good.
@@ -437,8 +446,9 @@ def marlExperiment(
 		
 		# Update master link's bandwidth limit after hosts init.
 		capacity = calc_max_capacity(len(all_hosts))
-		core_link.intf1.config(bw=capacity)
-		core_link.intf2.config(bw=capacity)
+		if protect_final_hop:
+			core_link.intf1.config(bw=capacity)
+			core_link.intf2.config(bw=capacity)
 
 		# Track the rewards, total load observed and legit rates per step (split by episode)
 		rewards.append([])
@@ -462,13 +472,17 @@ def marlExperiment(
 		# gen traffic at each host. This MUST happen after the bootstrap.
 		for (_, _, _, _, hosts, _) in teams:
 			for (host, good, bw, link, ip) in hosts:
-				host.sendCmd(
+				cmd = [
 					"tcpreplay-edit",
 					"-i", host.intfNames()[0],
 					"-l", str(0),
-					"-S", "0.0.0.0/0:{}/32".format(ip),
-					"-M", str(bw),
-					(good_file if good else bad_file)
+					"-S", "0.0.0.0/0:{}/32".format(ip)
+				] + (
+					[] if old_style else ["-M", str(bw)]
+				) + [(good_file if good else bad_file)]
+				 
+				host.sendCmd(
+					*cmd
 				)
 
 		# Let the pcaps come to life.
