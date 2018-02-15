@@ -60,8 +60,18 @@ def marlExperiment(
 		force_host_tc = False,
 		protect_final_hop = True,
 
-		rf = "ctl"
+		rf = "ctl",
+
+		rand_seed = None,
+		rand_state = None,
 	):
+
+	# Use any predetermined random state.
+	if rand_state is not None:
+		random.setstate(rand_state)
+	elif rand_seed is not None:
+		random.seed(rand_seed)
+
 
 	if max_bw is None:
 		max_bw = n_teams * n_inters * n_learners * host_range[1] * evil_range[1]
@@ -567,4 +577,4 @@ def marlExperiment(
 
 	# Okay, done!
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
-	return (rewards, good_traffic_percents, total_loads, store_sarsas)
+	return (rewards, good_traffic_percents, total_loads, store_sarsas, random.getstate())

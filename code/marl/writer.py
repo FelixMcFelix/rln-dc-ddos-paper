@@ -15,7 +15,7 @@ def mkdir_p(path):
             raise
 
 def writeResults(results_file, results, sarsa_dir=None):
-	(rewards, good_traffic_percents, total_loads, store_sarsas) = results
+	(rewards, good_traffic_percents, total_loads, store_sarsas, rng_state) = results
 
 	# First, handle the actual results.
 	mkdir_p(os.path.split(results_file)[0])
@@ -30,7 +30,9 @@ def writeResults(results_file, results, sarsa_dir=None):
 				all_t += 1
 
 	# Okay, now output the sarsa learners' state.
+	# Also, probably want to do something with rng state.
 	if sarsa_dir is not None:
+		# TODO
 		pass
 
 def makeResultsAverage(in_path, out_path, drop_zeroes=False):
