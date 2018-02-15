@@ -285,7 +285,7 @@ def marlExperiment(
 
 			# Make up a wonderful IP.
 			# Last byte => goodness. Even = good.
-			ip_bytes = list(random.randint(256, size=4))
+			ip_bytes = [random.randint(0,0xff) for i in xrange(4)]
 			ip_bytes[-1] = moralise(ip_bytes[-1], good)
 
 			ip = "{}.{}.{}.{}".format(*ip_bytes)

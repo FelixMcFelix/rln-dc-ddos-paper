@@ -49,8 +49,8 @@ class SarsaLearner:
 		action_vals = self._get_state_values(state)
 
 		# Epsilon-greedy action selection (linear-decreasing).
-		if random.random() < self._curr_epsilon:
-			a_index = random.randint(0, len(self.actions)-1)
+		if np.random.uniform() < self._curr_epsilon:
+			a_index = np.random.randint(len(self.actions))
 		else:
 			a_index = np.argmax(action_vals)
 		

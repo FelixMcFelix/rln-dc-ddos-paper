@@ -21,7 +21,9 @@ results = marlExperiment(
 
 	dt = 0.01,
 
-	rf = "ctl"
+	rf = "ctl",
+
+	rand_seed = 0xcafed00d
 )
 
 writeResults("../../results/online-mod.csv", results)
