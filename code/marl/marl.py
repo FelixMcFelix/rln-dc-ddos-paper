@@ -11,6 +11,7 @@ import twink.ofp5.parse as ofpp
 
 import itertools
 import numpy as np
+import random
 from sarsa import SarsaLearner
 import signal
 import socket
@@ -270,21 +271,21 @@ def marlExperiment(
 
 	def addHosts(extern, hosts_per_learner, hosts_upper):
 		host_count = (hosts_per_learner if hosts_per_learner == hosts_upper
-			else np.random.randint(hosts_per_learner, hosts_upper)
+			else random.randint(hosts_per_learner, hosts_upper)
 		)
 
 		hosts = []
 
 		for i in xrange(host_count):
 			new_host = newNamedHost()
-			good = np.random.uniform() < P_good
-			bw = (np.random.uniform(*(good_range if good else evil_range)))
+			good = random.random() < P_good
+			bw = (random.uniform(*(good_range if good else evil_range)))
 
 			link = trackedLink(extern, new_host, {"bw": bw} if (old_style or force_host_tc) else {})
 
 			# Make up a wonderful IP.
 			# Last byte => goodness. Even = good.
-			ip_bytes = list(np.random.randint(256, size=4))
+			ip_bytes = list(random.randint(256, size=4))
 			ip_bytes[-1] = moralise(ip_bytes[-1], good)
 
 			ip = "{}.{}.{}.{}".format(*ip_bytes)

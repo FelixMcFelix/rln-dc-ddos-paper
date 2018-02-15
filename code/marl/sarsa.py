@@ -1,4 +1,5 @@
 import numpy as np
+import random
 import tilecoding.representation as r
 
 class SarsaLearner:
@@ -48,8 +49,8 @@ class SarsaLearner:
 		action_vals = self._get_state_values(state)
 
 		# Epsilon-greedy action selection (linear-decreasing).
-		if np.random.uniform() < self._curr_epsilon:
-			a_index = np.random.choice(len(self.actions))
+		if random.random() < self._curr_epsilon:
+			a_index = random.randint(0, len(self.actions)-1)
 		else:
 			a_index = np.argmax(action_vals)
 		
