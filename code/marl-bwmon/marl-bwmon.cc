@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <iostream>
 #include <mutex>
@@ -8,50 +10,84 @@
 #include <thread>
 #include <vector>
 
-#include <netinet/in.h>
 #include <arpa/inet.h>
-
+#include <netinet/in.h>
 #include <pcap/pcap.h>
+#include <poll.h>
+#include <sys/select.h>
+#include <sys/time.h>
 
 class InterfaceStats
 {
+	int num_interfaces_;
+	std::vector<uint64_t> bad_byte_counts_;
+	std::vector<uint64_t> good_byte_counts_;
+
+	bool limiting_ = false;
+	std::chrono::high_resolution_clock::time_point limit_;
+	std::atomic<int> to_go_ = std::atomic<int>(0);
+
+	bool end_ = false;
+
+	mutable std::shared_mutex mutex_;
+	std::condition_variable_any stopped_limiting_;
+	std::condition_variable_any hit_limit_;
+
 public:
-	InterfaceStats(int numInterfaces) {
-		badByteCounts_ = std::vector<uint64_t>(numInterfaces, 0);
-		goodByteCounts_ = std::vector<uint64_t>(numInterfaces, 0);
-	}
+	InterfaceStats(int n)
+		: num_interfaces_(n)
+		, bad_byte_counts_(std::vector<uint64_t>(n, 0))
+		, good_byte_counts_(std::vector<uint64_t>(n, 0))
+	{ }
 
 	void incrementStat(int interface, bool good, uint32_t packetSize) {
 		std::shared_lock<std::shared_mutex> lock(mutex_);
 
 		if (good) 
-			goodByteCounts_[interface] += packetSize;
+			good_byte_counts_[interface] += packetSize;
 		else
-			badByteCounts_[interface] += packetSize;
+			bad_byte_counts_[interface] += packetSize;
 	}
 
-	void clearAndPrintStats(std::chrono::high_resolution_clock::time_point startTime) {
+	std::chrono::high_resolution_clock::time_point clearAndPrintStats(std::chrono::high_resolution_clock::time_point startTime) {
 		std::unique_lock<std::shared_mutex> lock(mutex_);
 
 		auto endTime = std::chrono::high_resolution_clock::now();
 		auto duration = endTime - startTime;
 
+		// First, tell the threads they have a limit TO WORK UP TO.
+		limiting_ = true;
+		limit_ = endTime;
+		to_go_.store(num_interfaces_);
+
+		// Okay, now await the signal from all the workers...
+		int t_g = num_interfaces_;
+		while ((t_g = to_go_.load()) > 0) hit_limit_.wait(lock);
+
+		// Then, we need to wait for them to finish before we do all this...
 		std::cout << std::chrono::nanoseconds(duration).count() << "ns";
 		
-		for (unsigned int i = 0; i < badByteCounts_.size(); ++i)
+		for (unsigned int i = 0; i < bad_byte_counts_.size(); ++i)
 		{
 			std::cout << ", ";
 
-			std::cout << goodByteCounts_[i] << " " << badByteCounts_[i];
+			std::cout << good_byte_counts_[i] << " " << bad_byte_counts_[i];
 		}
 
 		std::cout << std::endl;
 
 		// Empty the stats.
-		for (auto &el: goodByteCounts_)
+		for (auto &el: good_byte_counts_)
 			el = 0;
-		for (auto &el: badByteCounts_)
+		for (auto &el: bad_byte_counts_)
 			el = 0;
+
+		limiting_ = false;
+
+		// Signal done.
+		stopped_limiting_.notify_all();
+		
+		return endTime;
 	}
 
 	bool finished() {
@@ -64,11 +100,32 @@ public:
 		end_ = true;
 	}
 
-private:
-	std::vector<uint64_t> badByteCounts_;
-	std::vector<uint64_t> goodByteCounts_;
-	bool end_ = false;
-	mutable std::shared_mutex mutex_;
+	void checkCanRecord(const struct timeval tv, const int id) {
+		auto tv_convert =
+			std::chrono::high_resolution_clock::time_point(
+				std::chrono::seconds(tv.tv_sec)
+				+ std::chrono::microseconds(tv.tv_usec)
+			);
+
+		checkCanRecord(tv_convert, id);
+	}
+
+	void checkCanRecord(const std::chrono::high_resolution_clock::time_point tv_convert, const int id) {
+		std::shared_lock<std::shared_mutex> lock(mutex_);
+
+		// Need to (if we hit the limit), signal that we *have*,
+		// and then await the main thread signalling that it finished its read/write.
+		if (limiting_ && tv_convert >= limit_) {
+				// Signal.
+				to_go_ -= 1;
+				hit_limit_.notify_all();
+
+				// Await using our lock and the reader's signal.
+				// Don't loop here: the cond is guaranteed to be valid,
+				// and control flow MUST escape.
+				stopped_limiting_.wait(lock);
+		}
+	}
 };
 
 struct PcapLoopParams {
@@ -84,6 +141,8 @@ struct PcapLoopParams {
 
 static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_char *data) {
 	PcapLoopParams *params = reinterpret_cast<PcapLoopParams *>(user);
+
+	params->stats.checkCanRecord(h->ts, params->index);
 
 	// Look at the packet, decide good/bad, then increment!
 	// Establish the facts: HERE.
@@ -102,10 +161,6 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 			// Another assumption, we're little endian.
 			good = !(((ip>>24)&0xff) % 2);
 
-			//struct in_addr addr { s_addr: ip };
-			//char ip_str[INET_ADDRSTRLEN];
-			//inet_ntop(AF_INET, &addr, ip_str, INET_ADDRSTRLEN);
-			//std::cout << "message from: " << ip_str << " " << good << " " << ((ip>>24)&0xff) <<std::endl;
 			break;
 		}
 		case DLT_RAW:
@@ -117,14 +172,18 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 	}
 
 	params->stats.incrementStat(params->index, good, h->len);
-
-	if (params->stats.finished())
-		pcap_breakloop(params->iface);
 }
 
 static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &stats) {
 	int err = 0;
-	if((err = pcap_activate(iface))) {
+	int fd = 0;
+	char errbuff[PCAP_ERRBUF_SIZE];
+
+	if((err =
+		pcap_set_immediate_mode(iface, 1)
+		|| pcap_activate(iface))
+		|| pcap_setnonblock(iface, 1, errbuff))
+	{
 		std::cerr << "iface " << index << " could not be initialised: ";
 
 		switch (err) {
@@ -141,10 +200,39 @@ static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &sta
 		std::cerr << std::endl;
 	}
 
-	int linkType = pcap_datalink(iface);
-	auto params = PcapLoopParams(stats, iface, index, linkType);
+	if (!err) {
+		int linkType = pcap_datalink(iface);
+		auto params = PcapLoopParams(stats, iface, index, linkType);
 
-	pcap_loop(iface, -1, perPacketHandle, reinterpret_cast<u_char *>(&params));
+		if ((fd = pcap_get_selectable_fd(iface)) < 0)
+			std::cerr << "Weirdly, got fd " << fd << "." << std::endl;
+
+		struct pollfd iface_pollfd = {
+			fd,
+			POLLIN,
+			0
+		};
+
+		// pcap_loop(iface, -1, perPacketHandle, reinterpret_cast<u_char *>(&params));
+
+		int count_processed = 0;
+		while (count_processed >= 0) {
+			auto n_evts = poll(&iface_pollfd, 1, 1);
+
+			if (n_evts > 0)
+				count_processed = pcap_dispatch(
+					iface, -1, perPacketHandle, reinterpret_cast<u_char *>(&params)
+				);
+			if (n_evts == 0 || !count_processed)
+				stats.checkCanRecord(std::chrono::high_resolution_clock::now(), index);
+
+			if (stats.finished()) {
+				break;
+			}
+		}
+	} else {
+		std::cerr << "Error setting up pcap: " << errbuff << ", " << pcap_geterr(iface) << std::endl;
+	}
 
 	pcap_close(iface);
 	std::this_thread::yield();
@@ -174,12 +262,12 @@ void listDevices(char *errbuf) {
 int main(int argc, char const *argv[])
 {
 	char errbuf[PCAP_ERRBUF_SIZE];
-	auto numInterfaces = argc - 1;
-	auto stats = InterfaceStats(numInterfaces);
+	auto num_interfaces = argc - 1;
+	auto stats = InterfaceStats(num_interfaces);
 
 	std::vector<std::thread> workers;
 
-	if (numInterfaces == 0) {
+	if (num_interfaces == 0) {
 		listDevices(errbuf);
 		return 0;
 	}
@@ -188,7 +276,7 @@ int main(int argc, char const *argv[])
 
 	bool err = false;
 
-	for (int i = 0; i < numInterfaces; ++i)
+	for (int i = 0; i < num_interfaces; ++i)
 	{
 		/* iterate over iface names, spawn threads! */
 		auto p = pcap_create(argv[i+1], errbuf);
@@ -214,8 +302,7 @@ int main(int argc, char const *argv[])
 
 			if (std::cin.eof()) break;
 
-			stats.clearAndPrintStats(startTime);
-			startTime = std::chrono::high_resolution_clock::now();
+			startTime = stats.clearAndPrintStats(startTime);
 		}
 	}
 
