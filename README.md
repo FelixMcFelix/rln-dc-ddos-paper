@@ -5,4 +5,5 @@ Why? We should look for evidence that the model is becoming "out-of-date" and us
 ## Requirements
 * gcc 7+
 * mininet
-* python2 (accompanies mininet)
+* python2 (accompanies mininet) + numpy, twink
+* tcpreplay

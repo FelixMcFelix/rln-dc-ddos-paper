@@ -1,7 +1,7 @@
 #!/bin/bash
 config_file="/etc/depmod.d/openvswitch.conf"
 
-rm $config_file
+rm -f $config_file
 
 for module in datapath/linux/*.ko;
 do

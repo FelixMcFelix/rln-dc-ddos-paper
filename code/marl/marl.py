@@ -11,6 +11,7 @@ import twink.ofp5.parse as ofpp
 
 import itertools
 import numpy as np
+import os
 import random
 from sarsa import SarsaLearner
 import signal
@@ -416,6 +417,7 @@ def marlExperiment(
 
 		# remake/reclassify hosts
 		all_hosts = []
+		host_procs = []
 		l_teams = []
 
 		bw_teams = []
@@ -492,9 +494,12 @@ def marlExperiment(
 					[] if old_style else ["-M", str(bw)]
 				) + [(good_file if good else bad_file)]
 				 
-				host.sendCmd(
-					*cmd
-				)
+				#host.sendCmd(
+				#	*cmd
+				#)
+				host_procs.append(host.popen(
+					cmd, stdin=PIPE, stderr=sys.stderr
+				))
 
 		# Let the pcaps come to life.
 		time.sleep(0.5)
@@ -571,6 +576,11 @@ def marlExperiment(
 		mon_cmd.stdin.close()
 
 		removeAllSockets()
+
+		for proc in host_procs:
+			proc.terminate()
+
+		host_procs = []
 
 		net.stop()
 
