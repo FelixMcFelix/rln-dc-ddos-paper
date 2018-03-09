@@ -1,10 +1,10 @@
 from marl import *
 from writer import writeResults, makeResultsAverage
 
-hosts_p = 5
+hosts_p = 7
 
 results = marlExperiment(
-	n_teams = 5,
+	n_teams = 2,#5,
 
 	n_inters = 2,
 	n_learners = 3,
@@ -19,7 +19,7 @@ results = marlExperiment(
 	epsilon = 0.2,
 	discount = 0,
 
-	dt = 0.01,
+	dt = 0.05,#0.01,
 
 	rf = "ctl",
 
@@ -28,4 +28,5 @@ results = marlExperiment(
 
 writeResults("../../results/online-mod.csv", results)
 
-makeResultsAverage("../../results/online-mod.csv", "../../results/online-mod-avg.csv", drop_zeroes=True)
+makeResultsAverage("../../results/online-mod.csv", "../../results/online-mod-avg.csv")
+

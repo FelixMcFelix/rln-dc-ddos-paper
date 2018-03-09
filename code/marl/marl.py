@@ -515,12 +515,14 @@ def marlExperiment(
 			for (_, _, learners, _, _, sarsas) in teams:
 				enactActions(learners, sarsas)
 
-			#presleep = time.time()
+			presleep = time.time()
 
 			# Wait, somehow
 			time.sleep(dt)
 
-			#postsleep = time.time()
+			postsleep = time.time()
+
+			#print postsleep - presleep
 
 			# Measure good/bad loads!
 			mon_cmd.stdin.write("\n")
