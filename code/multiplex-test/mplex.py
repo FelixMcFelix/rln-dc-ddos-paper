@@ -24,6 +24,8 @@ def mplexExperiment(
 		n = 5,
 		inc_function = None,
 
+		udp = False,
+
 		pdrop_min = 0.0,
 		pdrop_max = 1.0,
 		pdrop_stride = 0.1,
@@ -36,7 +38,7 @@ def mplexExperiment(
 	):
 
 	if inc_function is None:
-		inc_function = lambda last, i, n: float(i)
+		inc_function = lambda last, i, n: float(i+1)
 
 	# helpers
 
@@ -166,10 +168,6 @@ def mplexExperiment(
 			"in_port=*,ip,nw_dst={},actions=\"{}-eth{}\"".format(ip,switch.name, out_port)
 		]
 
-		print host.nameToIntf
-		print host.defaultIntf()
-		print host.defaultIntf().IP()
-
 		msg = ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
 			0, 0, 1, None, None, None, 0, 1,
@@ -183,8 +181,6 @@ def mplexExperiment(
 				ofpb.ofp_action_output(None, 16, out_port, 65535)
 			])
 		)
-
-		print msg
 
 		switchRouteCommand(switch, cmd_tail, msg)
 
@@ -282,20 +278,23 @@ def mplexExperiment(
 	server_procs = [server.popen(["iperf3", "-s", "-p", str(base_iperf_port+x)], stdin=PIPE, stderr=sys.stderr) for x in xrange(n)]
 	host_procs = []
 
-	net.interact()
+	#net.interact()
 
 	for p in fxrange(pdrop_min, pdrop_max, pdrop_stride):
 		updateUpstreamRoute(server_switch, ac_prob=p)
 
-		host_procs = [host.popen(["iperf3", "-c", "-p", str(base_iperf_port+x), "-b", "{}M".format(bw)], stdin=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)]
+		host_procs = [host.popen(["iperf3", "-c", server.IP(), "-p", str(base_iperf_port+i), "-b", "{}M".format(bw)] + ["-u"] if udp else [], stdin=PIPE, stdout=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)]
 
+		print "=========="
 		print "stats for p_drop={:.2f}".format(p)
 		print "=========="
 
 		for proc, (host, bw) in zip(host_procs, hosts):
 			print "bw={}".format(bw)
 			print "----------"
-			print proc.communicate()
+			print proc.communicate()[0]
+
+		time.sleep(1)
 
 	removeAllSockets()
 
@@ -306,5 +305,5 @@ def mplexExperiment(
 
 	return None
 
-mplexExperiment(n=5)
+mplexExperiment(n=5, udp=True)
 
