@@ -42,6 +42,7 @@ def mplexExperiment(
 
 	initd_host_count = [0]
 	initd_switch_count = [0]
+	next_ip = [1]
 
 	def newNamedHost(**kw_args):
 		o = net.addHost("h{}".format(initd_host_count[0]), **kw_args)
@@ -52,6 +53,10 @@ def mplexExperiment(
 		o = net.addSwitch("s{}".format(initd_switch_count[0]), listenPort=7000+initd_switch_count[0], **kw_args)
 		initd_switch_count[0] += 1
 		return o
+
+	def assignIP(node):
+		node.setIP("10.0.0.{}".format(next_ip[0]), 24)
+		next_ip[0] += 1
 
 	def trackedLink(src, target, extras=None):
 		if extras is None:
@@ -88,7 +93,7 @@ def mplexExperiment(
 		switch_sockets[0] = {}
 
 	def updateOneRoute(switch, cmd_list, msg):
-		if not switch.listenPort:
+		if not False:#switch.listenPort:
 			switch.cmd(*cmd_list)
 		else:
 			s = (switch_sockets[0][switch.name]
@@ -122,18 +127,35 @@ def mplexExperiment(
 		])
 	)
 
-	def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
+	def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0, ip="10.0.0.1"):
 		# Turn from prob_drop into prob_send!
 		prob = 1 - ac_prob
 		p_drop_num = pdrop(prob)
-		p_drop = "" if ac_prob == 0.0 else "probdrop:{},".format(p_drop_num)
+		#p_drop = "" if ac_prob == 0.0 else "probdrop:{},".format(p_drop_num)
+		p_drop = "probdrop:{},".format(p_drop_num)
 
 		cmd_tail = [
-			"actions={}\"{}-eth{}\"".format(p_drop, name, out_port)
+			"in_port=*,ip,nw_dst={},actions={}\"{}-eth{}\"".format(ip, p_drop, switch.name, out_port)
 		]
 
 		# Try building that message from scratch, here.
-		msg = flow_pdrop_msg[:-20] + ofpb._pack("I", p_drop_num) + flow_pdrop_msg[-16:]
+		#msg = flow_pdrop_msg[:-20] + ofpb._pack("I", p_drop_num) + flow_pdrop_msg[-16:]
+
+
+		msg = ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 1, None, None, None, 0, 1,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				# Need to match Dest IP against curr host's.
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, False, 0, socket.inet_aton(ip), None)
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				# Looks like 29 is the number I picked for Pdrop.
+				ofpb._pack("HHI", 29, 8, p_drop_num),
+				ofpb.ofp_action_output(None, 16, out_port, 65535)
+			])
+		)
 
 		switchRouteCommand(switch, cmd_tail, msg)
 
@@ -141,20 +163,43 @@ def mplexExperiment(
 		ip = host.IP()
 
 		cmd_tail = [
-			"nw_dst={}".format(ip),
-			"actions=\"{}-eth{}\"".format(name, out_port)
+			"in_port=*,ip,nw_dst={},actions=\"{}-eth{}\"".format(ip,switch.name, out_port)
 		]
 
-		flow_pdrop_msg = ofpb.ofp_flow_mod(
+		print host.nameToIntf
+		print host.defaultIntf()
+		print host.defaultIntf().IP()
+
+		msg = ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
 			0, 0, 1, None, None, None, 0, 1,
 			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
 				# Need to match Dest IP against curr host's.
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
 				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, False, 0, socket.inet_aton(ip), None)
 			]),
 			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
 				# Looks like 29 is the number I picked for Pdrop.
 				ofpb.ofp_action_output(None, 16, out_port, 65535)
+			])
+		)
+
+		print msg
+
+		switchRouteCommand(switch, cmd_tail, msg)
+
+	def floodRoute(switch):
+		cmd_tail = [
+			"actions=flood"
+		]
+
+		msg = ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 1, None, None, None, 0, 1,
+			ofpb.ofp_match(None, None, None),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				# Looks like 29 is the number I picked for Pdrop.
+				ofpb.ofp_action_output(None, 16, ofp.OFPP_FLOOD, 65535)
 			])
 		)
 
@@ -179,12 +224,6 @@ def mplexExperiment(
 		else:
 			route_commands[0].append((switch, cmd_list, msg))
 
-	def routedSwitch(upstreamNode, **args):
-		sw = newNamedSwitch(**args)
-		trackedLink(upstreamNode, sw)
-		updateUpstreamRoute(sw)
-		return sw
-
 	def enactActions(learners, sarsas):
 		for (node, sarsa) in zip(learners, sarsas):
 			(_, action, _) = sarsa.last_act
@@ -195,6 +234,7 @@ def mplexExperiment(
 		server_switch = newNamedSwitch()
 
 		core_link = trackedLink(server, server_switch)
+		assignIP(server)
 
 		hosts = []
 		last_bw = 0.0
@@ -207,10 +247,13 @@ def mplexExperiment(
 			trackedLink(server_switch, h)
 
 			hosts.append((h, bw))
+			assignIP(h)
 
 			updateDownstreamRoute(server_switch, h, i+2)
 
 		updateUpstreamRoute(server_switch)
+
+		floodRoute(server_switch)
 
 		return (server, core_link, server_switch, hosts)
 
@@ -228,20 +271,23 @@ def mplexExperiment(
 	net = Mininet(link=TCLink)
 	alive = False
 
+	Cleanup.cleanup()
+
 	(server, core_link, server_switch, hosts) = buildNet(n)
 
 	net.start()
+	alive = True
 	executeRouteQueue()
-
-	# TODO: Record bandwidth stats
 
 	server_procs = [server.popen(["iperf3", "-s", "-p", str(base_iperf_port+x)], stdin=PIPE, stderr=sys.stderr) for x in xrange(n)]
 	host_procs = []
 
+	net.interact()
+
 	for p in fxrange(pdrop_min, pdrop_max, pdrop_stride):
 		updateUpstreamRoute(server_switch, ac_prob=p)
 
-		host_procs = [host.popen(["iperf3", "-p", str(base_iperf_port+x), "-b", "{}M".format(bw)], stdin=PIPE, stderr=sys.stderr) for i, (host, bw) in hosts]
+		host_procs = [host.popen(["iperf3", "-c", "-p", str(base_iperf_port+x), "-b", "{}M".format(bw)], stdin=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)]
 
 		print "stats for p_drop={:.2f}".format(p)
 		print "=========="
@@ -260,4 +306,5 @@ def mplexExperiment(
 
 	return None
 
-	mplexExperiment(n=5)
+mplexExperiment(n=5)
+
