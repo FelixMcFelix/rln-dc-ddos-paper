@@ -55,7 +55,7 @@
 
 \title{Reinforcement Learning in Network Defence/Control (WIP)}
 \author{Kyle A. Simpson\\
-	\tiny{\faGithub{} \href{https://github.com/felixmcfelix}{FelixMcFelix} \hspace{0.5em} \faGlobe{} \url{https://mcfelix.me}}}
+	\small{\faGithub{} \href{https://github.com/felixmcfelix}{FelixMcFelix} \hspace{0.5em} \faGlobe{} \url{https://mcfelix.me}}}
 \institute{University of Glasgow}
 \date{\nth{10} April, 2018}
 
@@ -65,10 +65,19 @@
 
 \section{Reinforcement learning}
 
-\begin{frame}{An introduction}
-	Yeah. \footcite{RL2E}
+\begin{frame}{Introducing: Reinforcement Learning}
+	\begin{itemize}
+		\item Goal: train an agent to make optimal decisions based on observed state.
+		\begin{itemize}
+			\item Formally, maximise the \alert{expected discounted reward}\footcite{RL2E}.
+		\end{itemize}
 	
-	Provide a rough explanation.
+		\item Underlying theory: systems as (discrete-time) \alert{Markov Decision Processes}---states, actions, rewards and transition probabilities.
+		\begin{itemize}
+			\item I.e., choosing action $a_t$ from a policy in state $s_t$, $a_t \sim \pi(s_t)$, induces the next state $s_{t+1}$ and an associated reward $r_{t+1}$ stochastically.
+			\item Generalises to \alert{value} $Q(s,a)$---how much reward can we \emph{eventually} expect from choosing each action currently available?
+		\end{itemize}
+	\end{itemize}
 \end{frame}
 
 \begin{frame}{Why have RL in networks?}
