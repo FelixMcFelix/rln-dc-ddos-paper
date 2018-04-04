@@ -6,6 +6,11 @@
 \usetheme[background=light, numbering=fraction]{metropolis}
 \usepackage{appendixnumberbeamer}
 
+\usepackage[labelfont=bf,textfont={it}]{caption}
+\usepackage{subcaption}
+\captionsetup[figure]{justification=centering}
+\captionsetup[subfigure]{justification=centering}
+
 %\usepackage{fontspec}
 %\setsansfont{Fira Sans Mono}
 
@@ -92,15 +97,30 @@
 	Network Model
 	
 	Pushback
+	
+	Group reward functions etc.
 \end{frame}
 
 \begin{frame}{The case for finer granularity}
-	Reduced service guarantees by nature of \emph{pushback} model.
-	This is exacerbated by TCP congestion avoidance---legit hosts will be punished far more severely, bad actors don't care!
-	
-	?? Add my plots of throughput?
-	
-	Alongside this higher-granularity view, reformulation to include flow characteristics in the decision-making process.
+	\begin{columns}
+	\begin{column}{0.45\linewidth}
+		\begin{itemize}
+			\item Reduced service guarantees by nature of \emph{pushback} model.
+			\begin{itemize}
+				\item \alert{Worse with good-faith TCP congestion avoidance}.
+			\end{itemize}
+			%This is exacerbated by TCP congestion avoidance---legit hosts will be punished far more severely, bad actors don't care!
+			
+			\item More granular $\implies$ should focus on flow stats, \alert{not aggregates} like now! %Alongside this higher-granularity view, reformulation to include flow characteristics in the decision-making process.
+		\end{itemize}
+	\end{column}
+	\begin{column}{0.5\linewidth}
+		\begin{figure}
+			\includegraphics[width=\linewidth]{../plots/online.pdf}
+			\caption{Service quality decreases as actions become less granular.}
+		\end{figure}
+	\end{column}
+	\end{columns}
 \end{frame}
 
 \section{The adversarial setting}
