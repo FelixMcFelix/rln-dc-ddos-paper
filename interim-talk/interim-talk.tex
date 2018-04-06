@@ -70,7 +70,7 @@
 
 \section{Reinforcement learning}
 
-\begin{frame}{Introducing: Reinforcement Learning}
+\begin{frame}{Introducing: Reinforcement Learning (RL)}
 	\begin{itemize}
 		\item Goal: train an agent to make optimal decisions based on observed state.
 		\begin{itemize}
@@ -86,25 +86,58 @@
 \end{frame}
 
 \begin{frame}{Why have RL in networks?}
-	Link to recent work in data-driven networking/optimisation?
+	%Link to recent work in data-driven networking/optimisation?
+	%
+	%Link to that one GMM paper w/ RL communication.
 	
-	Link to that one GMM paper w/ RL communication.
+	\begin{itemize}
+		\item \alert{Data-driven networking.} Effectively applied to intra-domain routing \footcite{DBLP:conf/hotnets/ValadarskySST17}, task allocation \footcite{DBLP:conf/hotnets/MaoAMK16} and more, each with general and domain-specific insights.
+		
+		\item \alert{In intrusion detectors?} Optimising information sharing in distributed statistical model training \footcite{DBLP:conf/paisi/XuSH07}.
+	\end{itemize}
 \end{frame}
 
 \section{What I'm working on}
 
-\begin{frame}{MARL for DDoS prevention}
-	Network Model
+\begin{frame}{Multiagent RL for DDoS prevention}
+%	Network Model \footcite{DBLP:journals/eaai/MalialisK15}
+%	
+%	Pushback \footcite{DBLP:journals/ccr/MahajanBFIPS02a}
+%	
+%	Group reward functions etc.
+%
+%	Its weaknesses? Strong assumptions about what knowledge the learners really have...
 	
-	Pushback
-	
-	Group reward functions etc.
+	\begin{itemize}
+		\item Reimplementing (and poking holes in) MARL\footcite{DBLP:journals/eaai/MalialisK15}.
+		% How? Violation of ISP-like criterion, 
+		
+		\item Network model
+		\begin{itemize}
+			\item Hosts have a fixed probability of being benign/malicious.
+			\item $n$ hosts per learner, $i$ learners to a team, $j$ teams, one server.
+			\item Per-team rewards: \alert{coordinated team learning}.
+			\item Action: (per-timestep) choose $p$, s.t. each learner drops $p\%$ of external traffic.
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{Flaws/Risks of MARL?}	
+	\begin{itemize}		
+		\item Action mechanism is \emph{pushback}\footcite{DBLP:journals/ccr/MahajanBFIPS02a} (probabilistic packet drop).
+		
+		\item Strong assumptions on benign/malicious packet estimation quality. 
+		\item Pushback is known to be flawed in practice.
+		\item Rigid ISP-like network assumptions.
+	\end{itemize}
 \end{frame}
 
 \begin{frame}{The case for finer granularity}
 	\begin{columns}
 	\begin{column}{0.45\linewidth}
 		\begin{itemize}
+			\item Learner/host ratio (action/host ratio) affects host QoS.
+			
 			\item Reduced service guarantees by nature of \emph{pushback} model.
 			\begin{itemize}
 				\item \alert{Worse with good-faith TCP congestion avoidance}.
@@ -126,19 +159,32 @@
 \section{The adversarial setting}
 
 \begin{frame}{Attacks}
-	Poisoning attacks---explain.
-	
-	Evasion attacks---yes. These are what are often known as `adversarial examples'!
+	\begin{description}
+		\item[Poisoning attacks] Affect the training of a continuously learning model (RL agents, collaborative learning).
+		
+		\item[Evasion attacks] Make data/state appear to be different. These are what are often known as \alert{adversarial examples}!
+	\end{description}
 \end{frame}
 
 \begin{frame}{The capabilities of attackers}
-	Evasion for \emph{polymorphic blending attacks} on past models are known \NP-Complete. ?? How do they differ from modern perturbations, which are solved by stochastic optimisation?
+	\begin{itemize}
+		\item Evasion for \emph{polymorphic blending attacks} (i.e., evasion) on past models are known \NP-Complete\footcite{DBLP:conf/ccs/FoglaL06}.
 	
-	We have empirically measured bounds on the effectiveness of poisoning attacks wrt.\ what percentage of inbound traffic they can control.
-	
-	We don't have results for this on e.g., Deep RL in the network.
-	
-	We also lack results on how/if evasion attacks can transfer for learners focused on non-stationarity/constant learning.
+		\item We have empirical bounds on the effectiveness of poisoning attacks wrt.\ what percentage of inbound traffic an attacker controls\footcite{DBLP:journals/jmlr/KloftL10}.
+		
+		\item Careless model exposure $\implies$ black-box model extraction\footcite{DBLP:conf/uss/TramerZJRR16} $\implies$ evasion\footcite{DBLP:conf/sp/Carlini017}.
+		
+		%\item Promising work on defences\footcite{DBLP:conf/acsac/CaoG17}.
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{Unknowns}
+	\begin{itemize}
+		\item We don't have results for poisoning on e.g., Deep RL in the network.
+		
+		\item We also lack results on how/if evasion attacks can transfer for learners focused on non-stationarity/constant learning.
+		
+	\end{itemize}
 \end{frame}
 
 \begin{frame}[standout]{Conclusion}
