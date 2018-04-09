@@ -168,11 +168,11 @@
 
 \begin{frame}{The capabilities of attackers}
 	\begin{itemize}
-		\item Evasion for \emph{polymorphic blending attacks} (i.e., evasion) on past models are known \NP-Complete\footcite{DBLP:conf/ccs/FoglaL06}.
+		\item \emph{Polymorphic blending attacks} (i.e., evasion) on past models are known \alert{\NP-Complete} by reduction to (s)FSA\footcite{DBLP:conf/ccs/FoglaL06}.
 	
 		\item We have empirical bounds on the effectiveness of poisoning attacks wrt.\ what percentage of inbound traffic an attacker controls\footcite{DBLP:journals/jmlr/KloftL10}.
 		
-		\item Careless model exposure $\implies$ black-box model extraction\footcite{DBLP:conf/uss/TramerZJRR16} $\implies$ evasion\footcite{DBLP:conf/sp/Carlini017}.
+		\item Careless model exposure $\implies$ \alert{black-box model extraction}\footcite{DBLP:conf/uss/TramerZJRR16} $\implies$ evasion\footcite{DBLP:conf/sp/Carlini017}.
 		
 		%\item Promising work on defences\footcite{DBLP:conf/acsac/CaoG17}.
 	\end{itemize}
@@ -181,8 +181,15 @@
 \begin{frame}{Unknowns}
 	\begin{itemize}
 		\item We don't have results for poisoning on e.g., Deep RL in the network.
+		\begin{itemize}
+			\item Can an adversary precisely affect state at all measurement points?
+			% Networks are unstable ``bursty'', and attacker has limited control over inbound traffic.
+		\end{itemize}
 		
-		\item We also lack results on how/if evasion attacks can transfer for learners focused on non-stationarity/constant learning.
+		\item We also lack results on whether evasion attacks can transfer between policies which evolve over time.
+		\begin{itemize}
+			\item E.g., $\pi_t$ to $\pi_{t+\delta}$ for reinforcement learners focused on non-stationarity.
+		\end{itemize}
 		
 	\end{itemize}
 \end{frame}
