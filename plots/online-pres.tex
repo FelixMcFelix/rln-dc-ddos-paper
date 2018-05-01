@@ -10,12 +10,12 @@
 \usepackage[active,tightpage]{preview}
 \PreviewEnvironment{tikzpicture}
 \setlength\PreviewBorder{\gpbboxborder}
-\usepackage{microtype} \usepackage{times}
+\usepackage{microtype} \usepackage[sfdefault]{FiraSans} \usepackage{newtxsf} \usepackage[T1]{fontenc} \renewcommand*\oldstylenums[1]{{\firaoldstyle #1}}
 \begin{document}
 
 \begin{tikzpicture}[gnuplot]
 %% generated with GNUPLOT 5.2p2 (Lua 5.3; terminal rev. 99, script rev. 102)
-%% Tue 01 May 2018 16:23:12 BST
+%% Tue 01 May 2018 12:13:11 BST
 \tikzset{every node/.append style={font={\scriptsize}}}
 \path (0.000,0.000) rectangle (9.000,6.000);
 \gpcolor{color=gp lt color axes}
@@ -268,7 +268,7 @@
 \node[gp node center,rotate=-270] at (0.276,3.338) {Ratio Legit Traffic Preserved};
 \node[gp node center] at (4.883,0.215) {Iteration (t * 50ms)};
 \gpcolor{rgb color={0.000,0.000,0.000}}
-\node[gp node right] at (6.979,5.357) {$n=2$};
+\node[gp node right] at (6.979,5.357) {n=2};
 \gpcolor{rgb color={0.580,0.000,0.827}}
 \draw[gp path] (7.163,5.357)--(8.079,5.357);
 \draw[gp path] (1.320,1.477)--(1.392,4.414)--(1.464,4.341)--(1.536,4.367)--(1.608,4.430)%
@@ -289,7 +289,7 @@
   --(7.726,4.481)--(7.798,4.480)--(7.870,4.500)--(7.942,4.521)--(8.014,4.504)--(8.086,4.481)%
   --(8.158,4.487)--(8.230,4.511)--(8.302,4.554)--(8.374,4.457)--(8.446,4.363);
 \gpcolor{rgb color={0.000,0.000,0.000}}
-\node[gp node right] at (6.979,5.049) {$n=7$};
+\node[gp node right] at (6.979,5.049) {n=7};
 \gpcolor{rgb color={0.000,0.620,0.451}}
 \draw[gp path] (7.163,5.049)--(8.079,5.049);
 \draw[gp path] (1.320,1.261)--(1.392,3.387)--(1.464,3.279)--(1.536,3.434)--(1.608,3.535)%
@@ -310,7 +310,7 @@
   --(7.726,4.116)--(7.798,4.073)--(7.870,4.062)--(7.942,4.035)--(8.014,4.083)--(8.086,4.035)%
   --(8.158,4.065)--(8.230,4.220)--(8.302,4.252)--(8.374,4.234)--(8.446,4.767);
 \gpcolor{rgb color={0.000,0.000,0.000}}
-\node[gp node right] at (6.979,4.741) {$n=14$};
+\node[gp node right] at (6.979,4.741) {n=14};
 \gpcolor{rgb color={0.337,0.706,0.914}}
 \draw[gp path] (7.163,4.741)--(8.079,4.741);
 \draw[gp path] (1.320,1.623)--(1.392,3.501)--(1.464,3.775)--(1.536,3.660)--(1.608,3.656)%
