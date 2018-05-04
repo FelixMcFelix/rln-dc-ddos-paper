@@ -50,6 +50,7 @@ def marlExperiment(
 		alpha = 0.05,
 		epsilon = 0.3,
 		discount = 0,
+		break_equal = False,
 
 		dt = 0.001,
 
@@ -128,6 +129,7 @@ def marlExperiment(
 		"epsilon": epsilon,
 		"learn_rate": alpha,
 		"discount": discount,
+		"break_equal": break_equal,
 		# "tile_c": 16,
 		# "tilings_c": 3,
 		# "default_q": 0,
@@ -587,6 +589,9 @@ def marlExperiment(
 		net.stop()
 
 		store_sarsas = team_sarsas
+
+		#for sar in store_sarsas:
+		#	print sar[0].values
 
 	# Okay, done!
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!

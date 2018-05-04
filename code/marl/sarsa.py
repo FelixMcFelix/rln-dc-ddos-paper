@@ -8,8 +8,9 @@ class SarsaLearner:
 	"""
 	def __init__(self, max_bw, vec_size, actions,
 				epsilon=0.3, learn_rate=0.05, discount=0,
-				tile_c=16, tilings_c=3, default_q=0,
-				epsilon_falloff=1000):
+				tile_c=16, tilings_c=3, default_q=0.0,
+				epsilon_falloff=1000,
+				break_equal=False):
 		state_range = [[0 for i in xrange(vec_size)], [max_bw for i in xrange(vec_size)]]
 		self.tc = r.TileCoding(
 			input_indices = [np.arange(vec_size)],
@@ -28,8 +29,9 @@ class SarsaLearner:
 		self.discount = discount
 
 		self.actions = actions
+		self.break_equal = break_equal
 		self.values = {}
-		self.default_q = default_q
+		self.default_q = float(default_q)
 
 		self._step_count = 0
 
@@ -43,7 +45,7 @@ class SarsaLearner:
 
 	def _update_state_value(self, state, action, value):
 		self._ensure_state_vals_exist(state)
-		self.values[state][action] = value
+		np.put(self.values[state], action, value)
 
 	def _select_action(self, state):
 		action_vals = self._get_state_values(state)
@@ -51,6 +53,8 @@ class SarsaLearner:
 		# Epsilon-greedy action selection (linear-decreasing).
 		if np.random.uniform() < self._curr_epsilon:
 			a_index = np.random.randint(len(self.actions))
+		elif self.break_equal:
+			a_index = np.random.choice(np.flatnonzero(action_vals == action_vals.max()))
 		else:
 			a_index = np.argmax(action_vals)
 		
