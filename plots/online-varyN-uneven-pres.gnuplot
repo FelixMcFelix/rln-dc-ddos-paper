@@ -1,5 +1,5 @@
 set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage[sfdefault]{FiraSans} \usepackage{newtxsf} \usepackage[T1]{fontenc} \renewcommand*\oldstylenums[1]{{\firaoldstyle #1}}'
-set output "online-pres.tex"
+set output "online-varyN-uneven-pres.tex"
 
 load "parula.pal"
 
@@ -20,6 +20,8 @@ set datafile separator ","
 
 set xlabel "Iteration (t * 50ms)"
 set ylabel "Ratio Legit Traffic Preserved"
+
+set yrange [0.0:1.0]
 
 plot '../results/online-standard-avg.csv' u 1:3 w lines smooth sbezier title "n=2", \
      '../results/online-mod-avg.csv' u 1:3 w lines smooth sbezier title "n=7", \
