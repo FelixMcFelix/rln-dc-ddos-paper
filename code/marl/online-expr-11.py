@@ -26,7 +26,7 @@ results = marlExperiment(
 	rand_seed = 0xcafed00d
 )
 
-writeResults("../../results/online-mod-11.csv", results)
+writeResults("../../results/online-11.csv", results)
 
-makeResultsAverage("../../results/online-mod-11.csv", "../../results/online-mod-avg-11.csv")
+makeResultsAverage("../../results/online-11.csv", "../../results/online-11-avg.csv")
 
