@@ -461,6 +461,7 @@ def marlExperiment(
 		
 		# Update master link's bandwidth limit after hosts init.
 		capacity = calc_max_capacity(len(all_hosts))
+		print capacity, bw_all
 		if protect_final_hop:
 			core_link.intf1.config(bw=capacity)
 			core_link.intf2.config(bw=capacity)
