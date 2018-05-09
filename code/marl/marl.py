@@ -31,7 +31,7 @@ def marlExperiment(
 		n_learners = 3,
 		host_range = [2, 2],
 
-		calc_max_capacity = None, 
+		calc_max_capacity = None,
 
 		P_good = 0.6,
 		good_range = [0, 1],
@@ -62,6 +62,8 @@ def marlExperiment(
 		old_style = False,
 		force_host_tc = False,
 		protect_final_hop = True,
+
+		with_ratio = False,
 
 		rf = "ctl",
 
@@ -116,10 +118,10 @@ def marlExperiment(
 
 	def safe_reward_func(f, total_svr_load, legit_svr_load, true_legit_svr_load,
 			total_leader_load, legit_leader_load, true_legit_leader_load,
-			num_teams, max_load):
+			num_teams, max_load, ratio):
 		return f(total_svr_load, min(legit_svr_load,true_legit_svr_load), true_legit_svr_load,
 			total_leader_load, min(legit_leader_load,true_legit_leader_load), true_legit_leader_load,
-			num_teams, max_load)
+			num_teams, max_load*ratio)
 	# gen
 
 	sarsaParams = {
@@ -505,7 +507,24 @@ def marlExperiment(
 				))
 
 		# Let the pcaps come to life.
-		time.sleep(0.5)
+		time.sleep(3)
+
+		# Now establish the true maximum throughput
+		ratio = 1.0
+		if with_ratio:
+			mon_cmd.stdin.write("\n")
+			mon_cmd.stdin.flush()
+			data = mon_cmd.stdout.readline().strip().split(",")
+
+			time_ns = int(data[0][:-2])
+			load_mbps = [map(
+					lambda bytes: (8000*float(bytes))/time_ns,
+					el.strip().split(" ")
+				) for el in data[1:]
+			]
+
+			observed = load_mbps[0][0] + load_mbps[0][1]
+			ratio = observed / bw_all[2]
 
 		last_traffic_ratio = 0.0
 		g_reward = 0.0
@@ -553,11 +572,11 @@ def marlExperiment(
 				# Compute reward!
 				reward = safe_reward_func(reward_func, total_mbps[0], load_mbps[0][0], bw_all[0],
 					total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
-					n_teams, capacity)
+					n_teams, capacity, ratio)
 
 				g_reward = safe_reward_func(std_marl, total_mbps[0], load_mbps[0][0], bw_all[0],
 					total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
-					n_teams, capacity)
+					n_teams, capacity, ratio)
 
 				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
 					# Encode state (as seen by this learner)
