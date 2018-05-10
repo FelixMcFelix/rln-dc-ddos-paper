@@ -10,7 +10,9 @@ import twink.ofp5.build as ofpb
 import twink.ofp5.oxm as ofpm
 import twink.ofp5.parse as ofpp
 
+import csv
 import itertools
+import json
 import numpy as np
 import os
 import random
@@ -34,7 +36,9 @@ def mplexExperiment(
 		playback = False,
 
 		linkopts = {},
-		base_iperf_port = 5201
+		base_iperf_port = 5201,
+
+		csv_dir = None,
 	):
 
 	if inc_function is None:
@@ -276,25 +280,50 @@ def mplexExperiment(
 	executeRouteQueue()
 
 	server_procs = [server.popen(["iperf3", "-s", "-p", str(base_iperf_port+x)], stdin=PIPE, stderr=sys.stderr) for x in xrange(n)]
-	host_procs = []
+	host_procs = [host.popen(
+		["iperf3",
+		"-c", server.IP(),
+		"-p", str(base_iperf_port+i),
+		"-b", "{}M".format(bw),
+		"-t", str(32),
+		"-J"] +
+		["-u"] if udp else [], stdin=PIPE, stdout=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)
+	]
 
 	#net.interact()
 
-	for p in fxrange(pdrop_min, pdrop_max, pdrop_stride):
-		updateUpstreamRoute(server_switch, ac_prob=p)
+	time.sleep(0.5)
 
-		host_procs = [host.popen(["iperf3", "-c", server.IP(), "-p", str(base_iperf_port+i), "-b", "{}M".format(bw)] + ["-u"] if udp else [], stdin=PIPE, stdout=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)]
+	for step in xrange(10):
+		updateUpstreamRoute(server_switch, ac_prob=step/10.0)
 
-		print "=========="
-		print "stats for p_drop={:.2f}".format(p)
-		print "=========="
+		time.sleep(3 * step)
 
-		for proc, (host, bw) in zip(host_procs, hosts):
-			print "bw={}".format(bw)
-			print "----------"
-			print proc.communicate()[0]
+	# for p in fxrange(pdrop_min, pdrop_max, pdrop_stride):
+	# 	updateUpstreamRoute(server_switch, ac_prob=p)
 
-		time.sleep(1)
+	# 	host_procs = [host.popen(["iperf3", "-c", server.IP(), "-p", str(base_iperf_port+i), "-b", "{}M".format(bw)] + ["-u"] if udp else [], stdin=PIPE, stdout=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)]
+
+	# 	print "=========="
+	# 	print "stats for p_drop={:.2f}".format(p)
+	# 	print "=========="
+
+	# 	for proc, (host, bw) in zip(host_procs, hosts):
+	# 		print "bw={}".format(bw)
+	# 		print "----------"
+	# 		print proc.communicate()[0]
+
+	# 	time.sleep(1)
+
+	datas = [json.loads(proc.communicate()[0]) for proc in host_procs]
+
+	if csv_dir is not None:
+		with open(csv_dir, 'w') as csv_file:
+			out = csv.writer(csv_file)
+			for (_, bw), data in zip(hosts, data):
+				for inter in data["intervals"]:
+					out.write_row([bw, inter["end"], float(inter["bits_per_second"])/1e6])
+
 
 	removeAllSockets()
 
@@ -305,5 +334,5 @@ def mplexExperiment(
 
 	return None
 
-mplexExperiment(n=5, udp=True)
-
+mplexExperiment(n=5, csv_dir="../../results/mplex-tcp.csv")
+mplexExperiment(n=5, udp=True, csv_dir="../../results/mplex-udp.csv")

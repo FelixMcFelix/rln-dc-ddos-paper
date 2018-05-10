@@ -6,9 +6,12 @@ class SarsaLearner:
 	"""Learning agent powered by Sarsa and Tile Coding, with e-greedy
 			Assumes that actions are discretised, but states are continuous.
 	"""
+	# Tilings taken from
+	# http://etheses.whiterose.ac.uk/8109/1/phd-thesis-malialis.pdf
+	# Section 4.3
 	def __init__(self, max_bw, vec_size, actions,
 				epsilon=0.3, learn_rate=0.05, discount=0,
-				tile_c=16, tilings_c=3, default_q=0.0,
+				tile_c=6, tilings_c=8, default_q=0.0,
 				epsilon_falloff=1000,
 				break_equal=False):
 		state_range = [[0 for i in xrange(vec_size)], [max_bw for i in xrange(vec_size)]]
