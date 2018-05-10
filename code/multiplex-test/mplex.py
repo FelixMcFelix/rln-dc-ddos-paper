@@ -279,56 +279,53 @@ def mplexExperiment(
 	alive = True
 	executeRouteQueue()
 
+	print "starting procs"
 	server_procs = [server.popen(["iperf3", "-s", "-p", str(base_iperf_port+x)], stdin=PIPE, stderr=sys.stderr) for x in xrange(n)]
 	host_procs = [host.popen(
 		["iperf3",
 		"-c", server.IP(),
+		"-i", str(0.5),
 		"-p", str(base_iperf_port+i),
 		"-b", "{}M".format(bw),
 		"-t", str(32),
 		"-J"] +
-		["-u"] if udp else [], stdin=PIPE, stdout=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)
+		(["-u"] if udp else []), 
+		stdin=PIPE, stdout=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)
 	]
 
 	#net.interact()
 
 	time.sleep(0.5)
 
-	for step in xrange(10):
-		updateUpstreamRoute(server_switch, ac_prob=step/10.0)
+	for step in xrange(20):
+		updateUpstreamRoute(server_switch, ac_prob=step/20.0)
+		print "pushing drop rate", step/20.0, "at t =",0.5+1.5*(step)
+		time.sleep(1.5)
 
-		time.sleep(3 * step)
-
-	# for p in fxrange(pdrop_min, pdrop_max, pdrop_stride):
-	# 	updateUpstreamRoute(server_switch, ac_prob=p)
-
-	# 	host_procs = [host.popen(["iperf3", "-c", server.IP(), "-p", str(base_iperf_port+i), "-b", "{}M".format(bw)] + ["-u"] if udp else [], stdin=PIPE, stdout=PIPE, stderr=sys.stderr) for i, (host, bw) in enumerate(hosts)]
-
-	# 	print "=========="
-	# 	print "stats for p_drop={:.2f}".format(p)
-	# 	print "=========="
-
-	# 	for proc, (host, bw) in zip(host_procs, hosts):
-	# 		print "bw={}".format(bw)
-	# 		print "----------"
-	# 		print proc.communicate()[0]
-
-	# 	time.sleep(1)
-
-	datas = [json.loads(proc.communicate()[0]) for proc in host_procs]
+	print "gathering stats..."
+	updateUpstreamRoute(server_switch, ac_prob=0.0)
+	datas_pre = [proc.communicate() for proc in host_procs]
+	datas = [json.loads(data[0]) for data in datas_pre]
+	print "gathered"
 
 	if csv_dir is not None:
 		with open(csv_dir, 'w') as csv_file:
 			out = csv.writer(csv_file)
-			for (_, bw), data in zip(hosts, data):
+			for (_, bw), data in zip(hosts, datas):
 				for inter in data["intervals"]:
-					out.write_row([bw, inter["end"], float(inter["bits_per_second"])/1e6])
+					inner = inter["sum"]
+					out.writerow([bw, inner["end"], float(inner["bits_per_second"])/1e6])
+					if udp: print "bw=", bw, "lost", data["end"]["sum"]["lost_percent"]
 
+	print "output written, cleaning up..."
 
 	removeAllSockets()
 
 	for proc in host_procs + server_procs:
-		proc.terminate()
+		try:
+			proc.terminate()
+		except:
+			pass
 
 	net.stop()
 

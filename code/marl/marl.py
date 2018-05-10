@@ -524,6 +524,7 @@ def marlExperiment(
 			]
 
 			observed = load_mbps[0][0] + load_mbps[0][1]
+			print observed, bw_all[2]
 			ratio = observed / bw_all[2]
 
 		last_traffic_ratio = 0.0
@@ -610,8 +611,8 @@ def marlExperiment(
 
 		store_sarsas = team_sarsas
 
-		#for sar in store_sarsas:
-		#	print sar[0].values
+		for sar in store_sarsas:
+			print sar[0].values
 
 	# Okay, done!
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
