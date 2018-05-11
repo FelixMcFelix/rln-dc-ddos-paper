@@ -1,5 +1,5 @@
-# set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times}'
-# set output "mplex.tex"
+set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[binary-units]{siunitx}'
+set output "mplex.tex"
 
 load "parula.pal"
 
@@ -19,7 +19,7 @@ set ytics nomirror
 set datafile separator ","
 
 set xlabel "Time (s)"
-set ylabel "Ratio Legit Traffic Preserved"
+set ylabel "Upload rate (\\si{\\mega\\bit\\per\\second})"
 
 set xrange [0:30]
 
