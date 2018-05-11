@@ -35,10 +35,15 @@ def mplexExperiment(
 		playback_file = "../../data/pcaps/bigFlows.pcap",
 		playback = False,
 
-		linkopts = {},
+		linkopts = {"delay": 20},
 		base_iperf_port = 5201,
 
 		csv_dir = None,
+
+		result_interval = 1.0,
+		max_pdrop = 0.4,
+		step_interval = 3.0,
+		n_steps = 10,
 	):
 
 	if inc_function is None:
@@ -244,7 +249,10 @@ def mplexExperiment(
 			bw = inc_function(last_bw, i, n_hosts)
 			last_bw = bw
 
-			trackedLink(server_switch, h)
+			opts = linkopts
+			opts["bw"] = bw
+
+			trackedLink(server_switch, h, extras=opts)
 
 			hosts.append((h, bw))
 			assignIP(h)
@@ -284,7 +292,7 @@ def mplexExperiment(
 	host_procs = [host.popen(
 		["iperf3",
 		"-c", server.IP(),
-		"-i", str(0.5),
+		"-i", str(result_interval),
 		"-p", str(base_iperf_port+i),
 		"-b", "{}M".format(bw),
 		"-t", str(32),
@@ -297,10 +305,10 @@ def mplexExperiment(
 
 	time.sleep(0.5)
 
-	for step in xrange(20):
-		updateUpstreamRoute(server_switch, ac_prob=step/20.0)
-		print "pushing drop rate", step/20.0, "at t =",0.5+1.5*(step)
-		time.sleep(1.5)
+	for step in xrange(n_steps):
+		updateUpstreamRoute(server_switch, ac_prob=max_pdrop * (step/float(n_steps)))
+		print "pushing drop rate", max_pdrop * (step/float(n_steps)), "at t =",0.5+step_interval*(step)
+		time.sleep(step_interval)
 
 	print "gathering stats..."
 	updateUpstreamRoute(server_switch, ac_prob=0.0)
@@ -308,14 +316,13 @@ def mplexExperiment(
 	datas = [json.loads(data[0]) for data in datas_pre]
 	print "gathered"
 
-	if csv_dir is not None:
-		with open(csv_dir, 'w') as csv_file:
-			out = csv.writer(csv_file)
-			for (_, bw), data in zip(hosts, datas):
-				for inter in data["intervals"]:
-					inner = inter["sum"]
-					out.writerow([bw, inner["end"], float(inner["bits_per_second"])/1e6])
-					if udp: print "bw=", bw, "lost", data["end"]["sum"]["lost_percent"]
+	out_results = []
+
+	for (_, bw), data in zip(hosts, datas):
+		for inter in data["intervals"]:
+			inner = inter["sum"]
+			out_results.append([bw, inner["end"], float(inner["bits_per_second"])/1e6])
+			if udp: print "bw=", bw, "lost", data["end"]["sum"]["lost_percent"]
 
 	print "output written, cleaning up..."
 
@@ -329,7 +336,22 @@ def mplexExperiment(
 
 	net.stop()
 
-	return None
+	return out_results
 
-mplexExperiment(n=5, csv_dir="../../results/mplex-tcp.csv")
-mplexExperiment(n=5, udp=True, csv_dir="../../results/mplex-udp.csv")
+results = []
+for i in xrange(10):
+	new_results =  mplexExperiment(n=5)
+	if len(results) == 0:
+		results = new_results
+	else:
+		out = []
+		# update average
+		for (old_row, new_row) in zip(results, new_results):
+			out.append([old_avg + (new_val - old_avg)/(i+1) for (old_avg, new_val) in zip(old_row, new_row)])
+		results = out
+
+with open("../../results/mplex-tcp.csv", "w") as csv_file:
+	csv_out = csv.writer(csv_file)
+	for row in results:
+		csv_out.writerow(row)
+#mplexExperiment(n=5, udp=True, csv_dir="../../results/mplex-udp.csv")
