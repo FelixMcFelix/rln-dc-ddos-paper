@@ -23,6 +23,7 @@ import time
 def marlExperiment(
 		linkopts = {
 		#	"bw": 10
+			"delay": 10
 		},
 		n_teams = 1,
 
@@ -527,6 +528,10 @@ def marlExperiment(
 			print observed, bw_all[2]
 			ratio = observed / bw_all[2]
 
+			if protect_final_hop:
+				core_link.intf1.config(bw=ratio*capacity)
+				core_link.intf2.config(bw=ratio*capacity)
+
 		last_traffic_ratio = 0.0
 		g_reward = 0.0
 
@@ -595,7 +600,7 @@ def marlExperiment(
 			rewards[-1].append(g_reward)
 			total_loads[-1].append(total_mbps[0])
 
-		print "good:", last_traffic_ratio, ", g_reward:", g_reward
+		print "good:", last_traffic_ratio, ", g_reward:", g_reward, ", selected:", reward
 
 		# End this monitoring instance.
 		mon_cmd.stdin.close()

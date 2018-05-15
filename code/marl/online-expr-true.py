@@ -9,7 +9,7 @@ results = marlExperiment(
 	host_range = [2, 2],
 
 	explore_episodes = 0.3,
-	episodes = 50,#500, Since mininet keeps running out of files even e/ cleanup
+	episodes = 10,#50,#500, Since mininet keeps running out of files even e/ cleanup
 	episode_length = 10000,
 	separate_episodes = True,
 
@@ -22,9 +22,11 @@ results = marlExperiment(
 
 #	old_style=True,
 
+	with_ratio = True,
+
 	rf = "ctl"
 )
 
-#writeResults("../../results/online.csv", results)
+writeResults("../../results/online.csv", results)
 
-#makeResultsAverage("../../results/online.csv", "../../results/online-avg.csv")
+makeResultsAverage("../../results/online.csv", "../../results/online-avg.csv")
