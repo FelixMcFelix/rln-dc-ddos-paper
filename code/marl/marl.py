@@ -242,8 +242,6 @@ def marlExperiment(
 
 		# Try building that message from scratch, here.
 		msg = flow_pdrop_msg[:-20] + ofpb._pack("I", p_drop_num) + flow_pdrop_msg[-16:]
-		#For now
-		#print msg
 		
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
@@ -295,8 +293,6 @@ def marlExperiment(
 			ip_bytes[-1] = moralise(ip_bytes[-1], good)
 
 			ip = "{}.{}.{}.{}".format(*ip_bytes)
-
-			#print ip
 
 			hosts.append(
 				(new_host, good, bw, link, ip)
@@ -556,7 +552,6 @@ def marlExperiment(
 			mon_cmd.stdin.write("\n")
 			mon_cmd.stdin.flush()
 			data = mon_cmd.stdout.readline().strip().split(",")
-			#print data
 
 			time_ns = int(data[0][:-2])
 			load_mbps = [map(

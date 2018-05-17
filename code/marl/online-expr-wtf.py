@@ -29,11 +29,12 @@ results = marlExperiment(
 
 	dt = 0.01,
 
-	old_style = True,
+	old_style = False,
+	break_equal = True,
 
 	rf = "ctl"
 )
 
-writeResults("../../results/online-wtf.csv", results)
+#writeResults("../../results/online-wtf.csv", results)
 
-makeResultsAverage("../../results/online-wtf.csv", "../../results/online-wtf-avg.csv")
+#makeResultsAverage("../../results/online-wtf.csv", "../../results/online-wtf-avg.csv")

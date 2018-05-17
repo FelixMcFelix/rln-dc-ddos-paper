@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import tilecoding.representation as r
+import sys
 
 class SarsaLearner:
 	"""Learning agent powered by Sarsa and Tile Coding, with e-greedy
@@ -21,7 +22,7 @@ class SarsaLearner:
 			ntilings = [tilings_c],
 			hashing = None,
 			state_range = state_range,
-			rnd_stream = np.random.RandomState()
+			rnd_stream = np.random.RandomState(),
 		)
 
 		self.epsilon = epsilon
@@ -39,19 +40,24 @@ class SarsaLearner:
 		self._step_count = 0
 
 	def _ensure_state_vals_exist(self, state):
-		if state not in self.values:
-			self.values[state] = np.array([self.default_q for ac in self.actions])
+		for tile in state:
+			if tile not in self.values:
+				self.values[tile] = np.full(len(self.actions), float(self.default_q))
 
 	def _get_state_values(self, state):
 		self._ensure_state_vals_exist(state)
-		return self.values[state]
+		return [self.values[tile] for tile in state]
 
-	def _update_state_value(self, state, action, value):
+	def _update_state_values(self, state, action, values):
 		self._ensure_state_vals_exist(state)
-		np.put(self.values[state], action, value)
+		for tile, value in zip(state, values):
+			self.values[tile][action] = value
 
 	def _select_action(self, state):
-		action_vals = self._get_state_values(state)
+		all_tile_action_vals = self._get_state_values(state)
+		action_vals = np.zeros(len(self.actions))
+		for tile_av in all_tile_action_vals:
+			action_vals += tile_av
 
 		# Epsilon-greedy action selection (linear-decreasing).
 		if np.random.uniform() < self._curr_epsilon:
@@ -63,36 +69,37 @@ class SarsaLearner:
 		
 		action = self.actions[a_index]
 
-		return (action, action_vals[a_index])
+		return (action, np.array([av[a_index] for av in all_tile_action_vals]))
 
 	# Need to convert state with self.tc(...) first
 	def bootstrap(self, state):
 		# Select an action:
-		(action, value) = self._select_action(state)
+		(action, values) = self._select_action(state)
 
-		self.last_act = (state, action, value)
-
+		self.last_act = (state, action, values)
+		
 		return action
 
 	# Ditto. run self.tc(...) on state observation
 	def update(self, state, reward):
-		(last_state, last_action, last_value) = self.last_act
+		(last_state, last_action, last_values) = self.last_act
 
 		# First, what is the value of the action would we choose in the new state w/ old model
-		(new_action, new_value) = self._select_action(state)
+		(new_action, new_values) = self._select_action(state)
+
+		updated_vals = last_values + (self.discount*new_values - last_values + reward) * self.learn_rate
 
 		# Update value accordingly
-		self._update_state_value(last_state, self.actions.index(last_action),
-			last_value + self.learn_rate*(reward + self.discount*new_value - last_value)
-		)
+		self._update_state_values(last_state, self.actions.index(last_action), updated_vals)
 
 		# Reduce epsilon somehow
-		self._curr_epsilon = (1 - self._step_count/float(self.epsilon_falloff)) * self.epsilon
+		self._curr_epsilon = max(0, (1 - self._step_count/float(self.epsilon_falloff)) * self.epsilon)
 		self._step_count += 1
 
-		self.last_act = (state, new_action, new_value)
+		self.last_act = (state, new_action, new_values)
 
 		return new_action
 
 	def to_state(self, *args):
-		return tuple(self.tc(*args))
+		out = self.tc(*args)
+		return tuple(out)
