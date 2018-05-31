@@ -104,7 +104,7 @@ def mplexExperiment(
 		switch_sockets[0] = {}
 
 	def updateOneRoute(switch, cmd_list, msg):
-		if not False:#switch.listenPort:
+		if not switch.listenPort:
 			switch.cmd(*cmd_list)
 		else:
 			s = (switch_sockets[0][switch.name]

@@ -66,6 +66,8 @@ def marlExperiment(
 
 		with_ratio = False,
 
+		force_cli_rule_updates = False,#True,
+
 		rf = "ctl",
 
 		rand_seed = None,
@@ -187,7 +189,8 @@ def marlExperiment(
 		switch_sockets[0] = {}
 
 	def updateOneRoute(switch, cmd_list, msg):
-		if not switch.listenPort:
+		if force_cli_rule_updates or not switch.listenPort:
+			print "sending by cmd"
 			switch.cmd(*cmd_list)
 		else:
 			s = (switch_sockets[0][switch.name]
