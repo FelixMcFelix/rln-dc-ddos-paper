@@ -44,6 +44,8 @@ def mplexExperiment(
 		max_pdrop = 0.4,
 		step_interval = 3.0,
 		n_steps = 10,
+
+		force_cmd_routes = False,
 	):
 
 	if inc_function is None:
@@ -104,7 +106,7 @@ def mplexExperiment(
 		switch_sockets[0] = {}
 
 	def updateOneRoute(switch, cmd_list, msg):
-		if not False:#switch.listenPort:
+		if force_cmd_routes or not switch.listenPort:
 			switch.cmd(*cmd_list)
 		else:
 			s = (switch_sockets[0][switch.name]
@@ -149,10 +151,6 @@ def mplexExperiment(
 			"in_port=*,ip,nw_dst={},actions={}\"{}-eth{}\"".format(ip, p_drop, switch.name, out_port)
 		]
 
-		# Try building that message from scratch, here.
-		#msg = flow_pdrop_msg[:-20] + ofpb._pack("I", p_drop_num) + flow_pdrop_msg[-16:]
-
-
 		msg = ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
 			0, 0, 1, None, None, None, 0, 1,
@@ -186,7 +184,6 @@ def mplexExperiment(
 				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, False, 0, socket.inet_aton(ip), None)
 			]),
 			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
-				# Looks like 29 is the number I picked for Pdrop.
 				ofpb.ofp_action_output(None, 16, out_port, 65535)
 			])
 		)
@@ -339,8 +336,8 @@ def mplexExperiment(
 	return out_results
 
 results = []
-for i in xrange(10):
-	new_results =  mplexExperiment(n=5)
+for i in xrange(20):
+	new_results = mplexExperiment(n=5)
 	if len(results) == 0:
 		results = new_results
 	else:

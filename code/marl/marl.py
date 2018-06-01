@@ -7,6 +7,7 @@ from mininet.clean import Cleanup
 
 import twink.ofp5 as ofp
 import twink.ofp5.build as ofpb
+import twink.ofp5.oxm as ofpm
 import twink.ofp5.parse as ofpp
 
 import itertools
@@ -70,6 +71,7 @@ def marlExperiment(
 
 		rand_seed = None,
 		rand_state = None,
+		force_cmd_routes = False,
 	):
 
 	# Use any predetermined random state.
@@ -143,6 +145,8 @@ def marlExperiment(
 
 	initd_host_count = [0]
 	initd_switch_count = [0]
+	next_ip = [1]
+
 	def newNamedHost(**kw_args):
 		o = net.addHost("h{}".format(initd_host_count[0]), **kw_args)
 		initd_host_count[0] += 1
@@ -151,6 +155,10 @@ def marlExperiment(
 		o = net.addSwitch("s{}".format(initd_switch_count[0]), listenPort=7000+initd_switch_count[0], **kw_args)
 		initd_switch_count[0] += 1
 		return o
+
+	def assignIP(node):
+		node.setIP("10.0.0.{}".format(next_ip[0]), 24)
+		next_ip[0] += 1
 
 	def trackedLink(src, target, extras=None):
 		if extras is None:
@@ -187,7 +195,7 @@ def marlExperiment(
 		switch_sockets[0] = {}
 
 	def updateOneRoute(switch, cmd_list, msg):
-		if not switch.listenPort:
+		if force_cmd_routes or not switch.listenPort:
 			switch.cmd(*cmd_list)
 		else:
 			s = (switch_sockets[0][switch.name]
@@ -209,16 +217,39 @@ def marlExperiment(
 			updateOneRoute(*el)
 		route_commands[0] = []
 
-	flow_pdrop_msg = ofpb.ofp_flow_mod(
-		None, 0, 0, 0, ofp.OFPFC_ADD,
-		0, 0, 1, None, None, None, 0, 1,
-		ofpb.ofp_match(None, None, None),
-		ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
-			# Looks like 29 is the number I picked for Pdrop.
-			ofpb._pack("HHI", 29, 8, 0xffffffff),
-			ofpb.ofp_action_output(None, 16, 1, 65535)
-		])
-	)
+	flow_pdrop_msg = [""]
+	flow_upstream_msg = [""]
+
+	def compute_msg(ip="10.0.0.1", out_port=1):
+		flow_pdrop_msg[0] = ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 1, None, None, None, 0, 1,
+#			ofpb.ofp_match(None, None, None),
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, False, 0, socket.inet_aton(ip), None)
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				# Looks like 29 is the number I picked for Pdrop.
+				ofpb._pack("HHI", 29, 8, 0xffffffff),
+				ofpb.ofp_action_output(None, 16, out_port, 65535)
+				#ofpb.ofp_action_output(None, 16, ofp.OFPP_FLOOD, 65535)
+			])
+		)
+		
+		flow_upstream_msg[0] = ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 1, None, None, None, 0, 1,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, False, 0, socket.inet_aton(ip), None)
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				ofpb.ofp_action_output(None, 16, out_port, 65535)
+			])
+		)
+
+	compute_msg()
 
 	def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
 		# Turn from prob_drop into prob_send!
@@ -240,9 +271,20 @@ def marlExperiment(
 			"actions={}\"{}-eth{}\"".format(p_drop, name, out_port)
 		]
 
-		# Try building that message from scratch, here.
-		msg = flow_pdrop_msg[:-20] + ofpb._pack("I", p_drop_num) + flow_pdrop_msg[-16:]
-		
+		if p_drop_num == 0xffffffff:
+			#print "shortcircuiting: guaranteed send"
+			msg = flow_upstream_msg[0]
+		else:
+			#print p_drop_num, hex(p_drop_num)
+			#print "subs'ing:", p_drop_num
+			# Try building that message from scratch, here.
+			copy_msg = flow_pdrop_msg[0]
+
+			msg = copy_msg[:-20] + ofpb._pack("I", p_drop_num) + copy_msg[-16:]
+			#msg = copy_msg
+
+		#print "action of",ac_prob,"=>",msg.encode("hex")
+
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
 		else:
@@ -348,8 +390,10 @@ def marlExperiment(
 	def buildNet(n_teams, team_sarsas=[]):
 		server = newNamedHost()
 		server_switch = newNamedSwitch()
+
 		core_link = trackedLink(server, server_switch)
 		updateUpstreamRoute(server_switch)
+		assignIP(server)
 
 		make_sarsas = len(team_sarsas) == 0
 
@@ -453,7 +497,7 @@ def marlExperiment(
 		for (_, _, learners, _, _, sarsas) in teams:
 			for (node, sarsa) in zip(learners, sarsas):
 				# reset network model to default rules.
-				updateUpstreamRoute(node)
+				#updateUpstreamRoute(node)
 
 				# Assume initial state is all zeroes (new network)
 				sarsa.bootstrap(sarsa.to_state(np.zeros(sarsaParams["vec_size"])))
@@ -484,6 +528,8 @@ def marlExperiment(
 			stderr=sys.stderr
 		)
 
+		server_ip = server.IP()
+
 		# gen traffic at each host. This MUST happen after the bootstrap.
 		for (_, _, _, _, hosts, _) in teams:
 			for (host, good, bw, link, ip) in hosts:
@@ -491,7 +537,8 @@ def marlExperiment(
 					"tcpreplay-edit",
 					"-i", host.intfNames()[0],
 					"-l", str(0),
-					"-S", "0.0.0.0/0:{}/32".format(ip)
+					"-S", "0.0.0.0/0:{}/32".format(ip),
+					"-D", "0.0.0.0/0:{}/32".format(server_ip)
 				] + (
 					[] if old_style else ["-M", str(bw)]
 				) + [(good_file if good else bad_file)]
@@ -524,12 +571,16 @@ def marlExperiment(
 			print observed, bw_all[2]
 			ratio = observed / bw_all[2]
 
+			print "new limit is:", ratio*capacity, "from", capacity
+
 			if protect_final_hop:
 				core_link.intf1.config(bw=ratio*capacity)
 				core_link.intf2.config(bw=ratio*capacity)
 
 		last_traffic_ratio = 0.0
 		g_reward = 0.0
+
+		#net.interact()
 
 		for i in xrange(episode_length):
 			# May need to early exit
@@ -563,7 +614,7 @@ def marlExperiment(
 			total_mbps = [good+bad for (good, bad) in load_mbps]
 
 			last_traffic_ratio = min(load_mbps[0][0]/bw_all[0], 1.0)
-			if not (i % 10): print "\titer {}/{}, good:{}".format(i, episode_length, last_traffic_ratio)
+			if not (i % 10): print "\titer {}/{}, good:{}, load:{}".format(i, episode_length, last_traffic_ratio, total_mbps[0])
 
 			for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
 				team_true_loads = bw_teams[team_no]
@@ -612,7 +663,7 @@ def marlExperiment(
 		store_sarsas = team_sarsas
 
 		for sar in store_sarsas:
-			print sar[0].values
+			pass#print sar[0].values
 
 	# Okay, done!
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!

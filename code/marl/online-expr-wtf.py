@@ -32,7 +32,8 @@ results = marlExperiment(
 	old_style = False,
 	break_equal = True,
 
-	rf = "ctl"
+	rf = "ctl",
+	force_cmd_routes = False,
 )
 
 #writeResults("../../results/online-wtf.csv", results)
