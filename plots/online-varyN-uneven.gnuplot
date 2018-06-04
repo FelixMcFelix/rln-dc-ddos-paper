@@ -23,7 +23,7 @@ set ylabel "Ratio Legit Traffic Preserved"
 
 set yrange [0.0:1.0]
 
-plot '../results/online-standard-avg.csv' u 1:3 w lines smooth sbezier title "$n=2$", \
-     '../results/online-mod-avg.csv' u 1:3 w lines smooth sbezier title "$n=7$", \
+plot '../results/online-2-avg.csv' u 1:3 w lines smooth sbezier title "$n=2$", \
+     '../results/online-7-avg.csv' u 1:3 w lines smooth sbezier title "$n=7$", \
      '../results/online-11-avg.csv' u 1:3 w lines smooth sbezier title "$n=11$", \
-     '../results/online-mod-more-avg.csv' u 1:3 w lines smooth sbezier title "$n=14$"
+     '../results/online-14-avg.csv' u 1:3 w lines smooth sbezier title "$n=14$"
