@@ -65,3 +65,39 @@ def makeResultsAverage(in_path, out_path, drop_zeroes=False):
 
 			for i, row in enumerate(stats):
 				c_out.writerow([i] + [np.mean(np.array(c)) for c in row])
+
+def lastTimestepsAndEpAverages(in_path, out_path):
+	with open(in_path, "r") as f_in:
+		with open(out_path, "w") as f_out:
+			# assume it's in order. Take last timestamp for each episode.
+			c_in = csv.reader(f_in)
+			c_out = csv.writer(f_out)
+
+			# Headery stuff
+			_ = c_in.next()
+			c_out.writerow(["episode", "g_reward", "legit_traffic", "total_load", "av_g_reward", "av_legit_traffic", "av_total_load"])
+
+			lasts = []
+			stats = []
+
+			for row in c_in:
+				ep = int(row[0])
+				t = int(row[1])
+				to_track = [float(x) for x in row[-3:]]
+				# print row
+
+				if len(stats) <= ep:
+					stats.append([[],[],[]])
+
+				if len(lasts) <= ep:
+					lasts.append([0.0, 0.0, 0.0])
+
+				for target, entry in zip(stats[ep], to_track):
+					target.append(entry)
+
+				lasts[ep] = to_track
+
+			# print stats
+
+			for i, (s_row, l_row) in enumerate(zip(stats, lasts)):
+				c_out.writerow([i] + l_row + [np.mean(np.array(c)) for c in s_row])

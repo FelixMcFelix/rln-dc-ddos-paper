@@ -72,6 +72,11 @@ def marlExperiment(
 		rand_seed = None,
 		rand_state = None,
 		force_cmd_routes = False,
+
+		rewards = [],
+		good_traffic_percents = [],
+		total_loads = [],
+		store_sarsas = [],
 	):
 
 	# Use any predetermined random state.
@@ -413,12 +418,8 @@ def marlExperiment(
 	### THE EXPERIMENT? ###
 
 	# initialisation
-	rewards = []
-	good_traffic_percents = []
-	total_loads = []
 
 	net = None
-	store_sarsas = []
 	alive = False
 
 	interrupted = [False]
