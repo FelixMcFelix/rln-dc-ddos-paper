@@ -1,4 +1,4 @@
-set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times}'
+set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype}'
 set output "online-varyN-uneven.tex"
 
 load "parula.pal"

@@ -1,4 +1,4 @@
-\documentclass[conference, letterpaper, 10pt, times]{IEEEtran}
+\documentclass[conference,10pt]{IEEEtran}
 
 %% IEEE CNS addition:
 \makeatletter
@@ -9,8 +9,6 @@
 	\def\@evenfoot{}}
 \makeatother
 \pagestyle{empty}
-
-\usepackage[T1]{fontenc}
 
 \usepackage[dvipsnames]{xcolor}
 \usepackage{graphicx}
@@ -28,7 +26,6 @@
 \newcommand{\subparagraph}{}
 \usepackage{titlesec}
 \titlespacing*{\section}{0pt}{1.5ex}{0.7ex}
-%\titleformat*{\filcenter\scshape}
 
 %bib
 \usepackage[maxnames=3,maxbibnames=99,mincrossrefs=5,style=ieee,sortcites,backend=bibtex]{biblatex}
@@ -47,7 +44,8 @@
 
 %opening!
 
-\newcommand{\mytitle}{Improving Direct-Control Reinforcement Learning for Network Intrusion Prevention}
+\newcommand{\mytitle}{%Dynamically Annealed Reinforcement Learning for Intrusion Prevention
+Dynamic Exploration via the Wavelet Transform}
 
 \usepackage{url}
 \usepackage{hyperref}
@@ -83,7 +81,7 @@
 
 \title{\mytitle{}}
 \author{Kyle A. Simpson\thanks{This work was supported by the Engineering and Physical Sciences
-		Research Council [grant number EP/M508056/1]}\\\emph{University of Glasgow, Glasgow, Scotland},\\
+		Research Council [grant number EP/M508056/1]},\\\emph{University of Glasgow, Glasgow, Scotland},\\
 		\email{k.simpson.1@research.gla.ac.uk}}
 
 % Remove date, leave no spacing.
@@ -116,22 +114,20 @@ Does next paragraph have proper indent? Please!
 \section{A Plan, of Sorts}
 
 \begin{enumerate}
-	\item The main case for contribution in what I have so far:
-	\begin{itemize}
-		\item Past work reliant on unrealistic network models: tcp-like behaviour (and its effects on collateral damage) not captured, disjoint ranges of traffic distribution (no benign heavy-hitters).
-		\item I offer more realistic network emulation environment, better treatment of protocol/traffic characteristics.
-	\end{itemize}
-	\item Forthcoming: rethinking state/action spaces to operate at a finer level of granularity.
+	\item Establish criteria used to inform system temp---what could make my system increase $\epsilon$ again late into training?
+	\begin{enumerate}
+		\item Current thoughts: Wavelet analysis of the reward signal.
+		\item Intuition: multiscale representation of variation in reward.
+		\item What do we see? Hopefully, state-to-state variation as well as longer-term characteristics.
+		\item Expect that overall worsening on the coarsest scales should indicate pressing, global need for exploration  (i.e., non-stationarity, changing problem).
+		\item We can perhaps derive a different uncertainty for each scale -- how do we choose? Combine answers, or (in turn) randomly select an $\epsilon$ from the derived set?
+	\end{enumerate}
+	\item What are my chosen features? Reward Function?
+	\item What actions do I give the agents? Just more probabilistic packet dropping?
+	\item Test against MARL and others---probably essential.
+	\item Model at least three scenarios: standard (under attack), normality shifts, attack changes.
+	\item \textsc{Ideally:} test adversarial work (what do such examples look like for my classifier, can an attacker actually operate on them?). How do results change with/without pretraining?
 \end{enumerate}
-
-\section{Related Work}
-
-This is a new, modern paper, and so I acknowledge others \emph{after} myself.
-How modest!
-
-\section{Conclusion}
-
-It all ends here, Mr.\ Bond...
 
 \printbibliography
 

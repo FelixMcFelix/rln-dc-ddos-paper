@@ -1,6 +1,6 @@
-# rln-annealing-paper
-Why? We should look for evidence that the model is becoming "out-of-date" and use this to allow more exploratory moves (increase ϵ).
-
+# rln-dc-ddos
+More principled examination of direct-RL for DDoS detection/mitigation than current work.
+Idea: move towards flow-specific metrics, incease discriminataive power and granularit.
 
 ## Requirements
 * gcc 7+
