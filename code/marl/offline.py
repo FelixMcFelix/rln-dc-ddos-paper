@@ -4,7 +4,7 @@ import subprocess
 import cPickle
 
 pickle_name = "../../results/offline.pkl"
-total_eps = 1000#00
+total_eps = 10000#0
 block_size = 50
 
 for i in xrange(0, total_eps, block_size):
