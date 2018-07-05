@@ -104,14 +104,29 @@
 
 \section{Introduction}
 
-Okay here is a... paper?
+What is the story I'm trying to push?
 
-\section{Initial Definitions}
+?? Threat model yada yada everything sucks all the time here are some statistics about things being 
 
-Testing to see if I get the right header behaviour.
-Another sentence to bring out the edge cases in this style.
+?? Reference to the possible mistreatment of RL in our domain? The problem of ``blind application'' so hated by Sommer and Paxson.
 
-Does next paragraph have proper indent? Please!
+?? RL as a mechanism to protect systems by monitoring performance characteristics---overcome the detection problem (different handle on the key problems of burstiness, evolution, non-stationarity).
+
+This paper contributes:
+\begin{itemize}
+	\item A DDoS mitigation system based on direct-control reinforcement learning designed for deployment in real-world software-defined networks.
+	\item Important weaknesses and flaws in the past design and evaluation of similar techniques.
+	\item ?? Advancing the use/representation of state-space in direct-control RL of networked applications.
+\end{itemize}
+
+\section{Background}
+
+?? Introduce RL, related definitions etc.
+
+?? Is this \emph{actually} just sarsa? We're using fn approx (of course), but this is fraught with its own difficulties. Is it strictly speaking correct to describe it as Sarsa at this point? It's, at the very least, 1-step semi-gradient Sarsa given that it is clearly on-policy...
+?? IDEA: try out average reward, td-$\lambda$ methods...
+
+?? Discuss mininet? Networking terms?
 
 \section{A Plan, of Sorts}
 
@@ -121,17 +136,48 @@ Does next paragraph have proper indent? Please!
 		\item Past work reliant on unrealistic network models: tcp-like behaviour (and its effects on collateral damage) not captured, disjoint ranges of traffic distribution (no benign heavy-hitters).
 		\item I offer more realistic network emulation environment, better treatment of protocol/traffic characteristics.
 	\end{itemize}
-	\item Forthcoming: rethinking state/action spaces to operate at a finer level of granularity.
+	\item Forthcoming: rethinking state/action spaces to operate at a finer level of granularity. New network model (live tcp back-and-forth), allows us to test collateral damage assumptions in a more realistic manner (and show clear case for moving beyond work of malialis and kudenko)
 \end{enumerate}
+
+\section{Results and Evaluation}
+
+\begin{figure}[ht]
+	\includegraphics[width=\linewidth]{../plots/online-varyN-uneven}
+	\caption{
+		MARL pushback control system performance plotted over time, for various settings of $n$ hosts per learner.
+		This plot shows that, from the perspective of benign hosts, service guarantees degrade as inference and applied actions become less granular.
+		This generalises for all behavioural discriminators: even a perfect agent \emph{must} punish benign flows if they are grouped with malicious actors.
+		\label{fig:marl-granularity}
+	}
+\end{figure}
+
+See above: a result.
+
+?? Observations: training time lengthier by nature of emulated environment.
+?? Risk of going for a simulation (i.e. numeric)? Always going to be interesting behaviour that is missed out on (in theory), at the cost of training time/limits of simulation speed
 
 \section{Related Work}
 
 This is a new, modern paper, and so I acknowledge others \emph{after} myself.
 How modest!
 
+?? Abuses of RL
+
+?? Direct-control work
+
+?? Indirect-control applications: link to all the juicy stuff in e.g. HotNets, data-driven networking, the works. 
+
 \section{Conclusion}
 
 It all ends here, Mr.\ Bond...
+
+?? Please write me once everything else is in place.
+
+?? Future Work? I.e., \emph{everything}: no one else is really looking at/interested in this specific kind of application of RL yet. \emph{Yet}.
+
+\section*{Acknowledgements}
+My thanks go to Dr.\ Dimitrios Pezaros for his supervision, guidance, and comments relating to the realisation of this work.
+Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
 
 \printbibliography
 

@@ -21,5 +21,5 @@ set datafile separator ","
 set xlabel "Episode"
 set ylabel "Global Reward"
 
-plot '../results/offline-avg.csv' u 1:2 w lines title "Last $t$", \
-     '../results/offline-avg.csv' u 1:5 w lines title "Average"
+plot '../results/offline-avg.csv' u 1:2 w lines smooth sbezier title "Last $t$", \
+     '../results/offline-avg.csv' u 1:5 w lines smooth sbezier title "Average"
