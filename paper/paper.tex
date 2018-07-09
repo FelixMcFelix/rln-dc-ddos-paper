@@ -11,6 +11,8 @@
 \pagestyle{empty}
 
 \usepackage[T1]{fontenc}
+\usepackage{amsfonts}
+\usepackage{amsmath}
 
 \usepackage[dvipsnames]{xcolor}
 \usepackage{graphicx}
@@ -139,8 +141,10 @@ This paper contributes:
 
 %?? Introduce RL, related definitions etc.
 \emph{Reinforcement learning} (RL) is a variant of machine learning principally concerned with with training an agent to perform optimally in the pursuit of a given task \cite{RL2E}.
-We assume the agent has a certain amount of knowledge whenever a decision must be made: at any point in time it knows which \emph{state} it is in, the set of \emph{actions} which are available to it, and a numeric \emph{reward} obtained from the last action chosen if available.
-RL methods use this information to gradually refine their \emph{valuation} of states or state-action pairs---allowing the inference of policies which choose actions to maximise the total reward.
+We assume the agent has a certain amount of knowledge whenever a decision must be made: at any point in time $t$ it knows which \emph{state} it is in ($S_t \in \mathcal{S}$), the set of \emph{actions} which are available to it ($\mathcal{A} = A(S_t)$) and, if available, a numeric \emph{reward} obtained from the last action chosen ($R_t \in \mathbb{R}, A_t \in \mathcal{A}$).
+RL methods combine this information with a \emph{policy} $\pi$ to determine which action should be taken: such a choice need not be optimal, if an agent needs to further explore some region of the state space.
+The policy is then further refined by, for instance, updating value estimates for state-action pairs, meaning that RL-based approaches learn adaptively and online.
+Formally, the goal is to maximise the \emph{expected discounted return}
 
 ?? Formalise?
 
@@ -170,7 +174,7 @@ There exists immense variation in \emph{how} policies and values may be learned,
 
 ?? STRUCTURE: Either (methodology) -> (results) OR (their stuff + its weaknesses) -> (a new direction) [second is way punchier, but not yet ready to go with that.]
 
-\section{Results and Evaluation}
+\section{Performance in an emulated environment}
 
 \begin{figure}[ht]
 	\includegraphics[width=\linewidth]{../plots/online-varyN-uneven}
@@ -182,10 +186,25 @@ There exists immense variation in \emph{how} policies and values may be learned,
 	}
 \end{figure}
 
+\begin{figure}[ht]
+	\includegraphics[width=\linewidth]{../plots/mplex}
+	\caption{
+		Average TCP upload rate of hosts targeting different bandwidths in \emph{mininet}, computed over 10 runs.
+		As the rate of packet drop is linearly increased from \SIrange{0}{40}{\percent}, all flows begin to converge on an extremely low upload rate, regardless of the target bandwidth.
+		This behaviour is to be expected, and is to the credit of the emulated environment---prior treatments have ignored such phenomena, which have strong implications on agent and network design.
+		This confirms that packet drop does not affect benign TCP flows linearly, causing a higher rate reduction than what malicious flows will experience.
+		\label{fig:mplex-tcp}
+	}
+\end{figure}
+
 See above: a result.
 
 ?? Observations: training time lengthier by nature of emulated environment.
 ?? Risk of going for a simulation (i.e. numeric)? Always going to be interesting behaviour that is missed out on (in theory), at the cost of training time/limits of simulation speed
+
+?? TCP perf characteristics under packet drop known by the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97}:
+$$ \operatorname{BW} = \frac{\operatorname{MSS}}{\operatorname{RTT}} \frac{C}{\sqrt{p}},$$
+for the \emph{maximum segment size} (MSS), \emph{round trip time} (RTT), a choice of constant $C$ dependent on system assumptions and the probability $p \in (0, 1]$ that a packet is lost.
 
 \section{Related Work}
 
@@ -208,6 +227,10 @@ It all ends here, Mr.\ Bond...
 ?? Please write me once everything else is in place.
 
 ?? Future Work? I.e., \emph{everything}: no one else is really looking at/interested in this specific kind of application of RL yet. \emph{Yet}.
+
+?? Benefit of the more realistic emulation environ is that it is far closer in behaviour and architecture (i.e. viable) to a real SDN-enabled deployment, captures some dynamics which were otherwise hidden/lost by human ignorance. It also allows me to develop the system towards evolving traffic models where it is expected that RL should shine over and above standard ML techniques. Room to introduce/roll-in dynamic changepoint detection or adaptive exploration \cite{DBLP:conf/ki/Tokic10, DBLP:conf/ki/TokicP11, DBLP:conf/annpr/TokicP12}?
+
+?? Overarching goal: works which respect the complexity of the network environment (rather than na\"{i}ve simulation, blind ML applications etc.) and choose well-considered pathways to solution. Call-to-action?
 
 \section*{Acknowledgements}
 My thanks go to Dr.\ Dimitrios Pezaros for his supervision, guidance, and comments relating to the realisation of this work.

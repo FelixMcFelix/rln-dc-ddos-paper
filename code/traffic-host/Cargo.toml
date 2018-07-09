@@ -1,0 +1,9 @@
+[package]
+name = "traffic-host"
+version = "0.1.0"
+authors = ["Kyle Simpson <kyleandrew.simpson@gmail.com>"]
+
+[dependencies]
+futures = "0.1"
+reqwest = "0.8"
+tokio = "0.1"
