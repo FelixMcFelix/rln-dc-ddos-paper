@@ -7,7 +7,8 @@ state = ([], [], [], [], None)
 
 filedir = sys.argv[1]
 block_size = int(sys.argv[2])
-should_read = bool(int(sys.argv[3]))
+total_size = int(sys.argv[3])
+should_read = bool(int(sys.argv[4]))
 
 if should_read:
 	with open(filedir, "rb") as infile:
@@ -22,7 +23,7 @@ results = marlExperiment(
 	n_learners = 3,
 	host_range = [2, 2],
 
-	explore_episodes = 80,#000,
+	explore_episodes = 0.8*total_size,
 	episodes = block_size,
 	episode_length = 1000,
 	separate_episodes = False,
@@ -46,6 +47,8 @@ results = marlExperiment(
 	store_sarsas = store_sarsas,
 	rand_state = random_state,
 )
+
+# FIXME:don't pickle results, only the sarsas + rng state!
 
 with open(filedir, "wb") as outfile:
 	cPickle.dump(results, outfile)
