@@ -3,7 +3,7 @@ from writer import writeResults, makeResultsAverage
 import cPickle
 import sys
 
-state = ([], [], [], [], None)
+state = ([], None)
 
 filedir = sys.argv[1]
 block_size = int(sys.argv[2])
@@ -14,7 +14,7 @@ if should_read:
 	with open(filedir, "rb") as infile:
 		state = cPickle.load(infile)
 
-(rewards, good_traffic_percents, total_loads, store_sarsas, random_state) = state
+(store_sarsas, random_state) = state
 
 results = marlExperiment(
 	n_teams = 5,
@@ -41,15 +41,14 @@ results = marlExperiment(
 
 	rf = "ctl",
 
-	rewards = rewards,
-	good_traffic_percents = good_traffic_percents,
-	total_loads = total_loads,
 	store_sarsas = store_sarsas,
 	rand_state = random_state,
 )
 
-# FIXME:don't pickle results, only the sarsas + rng state!
+(_, _, _, store_sarsas, random_state) = results
+
+writeResults("../../results/offline.csv", results, append=True)
 
 with open(filedir, "wb") as outfile:
-	cPickle.dump(results, outfile)
+	cPickle.dump((store_sarsas, random_state), outfile)
 

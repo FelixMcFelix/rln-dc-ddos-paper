@@ -14,16 +14,20 @@ def mkdir_p(path):
         else:
             raise
 
-def writeResults(results_file, results, sarsa_dir=None):
+def writeResults(results_file, results, sarsa_dir=None, append=False):
 	(rewards, good_traffic_percents, total_loads, store_sarsas, rng_state) = results
+
+	mode = "a" if append else "w"
 
 	# First, handle the actual results.
 	mkdir_p(os.path.split(results_file)[0])
-	with open(results_file, "w") as csvfile:
+	with open(results_file, mode) as csvfile:
 		out = csv.writer(csvfile)
 		all_t = 0
 		# Key/headers
-		out.writerow(["episode", "t", "global_t", "g_reward", "legit_traffic", "total_load"])
+		if not append:
+			out.writerow(["episode", "t", "global_t", "g_reward", "legit_traffic", "total_load"])
+			
 		for ep, (rewards_ep, g_traf_ep, load_ep) in enumerate(zip(rewards, good_traffic_percents, total_loads)):
 			for t, (reward, g_traffic, load) in enumerate(zip(rewards_ep, g_traf_ep, load_ep)):
 				out.writerow([ep, t, all_t, reward, g_traffic, load])

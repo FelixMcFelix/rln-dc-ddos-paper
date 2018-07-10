@@ -204,7 +204,8 @@ See above: a result.
 
 ?? TCP perf characteristics under packet drop known by the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97}:
 $$ \operatorname{BW} = \frac{\operatorname{MSS}}{\operatorname{RTT}} \frac{C}{\sqrt{p}},$$
-for the \emph{maximum segment size} (MSS), \emph{round trip time} (RTT), a choice of constant $C$ dependent on system assumptions and the probability $p \in (0, 1]$ that a packet is lost.
+for the \emph{maximum segment size} (MSS), \emph{round trip time} (RTT), a choice of constant $C \approx{} \sqrt{3/2}$ dependent on system assumptions and the probability $p \in (0, 1]$ that a packet is lost.
+The lower bound on $p$ is deliberately open, as packet drop acts as a control signal for the TCP send window size.
 
 \section{Related Work}
 
