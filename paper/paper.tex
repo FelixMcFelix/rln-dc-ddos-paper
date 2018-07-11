@@ -3,11 +3,12 @@
 \usepackage[T1]{fontenc}
 \usepackage{amsfonts}
 \usepackage{amsmath}
+\usepackage{bm}
 
 \usepackage[dvipsnames]{xcolor}
 \usepackage{graphicx}
 
-\usepackage[binary-units]{siunitx}
+\usepackage[binary-units, per-mode=symbol]{siunitx}
 \sisetup{range-phrase=--, range-units=single}
 
 \usepackage[basic]{complexity}
@@ -40,7 +41,7 @@
 	\bibstring[\emph]{andothers}%
 }{}{}
 \DeclareFieldFormat[inproceedings]{url}{}
-\DeclareFieldFormat[inproceedings]{article}{}
+\DeclareFieldFormat[article]{url}{}
 
 %opening!
 
@@ -74,6 +75,10 @@
 	\hbox to \columnwidth{\hfill\vrule width 0.5\columnwidth height 0.4pt\hfill}
 	\kern4.6pt}
 \makeatother
+
+% make math easy
+\newcommand{\acval}[3]{\ensuremath{\operatorname{\hat{q}}(#1, #2, #3)}}
+\newcommand{\wvec}[1]{\ensuremath{\bm{w}_{#1}}}
 
 %-------------------------------------%
 %-------------------------------------%
@@ -139,7 +144,7 @@ The intent is to augment what existing solutions can provide, by automatically a
 This paper contributes:
 \begin{itemize}
 	\item A DDoS mitigation system based on direct-control reinforcement learning designed for deployment in real-world software-defined networks.
-	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}---a deconstruction of the ISP-like formulation, an acknowledgement of the flaws and risk factors of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a}.
+	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}---a deconstruction of their ISP-like formulation, and an acknowledgement of the flaws and risk factors of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a}.
 	\item ?? TODO: Advance the use/representation/granularity of state-space in direct-control RL of networked applications.
 \end{itemize}
 
@@ -155,7 +160,7 @@ Formally then, the goal is to maximise the \emph{expected return} $\operatorname
 
 ?? Include some details of function approximation in the formalisation? I.e. tile coding, stability and convergence guarantees...
 
-There exists immense variation in \emph{how} policies and values may be learned, reliant upon the particular convergence guarantees required.
+There exists immense variation in \emph{how} policies and/or values may be learned, reliant upon the particular convergence guarantees required.
 
 ?? Is this \emph{actually} just sarsa? We're using fn approx (of course), but this is fraught with its own difficulties. Is it strictly speaking correct to describe it as Sarsa at this point? It's, at the very least, 1-step semi-gradient Sarsa given that it is clearly on-policy w/ fn approx...
 ?? IDEA: try out average reward, TD($\lambda$) methods as future work...
@@ -178,28 +183,51 @@ There exists immense variation in \emph{how} policies and values may be learned,
 ?? STRUCTURE: Either (methodology) -> (results) OR (their stuff + its weaknesses) -> (a new direction) [second is way punchier, but not yet ready to go with that.]
 
 \subsection{Topology}
-The network itself is tree-structured, where one server connects to $k$ team leaders, each connected to $l$ intermediate switches, which in turn each connect to $m$ egress switches.
+The network itself is tree-structured, where one server connects through a dedicated switch to $k$ team leader switches, each connected to $l$ intermediate switches, which in turn each connect to $m$ egress switches.
 Agents are co-located with these egress switches, who control the proportion of upstream packets from $n$ external hosts to discard according to load statistics observed along their path to the server.
 Agents communicate with their co-hosted OpenFlow-enabled switches---running a modified version of \emph{Open vSwitch} (OVS) \cite{open-vswitch}---to install probabilistic packet-drop rules.
+Each link has a delay of \SI{10}{\milli\second}.
+All links have unbounded capacity, save for the server-switch connection which is capped at a fixed $U_s$ \si{\mega\bit\per\second} in both directions.
 
 ?? Diagram? TikZ?
 
 Reimplementation of the network model was performed using mininet \cite{mininet}, a Python-based network emulator.
 Traffic is played back from hosts via Tcpreplay at a bandwidth assigned uniformly from a `good' or `bad' distribution, each using the same pcap file with source and destination IP addresses rewritten.
-While unrealistic with respect to packet content, it was assumed that this would provide representative load and packet inter-arrival characteristics.
-A sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training using a priori knowledge by simulation to transfer to reality.
+While unrealistic with respect to packet content, it was assumed that this would provide representative load and packet inter-arrival characteristics, since the agents as initially defined are blind to such information.
 
 \subsection{Agent Definitions}
 
-?? Specify update rules here? Sarsa \cite[pp.\ \numrange{129}{131}]{RL2E}? Semi-gradient Sarsa? enhanced by tile-coding with identical parameter choices \cite{DBLP:phd/ethos/Malialis14}.
+?? Specify update rules here? Semi-gradient Sarsa \cite[pp.\ \numrange{243}{244}]{RL2E}? enhanced by tile-coding with identical parameter choices \cite{DBLP:phd/ethos/Malialis14}.
 
-?? Specify reward function here?
+\begin{subequations}
+\begin{align}
+\delta_t = R_{t+1} + \gamma \acval{S_{t+1}}{A_{t+1}}{\wvec{t}} - \acval{S_t}{A_t}{\wvec{t}},\\
+\bm{w}_{t+1} = \bm{w}_{t} + \alpha \delta_t \nabla{\acval{S_t}{A_t}{\wvec{t}}},
+\end{align}
+\end{subequations}
+observing that the gradient is the binary vector of tile activations.
+
+The reward functions as I specify them here were introduced by \textcite{DBLP:journals/eaai/MalialisK15}; in particular, I make use of the global reward as a performance metric and the \emph{coordinated team learning} (CTL) reward for training.
+Using the Iverson bracket notation:
+\begin{subequations}
+\begin{align}
+c_t^{\mathit{f}} = [ > U_s],\\
+c_t^{\mathit{tf}} = [ > U_s/k],\\
+R_{t}^{\mathit{Global}} = (1 - c_t^{\mathit{f}})\frac{a}{b} - c_t^{\mathit{f}},\\
+R_{t}^{\mathit{CTL}} = (1 - c_t^{\mathit{f}}c_t^{\mathit{tf}})\frac{a}{b} - c_t^{\mathit{f}}c_t^{\mathit{tf}},
+\end{align}
+\end{subequations}
+
+?? Note, these are dependent on the current agent! Need to find a succinct way to express this somehow...
 
 ?? M\&K Seem not to have a grasp on the importance of up/down traffic splits. Hmm......... (i.e., both could be relevant?)
 
+?? wrt reward function relying on heuristic elements or perfect knowledge:
+A sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training using a priori knowledge by simulation to transfer to reality.
+
 \section{Performance in an Emulated Environment}
 
-?? System specs of execution environment: Intel Core i7-6700K clocked at \SI{4.2}{\giga\hertz}, with \SI{32}{\gibi\byte} of RAM. All code is available on a public Github repository\footnote{\url{https://github.com/FelixMcFelix/rln-dc-ddos-paper}}.
+?? System specs of execution environment: 4-core Intel Core i7-6700K clocked at \SI{4.2}{\giga\hertz}, with \SI{32}{\gibi\byte} of RAM. All code is available on a public Github repository\footnote{\url{https://github.com/FelixMcFelix/rln-dc-ddos-paper}}.
 
 \begin{figure}[ht]
 	\includegraphics[width=\linewidth]{../plots/online-varyN-uneven}
@@ -228,7 +256,9 @@ See above: a result.
 ?? Risk of going for a simulation (i.e. numeric)? Always going to be interesting behaviour that is missed out on (in theory), at the cost of training time/limits of simulation speed
 
 ?? TCP perf characteristics under packet drop known by the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97}:
-$$ \operatorname{BW} = \frac{\operatorname{MSS}}{\operatorname{RTT}} \frac{C}{\sqrt{p}},$$
+\begin{equation}
+\operatorname{BW} = \frac{\operatorname{MSS}}{\operatorname{RTT}} \frac{C}{\sqrt{p}},
+\end{equation}
 for the \emph{maximum segment size} (MSS), \emph{round trip time} (RTT), a choice of constant $C \approx{} \sqrt{3/2}$ dependent on system assumptions and the probability $p \in (0, 1]$ that a packet is lost.
 The lower bound on $p$ is deliberately open, as packet drop acts as a control signal for the TCP send window size and is an expected part of normal operation.
 
@@ -262,7 +292,7 @@ It all ends here, Mr.\ Bond...
 System state which is dependent on many signals drawn from across a wide network, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
 
 \section*{Acknowledgements}
-My thanks go to Dr.\ Dimitrios Pezaros for his supervision, guidance, and comments relating to the realisation of this work, and to Mircea Iordache for his comments and technical assistance.
+My thanks go to Dr.\ Dimitrios Pezaros for his supervision, guidance, and comments relating to the realisation of this work, and to Mircea Iordache and Richard Cziva for their comments and technical assistance.
 Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
 
 \printbibliography
