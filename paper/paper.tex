@@ -158,9 +158,24 @@ The policy is then further refined by updating value estimates for state-action 
 From any point in a sequence of decisions, we may describe the sum of rewards yet to come as the \emph{return}, $G_t = R_{t+1} + \ldots + R_{t+T}$ for some (possibly infinite) choice of $T$.
 Formally then, the goal is to maximise the \emph{expected return} $\operatorname{\mathbb{E}_{\pi}}[G_t | S_t]$ from any and all states $S_t$.
 
-?? Include some details of function approximation in the formalisation? I.e. tile coding, stability and convergence guarantees...
+%?? Include some details of function approximation in the formalisation? I.e. tile coding, stability and convergence guarantees...
 
-There exists immense variation in \emph{how} policies and/or values may be learned, reliant upon the particular convergence guarantees required.
+There exists immense variation in \emph{how} policies and/or values may be learned, reliant upon the learning environment, problem and required convergence guarantees.
+In particular, we shall focus on methods which choose actions according to their value estimates from the current state.
+To cope with a continuous state- and/or action-space, one valuable technique is to employ \emph{tile-coding} \cite[pp.\ \numrange{217}{221}]{RL2E}---this converts our state from $\mathbb{R}^d \times A$ into a sparse boolean feature vector $\operatorname{\mathbf{x}}(s, a) \forall a \in \mathcal{A}$ by subdividing it into a number of overlapping $d$-dimensional grids with an optional bias component.
+This transform, as an example of linear function approximation, then necessitates the use of \emph{semi-gradient Sarsa} \cite[pp.\ \numrange{243}{244}]{RL2E}.
+Given a weight vector $\wvec{0}=\bm{0}$ which defines :
+\begin{subequations}
+	\begin{gather}
+	\acval{s}{a}{\wvec{}} = \wvec{}^{\top} \operatorname{\mathbf{x}}(s, a),\\
+	\delta_t = R_{t+1} + \gamma \acval{S_{t+1}}{A_{t+1}}{\wvec{t}} - \acval{S_t}{A_t}{\wvec{t}},\\
+	\bm{w}_{t+1} = \bm{w}_{t} + \alpha \delta_t \nabla{\acval{S_t}{A_t}{\wvec{t}}}.
+	\end{gather}
+	\label{eqn:sg-sarsa}
+\end{subequations}
+
+Observing that $\nabla{\acval{\cdot}{\cdot}{\cdot}} = \operatorname{\mathbf{x}}(s, a)$, and $\operatorname{\mathbf{x}}(s, a)$ .
+Furthermore, if the action set remains 
 
 ?? Is this \emph{actually} just sarsa? We're using fn approx (of course), but this is fraught with its own difficulties. Is it strictly speaking correct to describe it as Sarsa at this point? It's, at the very least, 1-step semi-gradient Sarsa given that it is clearly on-policy w/ fn approx...
 ?? IDEA: try out average reward, TD($\lambda$) methods as future work...
@@ -183,7 +198,7 @@ There exists immense variation in \emph{how} policies and/or values may be learn
 ?? STRUCTURE: Either (methodology) -> (results) OR (their stuff + its weaknesses) -> (a new direction) [second is way punchier, but not yet ready to go with that.]
 
 \subsection{Topology}
-The network itself is tree-structured, where one server connects through a dedicated switch to $k$ team leader switches, each connected to $l$ intermediate switches, which in turn each connect to $m$ egress switches.
+The network itself is tree-structured, where one server $s$ connects through a dedicated switch to $k$ team leader switches, each connected to $l$ intermediate switches, which in turn each connect to $m$ egress switches.
 Agents are co-located with these egress switches, who control the proportion of upstream packets from $n$ external hosts to discard according to load statistics observed along their path to the server.
 Agents communicate with their co-hosted OpenFlow-enabled switches---running a modified version of \emph{Open vSwitch} (OVS) \cite{open-vswitch}---to install probabilistic packet-drop rules.
 Each link has a delay of \SI{10}{\milli\second}.
@@ -197,28 +212,26 @@ While unrealistic with respect to packet content, it was assumed that this would
 
 \subsection{Agent Definitions}
 
-?? Specify update rules here? Semi-gradient Sarsa \cite[pp.\ \numrange{243}{244}]{RL2E}? enhanced by tile-coding with identical parameter choices \cite{DBLP:phd/ethos/Malialis14}.
+Agents receive state input from monitors in the environment, a vector of load values (in \si{\mega\bit\per\second}) observed along their path to $s$: this is tile-coded with identical parameter choices to those of \textcite{DBLP:phd/ethos/Malialis14}.
 
-\begin{subequations}
-\begin{align}
-\delta_t = R_{t+1} + \gamma \acval{S_{t+1}}{A_{t+1}}{\wvec{t}} - \acval{S_t}{A_t}{\wvec{t}},\\
-\bm{w}_{t+1} = \bm{w}_{t} + \alpha \delta_t \nabla{\acval{S_t}{A_t}{\wvec{t}}},
-\end{align}
-\end{subequations}
-observing that the gradient is the binary vector of tile activations.
+At every time step, each agent installs an action onto the switch which hosts it, instructing it to drop $p\si{\percent}$ of traffic.
 
 The reward functions as I specify them here were introduced by \textcite{DBLP:journals/eaai/MalialisK15}; in particular, I make use of the global reward as a performance metric and the \emph{coordinated team learning} (CTL) reward for training.
-Using the Iverson bracket notation:
+These assume the presence of a classifier (exact or heuristic) which estimates the volume of `legitimate traffic' received at any point, $g(\cdot)$.
+At time $t$ an agent $a$ (with team leader $l_a$) receives either $R_{t}^{\mathit{Global}}$ or $R_{t}^{\mathit{CTL}}$:
 \begin{subequations}
-\begin{align}
-c_t^{\mathit{f}} = [ > U_s],\\
-c_t^{\mathit{tf}} = [ > U_s/k],\\
-R_{t}^{\mathit{Global}} = (1 - c_t^{\mathit{f}})\frac{a}{b} - c_t^{\mathit{f}},\\
-R_{t}^{\mathit{CTL}} = (1 - c_t^{\mathit{f}}c_t^{\mathit{tf}})\frac{a}{b} - c_t^{\mathit{f}}c_t^{\mathit{tf}},
-\end{align}
+\newcommand{\cond}[2]{\operatorname{c}_{#1,t}#2}
+\newcommand{\load}[1]{\operatorname{load}_{t}(#1)}
+\begin{gather}
+\cond{f} = [\load{s} > U_s],\\
+\cond{c}{(a)} = [\load{l_a} > U_s/k],\\
+R_{t}^{\mathit{Global}} = (1 - \cond{f}) \frac{g(\load{s})}{g(\load{\mathit{total}})} - \cond{f},\\
+R_{t}^{\mathit{CTL}} = (1 - \cond{f}\cond{c}{(a)}) \frac{g(\load{l_a})}{g(\load{\mathit{team}})} \allowbreak - \cond{f} \cond{c}{(a)},
+\end{gather}
+where $\load{\mathit{total}}$ and $\load{\mathit{team}}$ refer to the load across all egress points in the network and in $a$'s team, respectively.
 \end{subequations}
 
-?? Note, these are dependent on the current agent! Need to find a succinct way to express this somehow...
+The tile-coded state and chosen reward function are then used as input for the \emph{semi-gradient Sarsa} algorithm described in \cref{eqn:sg-sarsa}.
 
 ?? M\&K Seem not to have a grasp on the importance of up/down traffic splits. Hmm......... (i.e., both could be relevant?)
 
