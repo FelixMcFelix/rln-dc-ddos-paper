@@ -7,6 +7,8 @@
 
 \usepackage[dvipsnames]{xcolor}
 \usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, calc, fit, positioning}
 
 \usepackage[binary-units, per-mode=symbol]{siunitx}
 \sisetup{range-phrase=--, range-units=single}
@@ -80,6 +82,39 @@
 \newcommand{\acval}[3]{\ensuremath{\operatorname{\hat{q}}(#1, #2, #3)}}
 \newcommand{\wvec}[1]{\ensuremath{\bm{w}_{#1}}}
 
+\makeatletter
+\DeclareRobustCommand{\rvdots}{%
+	\vbox{
+		\baselineskip4\p@\lineskiplimit\z@
+		\kern-\p@
+		\hbox{.}\hbox{.}\hbox{.}
+}}
+\makeatother
+
+% Official colours!
+
+\definecolor{uofguniversityblue}{rgb}{0, 0.219608, 0.396078}
+
+\definecolor{uofgheather}{rgb}{0.356863, 0.32549, 0.490196}
+\definecolor{uofgaquamarine}{rgb}{0.603922, 0.72549, 0.678431}
+\definecolor{uofgslate}{rgb}{0.309804, 0.34902, 0.380392}
+\definecolor{uofgrose}{rgb}{0.823529, 0.470588, 0.709804}
+\definecolor{uofgmocha}{rgb}{0.709804, 0.564706, 0.47451}
+
+\definecolor{uofglawn}{rgb}{0.517647, 0.741176, 0}
+\definecolor{uofgcobalt}{rgb}{0, 0.615686, 0.92549}
+\definecolor{uofgturquoise}{rgb}{0, 0.709804, 0.819608}
+\definecolor{uofgsunshine}{rgb}{1.0, 0.862745, 0.211765}
+\definecolor{uofgpumpkin}{rgb}{1.0, 0.72549, 0.282353}
+\definecolor{uofgthistle}{rgb}{0.584314, 0.070588, 0.447059}
+\definecolor{uofgpillarbox}{rgb}{0.701961, 0.047059, 0}
+\definecolor{uofglavendar}{rgb}{0.356863, 0.301961, 0.580392}
+
+\definecolor{uofgsandstone}{rgb}{0.321569, 0.278431, 0.231373}
+\definecolor{uofgforest}{rgb}{0, 0.317647, 0.2}
+\definecolor{uofgburgundy}{rgb}{0.490196, 0.133333, 0.223529}
+\definecolor{uofgrust}{rgb}{0.603922, 0.227451, 0.023529}
+
 %-------------------------------------%
 %-------------------------------------%
 
@@ -152,19 +187,21 @@ This paper contributes:
 
 %?? Introduce RL, related definitions etc.
 \emph{Reinforcement learning} (RL) is a variant of machine learning principally concerned with with training an agent to choose an optimal sequence of actions in the pursuit of a given task \cite{RL2E}.
-We assume the agent has a certain amount of knowledge whenever a decision must be made: at any point in time $t$ it knows which \emph{state} it is in ($S_t \in \mathcal{S}$), the set of \emph{actions} which are available to it ($\mathcal{A} = A(S_t)$) and, if available, a numeric \emph{reward} obtained from the last action chosen ($R_t \in \mathbb{R}, A_t \in \mathcal{A}$).
+We assume the agent has a certain amount of knowledge whenever a decision must be made: at any point in time $t$ it knows which \emph{state} it is in ($S_t \in \mathcal{S}$), the set of \emph{actions} which are available to it ($\operatorname{A}(S_t) \subseteq \mathcal{A}$) and, if available, a numeric \emph{reward} obtained from the last action chosen ($R_t \in \mathbb{R}, A_{t-1} \in \operatorname{A}(S_{t-1})$).
+This formulation of interaction with a system is best described as a \emph{Markov decision problem} (MDP).
 RL methods combine this information with a current \emph{policy} $\pi$ to determine which action should be taken: such a choice need not be optimal, if an agent needs to further explore some region of the state space.
 The policy is then further refined by updating value estimates for state-action pairs or via policy gradient methods, meaning that RL-based approaches learn adaptively and online if reward functions are available in their deployment environment.
-From any point in a sequence of decisions, we may describe the sum of rewards yet to come as the \emph{return}, $G_t = R_{t+1} + \ldots + R_{t+T}$ for some (possibly infinite) choice of $T$.
-Formally then, the goal is to maximise the \emph{expected return} $\operatorname{\mathbb{E}_{\pi}}[G_t | S_t]$ from any and all states $S_t$.
+From any point in a sequence of decisions, we may describe the sum of rewards yet to come as the \emph{discounted return}, $G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+2} + \ldots$, choosing the discount factor $\gamma \in [0,1]$ to determine how crucial future rewards are vis-\`{a}-vis the current state.
+Formally then, the goal is to choose actions which maximise the \emph{expected discounted return} $\operatorname{\mathbb{E}_{\pi}}[G_t]$.
 
 %?? Include some details of function approximation in the formalisation? I.e. tile coding, stability and convergence guarantees...
 
-There exists immense variation in \emph{how} policies and/or values may be learned, reliant upon the learning environment, problem and required convergence guarantees.
+There is immense variation in \emph{how} policies and/or values may be learned, reliant upon the learning environment, problem and required convergence guarantees.
 In particular, we shall focus on methods which choose actions according to their value estimates from the current state.
-To cope with a continuous state- and/or action-space, one valuable technique is to employ \emph{tile-coding} \cite[pp.\ \numrange{217}{221}]{RL2E}---this converts our state from $\mathbb{R}^d \times A$ into a sparse boolean feature vector $\operatorname{\mathbf{x}}(s, a) \forall a \in \mathcal{A}$ by subdividing it into a number of overlapping $d$-dimensional grids with an optional bias component.
+To cope with a continuous state- and/or action-space, one valuable technique is to employ \emph{tile-coding} \cite[pp.\ \numrange{217}{221}]{RL2E}---this converts our state from $\mathbb{R}^d \times \mathcal{A}$ into a sparse boolean feature vector $\operatorname{\mathbf{x}}(s, a)$ by subdividing it into a number of overlapping $(d+|\mathcal{A}|)$-dimensional grids with an optional bias component.
+Entries of $\operatorname{\mathbf{x}}(s, a)$ are set to 1 if the state action pair exists within the corresponding tile.
 This transform, as an example of linear function approximation, then necessitates the use of \emph{semi-gradient Sarsa} \cite[pp.\ \numrange{243}{244}]{RL2E}.
-Given a weight vector $\wvec{0}=\bm{0}$ which defines :
+Given a weight vector $\wvec{0}=\bm{0}$ and learning rate $\alpha$, we may approximate an action $a$'s value in any state $s$ by $\operatorname{q}(s, a) \approx \acval{s}{a}{\wvec{}}$:
 \begin{subequations}
 	\begin{gather}
 	\acval{s}{a}{\wvec{}} = \wvec{}^{\top} \operatorname{\mathbf{x}}(s, a),\\
@@ -173,11 +210,13 @@ Given a weight vector $\wvec{0}=\bm{0}$ which defines :
 	\end{gather}
 	\label{eqn:sg-sarsa}
 \end{subequations}
+By computing the approximate value of every action available in the current state, actions with maximal value can be chosen each time (the \emph{greedy} policy), we might take a random action with probability $\epsilon$ to encourage early exploration (the \emph{$\epsilon$-greedy policy}), or we might some use some other mechanism.
 
-Observing that $\nabla{\acval{\cdot}{\cdot}{\cdot}} = \operatorname{\mathbf{x}}(s, a)$, and $\operatorname{\mathbf{x}}(s, a)$ .
-Furthermore, if the action set remains 
+If $\operatorname{A}(s) = \mathcal{A}$ in every state (and actions are themselves discrete), then the implementation of the policy and update rules may be simplified by storing a vector of action values for each state encountered.
+Observing that $\nabla{\acval{s}{a}{\wvec{}}} = \operatorname{\mathbf{x}}(s, a)$, we may gain further optimisations by considering that a tile-coded feature vector is a boolean vector of constant Hamming weight (and so is amenable to representation as an array of indices).
+Moreover, we need not store vectors of action values for tiles which have not yet been visited.
 
-?? Is this \emph{actually} just sarsa? We're using fn approx (of course), but this is fraught with its own difficulties. Is it strictly speaking correct to describe it as Sarsa at this point? It's, at the very least, 1-step semi-gradient Sarsa given that it is clearly on-policy w/ fn approx...
+%?? Is this \emph{actually} just sarsa? We're using fn approx (of course), but this is fraught with its own difficulties. Is it strictly speaking correct to describe it as Sarsa at this point? It's, at the very least, 1-step semi-gradient Sarsa given that it is clearly on-policy w/ fn approx...
 ?? IDEA: try out average reward, TD($\lambda$) methods as future work...
 
 ?? Discuss mininet? Networking terms? SDN stuff?
@@ -203,8 +242,57 @@ Agents are co-located with these egress switches, who control the proportion of 
 Agents communicate with their co-hosted OpenFlow-enabled switches---running a modified version of \emph{Open vSwitch} (OVS) \cite{open-vswitch}---to install probabilistic packet-drop rules.
 Each link has a delay of \SI{10}{\milli\second}.
 All links have unbounded capacity, save for the server-switch connection which is capped at a fixed $U_s$ \si{\mega\bit\per\second} in both directions.
+\Cref{fig:marl-topol} demonstrates this visually.
 
-?? Diagram? TikZ?
+\begin{figure}
+\centering
+\resizebox{\linewidth}{!}{
+\begin{tikzpicture}[
+texts/.style = {text=black},
+labeltexts/.style = {text=uofgsandstone},
+treeline/.style = {draw=uofgburgundy},
+treenode/.style = {texts, circle, centered, fill=white, treeline},
+external/.style = {fill=uofgrust},
+hideline/.style = {draw=uofgsandstone!40!white},
+hidenode/.style = {treenode, hideline},
+grow'=right
+]
+\node[treenode, label={[texts]above:Server}] (root) {}
+	child [treeline] { node [treenode, label={[texts]above:Core}] (sswitch) {}
+		child [treeline] { node [treenode, label={[texts]above:Leader}] (teaml) {} 
+			child [treeline] { node [treenode, label={[texts]above:Intermediate}] (inter) {}
+				child [treeline] { node [treenode, label={[texts]above:Agent/Egress}] (agent) {}
+					child [treeline] { node [treenode, external] (extern) {}
+						child [treeline] { node [treenode, external, label={[texts]above:Host}] (host) {} }
+						child [hideline] { node [hidenode] (endhost) {} }
+					}
+				}
+				child [hideline] { node [hidenode] (endagent) {} }
+			}
+			child [hideline] { node [hidenode] (endinter) {} }
+		}
+		child [hideline] { node [hidenode] (endteaml) {} }
+		edge from parent
+		node[below, labeltexts] {$U_s$}
+	};
+
+%\draw[-] (teaml) -- (endteaml);
+\node [labeltexts] (kdots) at ($(teaml)!0.5!(endteaml)$) {$\rvdots$};
+\node [labeltexts, right = -0.1cm of kdots] {$k$};
+\node [labeltexts] (ldots) at ($(inter)!0.5!(endinter)$) {$\rvdots$};
+\node [labeltexts, right = -0.1cm of ldots] {$l$};
+\node [labeltexts] (mdots) at ($(agent)!0.5!(endagent)$) {$\rvdots$};
+\node [labeltexts, right = -0.1cm of mdots] {$m$};
+\node [labeltexts] (ndots) at ($(host)!0.5!(endhost)$) {$\rvdots$};
+\node [labeltexts, right = -0.1cm of ndots] {$n$};
+\end{tikzpicture}
+}
+\caption{
+	Network topology diagram, showing how the server and its core switch's $k$ teams are structured, with $l$ intermediate routers per team, connected to $m$ agents which each moderate $n$ hosts beyond a single external switch.
+	Unfilled nodes are considered to be internal.
+	\label{fig:marl-topol}
+}
+\end{figure}
 
 Reimplementation of the network model was performed using mininet \cite{mininet}, a Python-based network emulator.
 Traffic is played back from hosts via Tcpreplay at a bandwidth assigned uniformly from a `good' or `bad' distribution, each using the same pcap file with source and destination IP addresses rewritten.
@@ -212,61 +300,91 @@ While unrealistic with respect to packet content, it was assumed that this would
 
 \subsection{Agent Definitions}
 
-Agents receive state input from monitors in the environment, a vector of load values (in \si{\mega\bit\per\second}) observed along their path to $s$: this is tile-coded with identical parameter choices to those of \textcite{DBLP:phd/ethos/Malialis14}.
+Agents receive state input from monitors in the environment, a vector of the four load values (in \si{\mega\bit\per\second}) observed along their path to $s$: this is tile-coded with identical parameter choices to those of \textcite{DBLP:phd/ethos/Malialis14}.
 
-At every time step, each agent installs an action onto the switch which hosts it, instructing it to drop $p\si{\percent}$ of traffic.
+At every time step, each agent installs an action via OpenFlow, instructing its host switch to drop each packet with probability $p$.
+Specifically, the agent chooses $p \in \left\{ 0.0, 0.1, \ldots, 0.9 \right\}$, giving a discrete, static action set which cannot completely filter traffic.
 
 The reward functions as I specify them here were introduced by \textcite{DBLP:journals/eaai/MalialisK15}; in particular, I make use of the global reward as a performance metric and the \emph{coordinated team learning} (CTL) reward for training.
-These assume the presence of a classifier (exact or heuristic) which estimates the volume of `legitimate traffic' received at any point, $g(\cdot)$.
-At time $t$ an agent $a$ (with team leader $l_a$) receives either $R_{t}^{\mathit{Global}}$ or $R_{t}^{\mathit{CTL}}$:
+These assume the presence of a classifier, $g(\cdot)$, which estimates the volume of `legitimate traffic' received at any point in the network.
+At time $t$ an agent $v$ (with team leader $l_v$) receives either $R_{t}^{\mathit{Global}}$ or $R_{t}^{\mathit{CTL}}$:
 \begin{subequations}
 \newcommand{\cond}[2]{\operatorname{c}_{#1,t}#2}
 \newcommand{\load}[1]{\operatorname{load}_{t}(#1)}
 \begin{gather}
 \cond{f} = [\load{s} > U_s],\\
-\cond{c}{(a)} = [\load{l_a} > U_s/k],\\
+\cond{c}{(v)} = [\load{l_v} > U_s/k],\\
 R_{t}^{\mathit{Global}} = (1 - \cond{f}) \frac{g(\load{s})}{g(\load{\mathit{total}})} - \cond{f},\\
-R_{t}^{\mathit{CTL}} = (1 - \cond{f}\cond{c}{(a)}) \frac{g(\load{l_a})}{g(\load{\mathit{team}})} \allowbreak - \cond{f} \cond{c}{(a)},
+R_{t}^{\mathit{CTL}}(v) = (1 - \cond{f}\cond{c}{(v)}) \frac{g(\load{l_v})}{g(\load{\mathit{team}})} \allowbreak - \cond{f} \cond{c}{(v)},
 \end{gather}
-where $\load{\mathit{total}}$ and $\load{\mathit{team}}$ refer to the load across all egress points in the network and in $a$'s team, respectively.
+where $\load{\mathit{total}}$ and $\load{\mathit{team}}$ refer to the load across all egress points in the network and in $v$'s team, respectively.
 \end{subequations}
 
-The tile-coded state and chosen reward function are then used as input for the \emph{semi-gradient Sarsa} algorithm described in \cref{eqn:sg-sarsa}.
+The tile-coded state and chosen reward function are then used as input for the \emph{semi-gradient Sarsa} algorithm described in \cref{eqn:sg-sarsa}, making use of $\epsilon$-greedy action selection.
 
 ?? M\&K Seem not to have a grasp on the importance of up/down traffic splits. Hmm......... (i.e., both could be relevant?)
 
 ?? wrt reward function relying on heuristic elements or perfect knowledge:
-A sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training using a priori knowledge by simulation to transfer to reality.
+A sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training by a simulated environment to transfer to reality.
 
 \section{Performance in an Emulated Environment}
 
-?? System specs of execution environment: 4-core Intel Core i7-6700K clocked at \SI{4.2}{\giga\hertz}, with \SI{32}{\gibi\byte} of RAM. All code is available on a public Github repository\footnote{\url{https://github.com/FelixMcFelix/rln-dc-ddos-paper}}.
+The original introduction of this approach to direct-control reinforcement learning as introduced by \textcite{DBLP:journals/eaai/MalialisK15} fails to consider key cases: the accurate simulation of TCP-like behaviour (and its effects on collateral damage), disjoint ranges of traffic distribution (i.e., the presence of benign heavy-hitters), and assumes a rigid ISP-like topology.
 
-\begin{figure}[ht]
+All experiments described were executed using an Ubuntu 16.04.4 LTS machine with a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
+All code underpinning these findings is available on a public repository\footnote{\url{https://github.com/FelixMcFelix/rln-dc-ddos-paper}}.
+
+\subsection{Service Guarantees and Host Density}
+The .
+In practice, well-established network topologies such as the \emph{fat-tree topology} fan out internally (to provide efficient replication and scaling of resources) while having comparatively few egress points.
+It is this latter condition which I feel is most worth examining: the case where the host/agent ratio is heavily skewed in favour of hosts, and actions as they have been defined are forced to become less granular.
+
+The base `online' experiment I replicate configures the network topology using $k=5$ teams, $l=3$ intermediate nodes per team, $m=2$ agents per intermediate node, and $n \in \{2, 7, 11, 14\}$ hosts per learner.
+I set $\gamma=0$ (leading to opportunistic behaviour), $\alpha=0.05$ and linearly annealing $\epsilon=0.2 \rightarrow 0$ by $t=3000$.
+Benign and malicious hosts uploaded between \SIrange{0}{1}{\mega\bit\per\second} and \SIrange{2.5}{6}{\mega\bit\per\second} respectively, and hosts are redrawn at each episode's start with $\operatorname{P}(\mathit{malicious})=0.4$.
+$U_s$ was fixed at $klmn+2\si{\mega\bit\per\second}$.
+The performance of each choice of $n$ was averaged over \num{10} episodes of length \num{10000} timesteps (setting $\wvec{}=\bm{0}$ between episodes).
+Host allocations were generated pseudorandomly to ensure fairness between choices of $n$.
+
+\begin{figure}
 	\includegraphics[width=\linewidth]{../plots/online-varyN-uneven}
 	\caption{
 		MARL pushback control system performance plotted over time, for various settings of $n$ hosts per learner.
 		This plot shows that, from the perspective of benign hosts, service guarantees degrade as inference and applied actions become less granular.
 		This generalises for all behavioural discriminators: even a perfect agent \emph{must} punish benign flows if they are grouped with malicious actors.
+		%		?? Effect on max perf AND learning rate??
+		Crucially, both the maximum achievable performance and learning rate are negatively impacted when granularity is coarse.
 		\label{fig:marl-granularity}
 	}
 \end{figure}
 
-\begin{figure}[ht]
+\Cref{fig:marl-granularity} shows that allocating more hosts to each learner in the recreated experiment leads to a decrease in the amount of benign traffic observed at the server.
+Given the UDP-like behaviour of Tcpreplay, being able to replicate the online performance of \citeauthor{DBLP:journals/eaai/MalialisK15} in the $n=2$ case suggests that the numeric simulation their work is entirely based upon does not capture the key interactions between TCP flows and packet drop as a control action.
+
+Notably, modelling the environment in Mininet makes evaluation rather slow as any interaction, coordination and communication must take place in real-time.
+While I'm sure this enhances the quality of model learned due to the explicit inclusion of more accurate network behaviour, a more abstract simulator based on observed physical properties could provide data at less computational cost.
+
+\subsection{TCP Multiplexing and Fallback Behaviour}
+While Tcpreplay was useful in recreating the original work, flow behaviour under packet loss is closer to that of UDP when using it to replay traffic.
+To validate the operation of the pdrop OpenFlow action and to investigate the effects of collateral damage upon benign TCP flows, I conducted an iperf3 test using mininet.
+Several hosts communicated concurrently to a single server over one switch, with maximum send rates in $\{1,...,5\}$ \si{\mega\bit\per\second} and a constant \SI{40}{\milli\second} latency.
+During the test, the rate of packet drop was increased linearly from \SIrange{0}{40}{\percent} and the observed throughput for each host was measured.
+
+\begin{figure}
 	\includegraphics[width=\linewidth]{../plots/mplex}
 	\caption{
 		Average TCP upload rate of hosts targeting different bandwidths in \emph{mininet}, computed over 10 runs.
 		As the rate of packet drop is linearly increased from \SIrange{0}{40}{\percent}, all flows begin to converge on an extremely low upload rate, regardless of the target bandwidth.
-		This behaviour is to be expected, and is to the credit of the emulated environment---prior treatments have ignored such phenomena, which have strong implications on agent and network design.
-		This confirms that packet drop does not affect benign TCP flows linearly, causing a higher rate reduction than what malicious flows will experience.
+		This behaviour is expected and well-understood, and is present in this emulated environment---prior treatments have ignored such phenomena, which have strong implications on agent and network design.
+		Malicious flows are not expected to obey the Mathis equation in this way, worsening collateral damage experienced by benign TCP flows.
 		\label{fig:mplex-tcp}
 	}
 \end{figure}
 
-See above: a result.
-
-?? Observations: training time lengthier by nature of emulated environment.
-?? Risk of going for a simulation (i.e. numeric)? Always going to be interesting behaviour that is missed out on (in theory), at the cost of training time/limits of simulation speed
+\Cref{fig:mplex-tcp} shows that benign TCP flows are severely harmed by \emph{any} packet drop, so collateral damage to these hosts is significant.
+Good-faith TCP congestion avoidance causes these flows to attempt to back off very quickly.
+%?? Talk about the same major points you made in the presentation here (i.e. TCP interactions) w/ pushback. Or in the evaluation...
+UDP, however, behaves as expected---malicious hosts are expected to exhibit the same behaviour, given that congestion is their primary goal.
 
 ?? TCP perf characteristics under packet drop known by the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97}:
 \begin{equation}
@@ -274,6 +392,30 @@ See above: a result.
 \end{equation}
 for the \emph{maximum segment size} (MSS), \emph{round trip time} (RTT), a choice of constant $C \approx{} \sqrt{3/2}$ dependent on system assumptions and the probability $p \in (0, 1]$ that a packet is lost.
 The lower bound on $p$ is deliberately open, as packet drop acts as a control signal for the TCP send window size and is an expected part of normal operation.
+
+\subsection{Synthesis}
+
+%It'd be really good if I could figure out a rough proof for the service property...
+%Okay... now say what this means for future viability! What changes can I make? Flow-specific metrics, of course! Increase granularity as much as I can!
+Both of these experiments suggest that the most viable way to enhance and deploy this MARL approach is to consider flows individually to maximise performance for legitimate hosts and to detect malicious hosts in a more principled manner.
+While this will add significant computational cost, this may be worked around with intelligent sampling and monitoring while taking multiple actions per-timestep \cite{DBLP:conf/hotnets/MaoAMK16}.
+
+?? Observations: training time lengthier by nature of emulated environment.
+?? Risk of going for a simulation (i.e. numeric)? Always going to be interesting behaviour that is missed out on (in theory), at the cost of training time/limits of simulation speed
+
+\section{A New Normal}
+
+?? TODO: everything
+
+\section{Rethinking the State Space}
+
+?? TODO: everything
+
+?? What concessions will we have to make in order to make per-flow processing more viable? Intelligent sampling/reanalysis of flows when needed (i.e. an external heuristic guiding method)?
+
+\section{The Results of Doing So}
+
+?? They'd probably look real nice...
 
 \section{Related Work}
 
