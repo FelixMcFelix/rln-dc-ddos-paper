@@ -84,8 +84,23 @@ def lastTimestepsAndEpAverages(in_path, out_path):
 			lasts = []
 			stats = []
 
+			# May be the case that episode numbers are wrong
+			# due to block-based writing/execution.
+			# However, everything is still in chrono order.
+			# Mitigate this by monitoring episode number
+			# in case there's a sudden discontinuity, then fix.
+			highest_ep = 0
+			curr_seen = 0
+
 			for row in c_in:
-				ep = int(row[0])
+				seen_ep = int(row[0])
+				
+				if curr_seen != seen_ep:
+					highest_ep += 1
+				
+				ep = highest_ep
+				curr_seen = seen_ep
+
 				t = int(row[1])
 				to_track = [float(x) for x in row[-3:]]
 				# print row

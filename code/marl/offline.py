@@ -10,7 +10,7 @@ block_size = 50
 # Create the file
 writeResults("../../results/offline.csv", ([], [], [], [], None))
 
-# Run these, natch into sets of 50.
+# Run these, batch into sets of 50.
 for i in xrange(0, total_eps, block_size):
 	remaining = total_eps - i
 	local_block = block_size if remaining >= block_size else remaining
