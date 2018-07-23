@@ -54,6 +54,8 @@ def marlExperiment(
 		discount = 0,
 		break_equal = False,
 
+		model = "tcpreplay",
+
 		dt = 0.001,
 
 		# These should govern tc on the links at various points in the network.
@@ -520,7 +522,8 @@ def marlExperiment(
 		alive = True
 		executeRouteQueue()
 
-		#net.interact()
+		if model == "nginx":
+			net.interact()
 
 		# Spool up the monitoring tool.
 		mon_cmd = server_switch.popen(
@@ -531,25 +534,42 @@ def marlExperiment(
 
 		server_ip = server.IP()
 
+		# spool up server if need be
+		server_proc = None
+
+		if model == "nginx":
+			cmd = [
+				"nginx",
+				"-p", "$PWD/../traffic-host",
+				"-c", "h1.conf",
+			]
+
+			server_proc = server.popen(
+				cmd, stdin=PIPE, stderr=sys.stderr
+			)
+
 		# gen traffic at each host. This MUST happen after the bootstrap.
 		for (_, _, _, _, hosts, _) in teams:
 			for (host, good, bw, link, ip) in hosts:
-				cmd = [
-					"tcpreplay-edit",
-					"-i", host.intfNames()[0],
-					"-l", str(0),
-					"-S", "0.0.0.0/0:{}/32".format(ip),
-					"-D", "0.0.0.0/0:{}/32".format(server_ip)
-				] + (
-					[] if old_style else ["-M", str(bw)]
-				) + [(good_file if good else bad_file)]
-				 
-				#host.sendCmd(
-				#	*cmd
-				#)
-				host_procs.append(host.popen(
-					cmd, stdin=PIPE, stderr=sys.stderr
-				))
+				if model == "tcpreplay":
+					cmd = [
+						"tcpreplay-edit",
+						"-i", host.intfNames()[0],
+						"-l", str(0),
+						"-S", "0.0.0.0/0:{}/32".format(ip),
+						"-D", "0.0.0.0/0:{}/32".format(server_ip)
+					] + (
+						[] if old_style else ["-M", str(bw)]
+					) + [(good_file if good else bad_file)]
+				elif model == "nginx":
+					cmd = [] # TODO
+				else:
+					cmd = []
+
+				if len(cmd) > 0:
+					host_procs.append(host.popen(
+						cmd, stdin=PIPE, stderr=sys.stderr
+					))
 
 		# Let the pcaps come to life.
 		time.sleep(3)
@@ -654,10 +674,13 @@ def marlExperiment(
 
 		removeAllSockets()
 
+		if server_proc is not None:
+			server_proc.terminate()
 		for proc in host_procs:
 			proc.terminate()
 
 		host_procs = []
+		server_prov = None
 
 		net.stop()
 
