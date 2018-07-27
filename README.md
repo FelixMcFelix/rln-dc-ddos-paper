@@ -5,5 +5,7 @@ Idea: move towards flow-specific metrics, incease discriminataive power and gran
 ## Requirements
 * gcc 7+
 * mininet
-* python2 (accompanies mininet) + numpy, twink
+* python2 (accompanies mininet) + numpy, twink, ryu
+* ryu-bin
 * tcpreplay
+* rustc >= 1.27
