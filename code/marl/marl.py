@@ -1,5 +1,5 @@
 from mininet.topo import Topo
-from mininet.node import OVSSwitch, RemoteController
+from mininet.node import OVSSwitch, RemoteController, Switch
 from mininet.link import TCLink
 from mininet.cli import CLI
 from mininet.net import Mininet
@@ -10,7 +10,10 @@ import twink.ofp5.build as ofpb
 import twink.ofp5.oxm as ofpm
 import twink.ofp5.parse as ofpp
 
+#from controller import controller_build_port
+import cPickle as pickle
 import itertools
+import networkx as nx
 import numpy as np
 import os
 import random
@@ -20,6 +23,8 @@ import socket
 from subprocess import PIPE, Popen
 import sys
 import time
+
+controller_build_port = 6666
 
 def marlExperiment(
 		linkopts = {
@@ -56,6 +61,8 @@ def marlExperiment(
 
 		model = "tcpreplay",
 
+		use_controller = True,
+
 		dt = 0.001,
 
 		# These should govern tc on the links at various points in the network.
@@ -87,6 +94,17 @@ def marlExperiment(
 	elif rand_seed is not None:
 		random.seed(rand_seed)
 
+	c0 = RemoteController("c0", ip="127.0.0.1", port=6633)
+	class MaybeControlledSwitch(OVSSwitch):
+		def __init__(self, name, **params):
+			OVSSwitch.__init__(self, name, **params)
+			self.controlled = False
+
+		def start(self, controllers):
+			return OVSSwitch.start(self, self._controller_list())
+
+		def _controller_list(self):
+			return [c0] if use_controller and self.controlled else []
 
 	if max_bw is None:
 		max_bw = n_teams * n_inters * n_learners * host_range[1] * evil_range[1]
@@ -167,10 +185,31 @@ def marlExperiment(
 		node.setIP("10.0.0.{}".format(next_ip[0]), 24)
 		next_ip[0] += 1
 
-	def trackedLink(src, target, extras=None):
+	def trackedLink(src, target, extras=None, port_dict=None):
 		if extras is None:
 			extras = linkopts
 		l = net.addLink(src, target, **extras)
+
+		def label(node):
+			if isinstance(node, Switch):
+				return node.dpid
+			else:
+				return node.IP()
+
+		def dict_link(s_l, t_l):
+			if s_l not in port_dict:
+				port_dict[s_l] = {}
+
+			d = port_dict[s_l]
+			if t_l not in d:
+				port_dict[s_l][t_l] = len(d)
+
+		if port_dict is not None:
+			s_label = label(src)
+			t_label = label(target)
+
+			dict_link(s_label, t_label)
+			dict_link(t_label, s_label)
 		return l
 
 	route_commands = [[]]
@@ -297,9 +336,9 @@ def marlExperiment(
 		else:
 			route_commands[0].append((switch, cmd_list, msg))
 
-	def routedSwitch(upstreamNode, **args):
-		sw = newNamedSwitch(**args)
-		trackedLink(upstreamNode, sw)
+	def routedSwitch(upstreamNode, *args, **kw_args):
+		sw = newNamedSwitch(*args)
+		trackedLink(upstreamNode, sw, **kw_args)
 		updateUpstreamRoute(sw)
 		return sw
 
@@ -343,13 +382,25 @@ def marlExperiment(
 
 			ip = "{}.{}.{}.{}".format(*ip_bytes)
 
+			new_host.setIP(ip, 24)
+
 			hosts.append(
 				(new_host, good, bw, link, ip)
 			)
 		return hosts
 
-	def makeTeam(parent, inter_count, learners_per_inter, sarsas=[]):
-		leader = routedSwitch(parent)
+	def makeTeam(parent, inter_count, learners_per_inter, sarsas=[], graph=None,
+			ss_label=None, port_dict=None):
+		leader = routedSwitch(parent, port_dict=port_dict)
+		leader.controlled = True
+
+		def add_to_graph(parent, new_child):
+			label = (None, new_child.dpid)
+			if graph is not None and parent is not None:
+				graph.add_edge(parent, label)
+			return label
+
+		leader_label = add_to_graph(ss_label, leader)
 
 		intermediates = []
 		learners = []
@@ -359,11 +410,14 @@ def marlExperiment(
 		newSarsas = len(sarsas) == 0
 
 		for i in xrange(inter_count):
-			new_interm = routedSwitch(leader)
+			new_interm = routedSwitch(leader, port_dict=port_dict)
 			intermediates.append(new_interm)
+			inter_label = add_to_graph(leader_label, new_interm)
+			new_interm.controlled=True
 
 			for j in xrange(learners_per_inter):
-				new_learn = routedSwitch(new_interm)
+				new_learn = routedSwitch(new_interm, port_dict=port_dict)
+				_ = add_to_graph(inter_label, new_learn)
 
 				# Init and pair the actual learning agent here, too!
 				# Bootstrapping happens later -- per-episode, in the 0-load state.
@@ -397,22 +451,34 @@ def marlExperiment(
 	def buildNet(n_teams, team_sarsas=[]):
 		server = newNamedHost()
 		server_switch = newNamedSwitch()
+		server_switch.controlled = True
 
-		core_link = trackedLink(server, server_switch)
+		port_dict = {}
+
+		core_link = trackedLink(server, server_switch, port_dict=port_dict)
 		updateUpstreamRoute(server_switch)
 		assignIP(server)
 
 		make_sarsas = len(team_sarsas) == 0
 
+		G = nx.Graph()
+		server_label = (server.IP(), None)
+		switch_label = (None, server_switch.dpid)
+		G.add_edge(server_label, switch_label)
+
 		teams = []
 		for i in xrange(n_teams):
 			t = makeTeam(server_switch, n_inters, n_learners,
-				sarsas=[] if make_sarsas else team_sarsas[i])
-			trackedLink(server_switch, t[0])
+				sarsas=[] if make_sarsas else team_sarsas[i],
+				graph=G,
+				ss_label=switch_label,
+				port_dict=port_dict)
+			# this doesn't need to even be here
+			#trackedLink(server_switch, t[0], port_dict=)
 			teams.append(t)
 			if make_sarsas: team_sarsas.append(t[-1])
 
-		return (server, server_switch, core_link, teams, team_sarsas)
+		return (server, server_switch, core_link, teams, team_sarsas, G, port_dict)
 
 	def pdrop(prob):
 		return int(prob * 0xffffffff)
@@ -444,14 +510,11 @@ def marlExperiment(
 
 		print "beginning episode {} of {}".format(ep+1, episodes)
 
-		net = Mininet(link=TCLink)
-
-		# May be useful to keep around
-		#net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
+		net = Mininet(link=TCLink, switch=MaybeControlledSwitch)
 
 		# build the network model...
 		# EVERY TIME, because scorched-earth is the only language mininet speaks
-		(server, server_switch, core_link, teams, team_sarsas) = buildNet(n_teams, team_sarsas=store_sarsas)
+		(server, server_switch, core_link, teams, team_sarsas, graph, port_dict) = buildNet(n_teams, team_sarsas=store_sarsas)
 
 		tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
 			[leader] + intermediates + learners for (leader, intermediates, learners, _, _, _) in teams
@@ -462,6 +525,59 @@ def marlExperiment(
 		switch_list_indices = {}
 		for i, sw in enumerate(tracked_switches):
 			switch_list_indices[sw.name] = i
+
+		# setup the controller, if required...
+		ctl_proc = None
+		controller = None
+		if use_controller:
+			# host the daemon, queue conns
+			ctl_proc = Popen(
+				["ryu-manager", "controller.py"],
+				stdin=PIPE,
+				stderr=sys.stderr
+			)
+
+			apsp = dict(nx.all_pairs_shortest_path(graph))
+
+			# classify nodes before building table info for the controller
+			ips = []
+			dpids = []
+			for node in graph.nodes():
+				(maybe_ip, maybe_dpid) = node 
+				if maybe_ip is not None:
+					ips += node
+				if maybe_dpid is not None:
+					dpids += node
+
+			def hard_label(node):
+				(left, right) = node
+				return left if right is None else right
+
+			# for each dpid, find the port which is closest to each IP
+			entry_map = {}
+			for dnode in dpids:
+				(_, dpid) = dnode
+				entry_map[dpid] = {}
+				for inode in ips:
+					(ip, _) = inode
+					path = apsp[dnode][inode]
+					port = port_dict[dpid][hard_label(path[1])]
+					entry_map[dpid][ip] = port
+
+			# handle those conns
+			# now send computed stuff to ctl...
+			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+				sock.bind(("127.0.0.1", controller_build_port))
+				sock.listen(1)
+				with sock.accept()[0] as data_sock:
+					# pickle, send its length, send the pickle...
+					pickle_str = pickle.dumps(entry_map)
+					data_sock.sendall(struct.pack("!Q", len(pickle)))
+					data_sock.sendall(pickle)
+
+			# mininet will automatically link switches to a controller, if it
+			# exists and is registered.
+			#controller = net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
 
 		# remake/reclassify hosts
 		all_hosts = []
@@ -516,6 +632,9 @@ def marlExperiment(
 		rewards.append([])
 		good_traffic_percents.append([])
 		total_loads.append([])
+
+		# pre-setup (i.e. controller config...)
+		net.build()
 
 		# Begin the new episode!
 		net.start()
@@ -676,6 +795,8 @@ def marlExperiment(
 
 		if server_proc is not None:
 			server_proc.terminate()
+		if ctl_proc is not None:
+			ctl_proc.terminate()
 		for proc in host_procs:
 			proc.terminate()
 
