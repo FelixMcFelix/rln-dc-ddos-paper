@@ -11,6 +11,7 @@ import twink.ofp5.oxm as ofpm
 import twink.ofp5.parse as ofpp
 
 #from controller import controller_build_port
+from contextlib import closing
 import cPickle as pickle
 import itertools
 import networkx as nx
@@ -20,6 +21,7 @@ import random
 from sarsa import SarsaLearner
 import signal
 import socket
+import struct
 from subprocess import PIPE, Popen
 import sys
 import time
@@ -101,6 +103,7 @@ def marlExperiment(
 			self.controlled = False
 
 		def start(self, controllers):
+			print "starting", self.name, "controlled:", self.controlled, "dpid:", self.dpid
 			return OVSSwitch.start(self, self._controller_list())
 
 		def _controller_list(self):
@@ -168,8 +171,8 @@ def marlExperiment(
 
 	# helpers
 
-	initd_host_count = [0]
-	initd_switch_count = [0]
+	initd_host_count = [1]
+	initd_switch_count = [1]
 	next_ip = [1]
 
 	def newNamedHost(**kw_args):
@@ -185,11 +188,7 @@ def marlExperiment(
 		node.setIP("10.0.0.{}".format(next_ip[0]), 24)
 		next_ip[0] += 1
 
-	def trackedLink(src, target, extras=None, port_dict=None):
-		if extras is None:
-			extras = linkopts
-		l = net.addLink(src, target, **extras)
-
+	def map_link(port_dict, n1, n2):
 		def label(node):
 			if isinstance(node, Switch):
 				return node.dpid
@@ -204,12 +203,19 @@ def marlExperiment(
 			if t_l not in d:
 				port_dict[s_l][t_l] = len(d)
 
-		if port_dict is not None:
-			s_label = label(src)
-			t_label = label(target)
+		s_label = label(n1)
+		t_label = label(n2)
 
-			dict_link(s_label, t_label)
-			dict_link(t_label, s_label)
+		dict_link(s_label, t_label)
+		dict_link(t_label, s_label)
+
+	def trackedLink(src, target, extras=None, port_dict=None):
+		if extras is None:
+			extras = linkopts
+		l = net.addLink(src, target, **extras)
+
+		if port_dict is not None:
+			map_link(port_dict, src, target)
 		return l
 
 	route_commands = [[]]
@@ -455,9 +461,10 @@ def marlExperiment(
 
 		port_dict = {}
 
-		core_link = trackedLink(server, server_switch, port_dict=port_dict)
+		core_link = trackedLink(server, server_switch)#, port_dict=port_dict)
 		updateUpstreamRoute(server_switch)
 		assignIP(server)
+		map_link(port_dict, server, server_switch)
 
 		make_sarsas = len(team_sarsas) == 0
 
@@ -502,8 +509,8 @@ def marlExperiment(
 		if interrupted[0]:
 			break
 
-		initd_switch_count = [0]
-		initd_host_count = [0]
+		initd_switch_count = [1]
+		initd_host_count = [1]
 		alive = False
 		if separate_episodes:
 			store_sarsas = []
@@ -543,11 +550,11 @@ def marlExperiment(
 			ips = []
 			dpids = []
 			for node in graph.nodes():
-				(maybe_ip, maybe_dpid) = node 
+				(maybe_ip, maybe_dpid) = node
 				if maybe_ip is not None:
-					ips += node
+					ips.append(node)
 				if maybe_dpid is not None:
-					dpids += node
+					dpids.append(node)
 
 			def hard_label(node):
 				(left, right) = node
@@ -561,19 +568,22 @@ def marlExperiment(
 				for inode in ips:
 					(ip, _) = inode
 					path = apsp[dnode][inode]
+					#print port_dict, path, inode
 					port = port_dict[dpid][hard_label(path[1])]
 					entry_map[dpid][ip] = port
 
 			# handle those conns
 			# now send computed stuff to ctl...
-			with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+			with closing(
+				socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			) as sock:
 				sock.bind(("127.0.0.1", controller_build_port))
 				sock.listen(1)
-				with sock.accept()[0] as data_sock:
+				with closing(sock.accept()[0]) as data_sock:
 					# pickle, send its length, send the pickle...
 					pickle_str = pickle.dumps(entry_map)
-					data_sock.sendall(struct.pack("!Q", len(pickle)))
-					data_sock.sendall(pickle)
+					data_sock.sendall(struct.pack("!Q", len(pickle_str)))
+					data_sock.sendall(pickle_str)
 
 			# mininet will automatically link switches to a controller, if it
 			# exists and is registered.
