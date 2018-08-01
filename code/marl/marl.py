@@ -63,7 +63,7 @@ def marlExperiment(
 
 		model = "tcpreplay",
 
-		use_controller = True,
+		use_controller = False,
 
 		dt = 0.001,
 
@@ -201,7 +201,7 @@ def marlExperiment(
 
 			d = port_dict[s_l]
 			if t_l not in d:
-				port_dict[s_l][t_l] = len(d)
+				port_dict[s_l][t_l] = len(d) + 1
 
 		s_label = label(n1)
 		t_label = label(n2)
@@ -269,10 +269,36 @@ def marlExperiment(
 			updateOneRoute(*el)
 		route_commands[0] = []
 
+	def pdrop(prob):
+		return int(prob * 0xffffffff)
+
+	def netip(ip, subnet):
+		(lhs,) = struct.unpack("I", socket.inet_aton(ip))
+		(rhs,) = struct.unpack("I", socket.inet_aton(subnet))
+		return struct.pack("I", lhs & rhs)
+
+	def internal_choose_group(group, ip="10.0.0.1", subnet="255.255.255.0"):
+		return ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 1, None, None, None, 0, 0,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_APPLY_ACTIONS, None, [
+				ofpb.ofp_action_group(None, 8, group)
+			])
+		)
+
 	flow_pdrop_msg = [""]
 	flow_upstream_msg = [""]
+	flow_gselect_msg = [""]
+	flow_outbound_msg = [""]
+	flow_outbound_flood = [""]
+	flow_group_msgs = [[]]
 
-	def compute_msg(ip="10.0.0.1", out_port=1):
+	def compute_msg(ip="10.0.0.1", subnet="255.255.255.0",
+			out_port=1, away_port=2):
 		flow_pdrop_msg[0] = ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
 			0, 0, 1, None, None, None, 0, 1,
@@ -288,22 +314,92 @@ def marlExperiment(
 				#ofpb.ofp_action_output(None, 16, ofp.OFPP_FLOOD, 65535)
 			])
 		)
+
+		groups = []
 		
+		for i in xrange(10):
+			#calc pdrop number
+			prob = 1.0 - (i/10.0)
+			p_drop_num = pdrop(prob)
+
+			groups.append(ofpb.ofp_group_mod(
+				None, ofp.OFPGC_ADD, ofp.OFPGT_INDIRECT, i,
+				[ofpb.ofp_bucket(None, 1, 0, 0, [
+					# Looks like 29 is the number I picked for Pdrop.
+					ofpb._pack("HHI", 29, 8, p_drop_num),
+					ofpb.ofp_action_output(None, 16, out_port, 65535)
+				])]
+			))
+
+		flow_group_msgs[0] = groups
+
+		flow_gselect_msg[0] = internal_choose_group(0, ip=ip, subnet=subnet)
+
+		flow_outbound_msg[0] = ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 0, None, None, None, 0, 0,
+			ofpb.ofp_match(None, None, None),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				ofpb.ofp_action_output(None, 16, away_port, 65535)
+			])
+		)
+
+		flow_outbound_flood[0] = ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 0, None, None, None, 0, 0,
+			ofpb.ofp_match(None, None, None),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				ofpb.ofp_action_output(None, 16, ofp.OFPP_FLOOD, 65535)
+			])
+		)
+
 		flow_upstream_msg[0] = ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
-			0, 0, 1, None, None, None, 0, 1,
+			0, 0, 1, None, None, None, 0, 0,
 			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
 				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
-				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, False, 0, socket.inet_aton(ip), None)
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
 			]),
 			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
 				ofpb.ofp_action_output(None, 16, out_port, 65535)
 			])
 		)
+		print socket.inet_aton(ip).encode("hex_codec"), socket.inet_aton(subnet).encode("hex_codec")
 
 	compute_msg()
 
+	def prepLearner(switch, out_port=1, ac_prob=0.0):
+		if switch.controlled:
+			return
+
+		cmd_list = []
+
+		# send group+bucket instantiations,
+		# also the base rules (internal dst -> G0, external -> outwards port=2)
+		for msg in flow_group_msgs[0] + flow_gselect_msg + flow_outbound_msg:
+			if alive:
+				updateOneRoute(switch, cmd_list, msg)
+			else:
+				route_commands[0].append((switch, cmd_list, msg))
+
+	def prepExternal(switch, out_port=1, ac_prob=0.0):
+		if switch.controlled:
+			return
+
+		cmd_list = []
+
+		# send group+bucket instantiations,
+		# also the base rules (internal dst -> G0, external -> outwards port=2)
+		for msg in flow_upstream_msg + flow_outbound_flood:
+			if alive:
+				updateOneRoute(switch, cmd_list, msg)
+			else:
+				route_commands[0].append((switch, cmd_list, msg))
+
 	def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
+		if switch.controlled:
+			return
+
 		# Turn from prob_drop into prob_send!
 		prob = 1 - ac_prob
 		name = switch.name
@@ -322,30 +418,39 @@ def marlExperiment(
 			listenAddr,
 			"actions={}\"{}-eth{}\"".format(p_drop, name, out_port)
 		]
+		if not use_controller:
+			if p_drop_num == 0xffffffff:
+				msg = flow_upstream_msg[0]
+			else:
+				# Try building that message from scratch, here.
+				copy_msg = flow_pdrop_msg[0]
 
-		if p_drop_num == 0xffffffff:
-			#print "shortcircuiting: guaranteed send"
-			msg = flow_upstream_msg[0]
+				msg = copy_msg[:-20] + ofpb._pack("I", p_drop_num) + copy_msg[-16:]
 		else:
-			#print p_drop_num, hex(p_drop_num)
-			#print "subs'ing:", p_drop_num
-			# Try building that message from scratch, here.
-			copy_msg = flow_pdrop_msg[0]
-
-			msg = copy_msg[:-20] + ofpb._pack("I", p_drop_num) + copy_msg[-16:]
-			#msg = copy_msg
-
-		#print "action of",ac_prob,"=>",msg.encode("hex")
+			cmd_list = []
+			msg = internal_choose_group(int(ac_prob * 10))
+			print "internal group choice ahoy", msg.encode("hex_codec")
 
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
 		else:
 			route_commands[0].append((switch, cmd_list, msg))
 
-	def routedSwitch(upstreamNode, *args, **kw_args):
+	def routedSwitch(upstreamNode, variant, *args, **kw_args):
 		sw = newNamedSwitch(*args)
 		trackedLink(upstreamNode, sw, **kw_args)
-		updateUpstreamRoute(sw)
+		if not use_controller:
+			updateUpstreamRoute(sw)
+		elif variant == 0:
+			#controlled
+			sw.controlled = True
+		elif variant == 1:
+			#learner
+			prepLearner(sw)
+			updateUpstreamRoute(sw)
+		elif variant == 2:
+			#external
+			prepExternal(sw)	
 		return sw
 
 	def enactActions(learners, sarsas):
@@ -397,8 +502,7 @@ def marlExperiment(
 
 	def makeTeam(parent, inter_count, learners_per_inter, sarsas=[], graph=None,
 			ss_label=None, port_dict=None):
-		leader = routedSwitch(parent, port_dict=port_dict)
-		leader.controlled = True
+		leader = routedSwitch(parent, 0, port_dict=port_dict)
 
 		def add_to_graph(parent, new_child):
 			label = (None, new_child.dpid)
@@ -416,13 +520,12 @@ def marlExperiment(
 		newSarsas = len(sarsas) == 0
 
 		for i in xrange(inter_count):
-			new_interm = routedSwitch(leader, port_dict=port_dict)
+			new_interm = routedSwitch(leader, 0, port_dict=port_dict)
 			intermediates.append(new_interm)
 			inter_label = add_to_graph(leader_label, new_interm)
-			new_interm.controlled=True
 
 			for j in xrange(learners_per_inter):
-				new_learn = routedSwitch(new_interm, port_dict=port_dict)
+				new_learn = routedSwitch(new_interm, 1, port_dict=port_dict)
 				_ = add_to_graph(inter_label, new_learn)
 
 				# Init and pair the actual learning agent here, too!
@@ -432,7 +535,7 @@ def marlExperiment(
 				
 				learners.append(new_learn)
 
-				new_extern = routedSwitch(new_learn)
+				new_extern = routedSwitch(new_learn, 2)
 				extern_switches.append(new_extern)
 
 		return (leader, intermediates, learners, extern_switches, hosts, sarsas)
@@ -486,9 +589,6 @@ def marlExperiment(
 			if make_sarsas: team_sarsas.append(t[-1])
 
 		return (server, server_switch, core_link, teams, team_sarsas, G, port_dict)
-
-	def pdrop(prob):
-		return int(prob * 0xffffffff)
 
 	### THE EXPERIMENT? ###
 

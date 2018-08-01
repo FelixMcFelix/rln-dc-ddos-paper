@@ -23,7 +23,8 @@ results = marlExperiment(
 
 #	old_style=True,
 
-	rf = "ctl"
+	rf = "ctl",
+	use_controller = True,
 )
 
 writeResults("../../results/online-2-ng.csv", results)

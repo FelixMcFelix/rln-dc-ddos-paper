@@ -16,6 +16,9 @@ ipv4_eth = 0x0800
 # as commanded by the dark lord
 controller_build_port = 6666
 
+def full_dpid(incomplete_id):
+	return "{:016x}".format(incomplete_id)
+
 class SmartishRouter(app_manager.RyuApp):
 	OFP_VERSIONS = [ofproto_v1_4.OFP_VERSION]
 
@@ -116,9 +119,7 @@ class SmartishRouter(app_manager.RyuApp):
 
 		t = 3
 
-		# FIXME: dpids seem to change...
-
-		dpid = "{:016x}".format(datapath.id)
+		dpid = full_dpid(datapath.id)
 
 		if dpid in self.entry_map:
 			l_dict = self.entry_map[dpid]
@@ -159,7 +160,7 @@ class SmartishRouter(app_manager.RyuApp):
 				parser.OFPInstructionGotoTable(next_table),
 			)
 		mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
-			match=match, instructions=inst)
+			match=match, instructions=inst, table_id=table_id)
 
 		datapath.send_msg(mod)
 
@@ -203,11 +204,15 @@ class SmartishRouter(app_manager.RyuApp):
 			),
 			[parser.OFPActionOutput(msg.in_port)],
 			table_id=2)
+			
+		dpid = full_dpid(datapath.id)
+		print ipv4_pkt.dst
+		port = 1 if dpid not in self.entry_map else self.entry_map[dpid][ipv4_pkt.dst]
 
 		# Don't try and guess where this is to go, let the switch deal with it,
 		# since it's pre-primed with knowledge of internal routes...
 		# note: goto-table is an instr, not action...
-		actions = [parser.OFPInstructionGotoTable(3)]
+		actions=[parser.OFPActionOutput(port)],
 		out = ofp_parser.OFPPacketOut(
 			datapath=dp, buffer_id=msg.buffer_id, in_port=msg.in_port,
 			actions=actions)
