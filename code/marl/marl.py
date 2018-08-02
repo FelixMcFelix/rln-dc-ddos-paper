@@ -10,7 +10,6 @@ import twink.ofp5.build as ofpb
 import twink.ofp5.oxm as ofpm
 import twink.ofp5.parse as ofpp
 
-#from controller import controller_build_port
 from contextlib import closing
 import cPickle as pickle
 import itertools
@@ -103,7 +102,6 @@ def marlExperiment(
 			self.controlled = False
 
 		def start(self, controllers):
-			print "starting", self.name, "controlled:", self.controlled, "dpid:", self.dpid
 			return OVSSwitch.start(self, self._controller_list())
 
 		def _controller_list(self):
@@ -261,6 +259,7 @@ def marlExperiment(
 				try:
 					s.sendall(msg)
 					sent = True
+					#print ofpp.parse(s.recv(4096)) 
 				except:
 					s = openSwitchSocket(switch)
 
@@ -280,7 +279,7 @@ def marlExperiment(
 	def internal_choose_group(group, ip="10.0.0.1", subnet="255.255.255.0"):
 		return ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
-			0, 0, 1, None, None, None, 0, 0,
+			0, 0, 1, None, None, None, 0, 1,
 			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
 				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
 				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
@@ -295,6 +294,7 @@ def marlExperiment(
 	flow_gselect_msg = [""]
 	flow_outbound_msg = [""]
 	flow_outbound_flood = [""]
+	flow_arp_upcall = [""]
 	flow_group_msgs = [[]]
 
 	def compute_msg(ip="10.0.0.1", subnet="255.255.255.0",
@@ -315,6 +315,17 @@ def marlExperiment(
 			])
 		)
 
+		flow_arp_upcall[0] = ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 1, None, None, None, 0, 1,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0806, None),
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				ofpb.ofp_action_output(None, 16, ofp.OFPP_CONTROLLER, 65535)
+			])
+		)
+
 		groups = []
 		
 		for i in xrange(10):
@@ -322,13 +333,14 @@ def marlExperiment(
 			prob = 1.0 - (i/10.0)
 			p_drop_num = pdrop(prob)
 
+			# For select group, weight MUST be zero.
 			groups.append(ofpb.ofp_group_mod(
 				None, ofp.OFPGC_ADD, ofp.OFPGT_INDIRECT, i,
-				[ofpb.ofp_bucket(None, 1, 0, 0, [
+				ofpb.ofp_bucket(None, 0, ofp.OFPP_ANY, ofp.OFPG_ANY, [
 					# Looks like 29 is the number I picked for Pdrop.
 					ofpb._pack("HHI", 29, 8, p_drop_num),
 					ofpb.ofp_action_output(None, 16, out_port, 65535)
-				])]
+				])
 			))
 
 		flow_group_msgs[0] = groups
@@ -337,7 +349,7 @@ def marlExperiment(
 
 		flow_outbound_msg[0] = ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
-			0, 0, 0, None, None, None, 0, 0,
+			0, 0, 0, None, None, None, 0, 1,
 			ofpb.ofp_match(None, None, None),
 			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
 				ofpb.ofp_action_output(None, 16, away_port, 65535)
@@ -346,7 +358,7 @@ def marlExperiment(
 
 		flow_outbound_flood[0] = ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
-			0, 0, 0, None, None, None, 0, 0,
+			0, 0, 0, None, None, None, 0, 1,
 			ofpb.ofp_match(None, None, None),
 			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
 				ofpb.ofp_action_output(None, 16, ofp.OFPP_FLOOD, 65535)
@@ -355,7 +367,7 @@ def marlExperiment(
 
 		flow_upstream_msg[0] = ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
-			0, 0, 1, None, None, None, 0, 0,
+			0, 0, 1, None, None, None, 0, 1,
 			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
 				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
 				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
@@ -364,7 +376,6 @@ def marlExperiment(
 				ofpb.ofp_action_output(None, 16, out_port, 65535)
 			])
 		)
-		print socket.inet_aton(ip).encode("hex_codec"), socket.inet_aton(subnet).encode("hex_codec")
 
 	compute_msg()
 
@@ -390,7 +401,7 @@ def marlExperiment(
 
 		# send group+bucket instantiations,
 		# also the base rules (internal dst -> G0, external -> outwards port=2)
-		for msg in flow_upstream_msg + flow_outbound_flood:
+		for msg in flow_arp_upcall + flow_upstream_msg + flow_outbound_flood:
 			if alive:
 				updateOneRoute(switch, cmd_list, msg)
 			else:
@@ -429,7 +440,6 @@ def marlExperiment(
 		else:
 			cmd_list = []
 			msg = internal_choose_group(int(ac_prob * 10))
-			print "internal group choice ahoy", msg.encode("hex_codec")
 
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
@@ -451,6 +461,7 @@ def marlExperiment(
 		elif variant == 2:
 			#external
 			prepExternal(sw)	
+			sw.controlled = True
 		return sw
 
 	def enactActions(learners, sarsas):
@@ -572,7 +583,7 @@ def marlExperiment(
 		make_sarsas = len(team_sarsas) == 0
 
 		G = nx.Graph()
-		server_label = (server.IP(), None)
+		server_label = ((server.IP(), server.MAC()), None)
 		switch_label = (None, server_switch.dpid)
 		G.add_edge(server_label, switch_label)
 
@@ -639,7 +650,10 @@ def marlExperiment(
 		if use_controller:
 			# host the daemon, queue conns
 			ctl_proc = Popen(
-				["ryu-manager", "controller.py"],
+				[
+					"ryu-manager", "controller.py",
+					"--verbose"
+				],
 				stdin=PIPE,
 				stderr=sys.stderr
 			)
@@ -649,16 +663,19 @@ def marlExperiment(
 			# classify nodes before building table info for the controller
 			ips = []
 			dpids = []
+			inner_host_macs = {}
 			for node in graph.nodes():
 				(maybe_ip, maybe_dpid) = node
 				if maybe_ip is not None:
+					(ip, mac) = maybe_ip
 					ips.append(node)
+					inner_host_macs[ip] = mac
 				if maybe_dpid is not None:
 					dpids.append(node)
 
 			def hard_label(node):
 				(left, right) = node
-				return left if right is None else right
+				return left[0] if right is None else right
 
 			# for each dpid, find the port which is closest to each IP
 			entry_map = {}
@@ -666,11 +683,11 @@ def marlExperiment(
 				(_, dpid) = dnode
 				entry_map[dpid] = {}
 				for inode in ips:
-					(ip, _) = inode
+					((ip, _), _) = inode
 					path = apsp[dnode][inode]
-					#print port_dict, path, inode
 					port = port_dict[dpid][hard_label(path[1])]
-					entry_map[dpid][ip] = port
+					# (port_no, adjacent?)
+					entry_map[dpid][ip] = (port, len(path)==2)
 
 			# handle those conns
 			# now send computed stuff to ctl...
@@ -681,7 +698,7 @@ def marlExperiment(
 				sock.listen(1)
 				with closing(sock.accept()[0]) as data_sock:
 					# pickle, send its length, send the pickle...
-					pickle_str = pickle.dumps(entry_map)
+					pickle_str = pickle.dumps((entry_map, inner_host_macs))
 					data_sock.sendall(struct.pack("!Q", len(pickle_str)))
 					data_sock.sendall(pickle_str)
 

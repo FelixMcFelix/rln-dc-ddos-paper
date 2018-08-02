@@ -8,8 +8,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_4
-from ryu.lib.packet import packet
-from ryu.lib.packet import ipv4
+from ryu.lib.packet import packet, ipv4, ethernet, arp, ether_types
 
 ipv4_eth = 0x0800
 
@@ -43,7 +42,10 @@ class SmartishRouter(app_manager.RyuApp):
 			buf = buf[8:]
 			while len(buf) < pickle_len:
 				buf += data_sock.recv(4096)
-			self.entry_map = pickle.loads(buf)
+
+			(routes, macs) = pickle.loads(buf)
+			self.entry_map = routes
+			self.macs = macs
 
 	def local_ip(self):
 	   return (self.subnet, self.netmask)
@@ -58,20 +60,30 @@ class SmartishRouter(app_manager.RyuApp):
 		ofp = datapath.ofproto
 		parser = datapath.ofproto_parser
 
-		print "made friends with", hex(datapath.id), ", telling them what to do..."
-		print "address was...", datapath.address
-
 		self.logger.debug("Seeing %d tables on dp 0x%016x:"
 			"need 4", n_tables, msg.datapath_id)
 
 		local = self.local_ip()
+		dpid = full_dpid(datapath.id)
+
+		if dpid not in self.entry_map:
+			print "I believe", dpid, "to be external (?)"
+			# this is an external switch, it's being managed elsewhere...
+			return
 
 		# Table 0: (categorisation)
+		#	arp -> proxy
 		#	local src, local dest -> T3
 		#	local dest -> T1
 		#	local src -> T2
 
 		t = 0
+		self.add_flow(datapath, 1,
+			parser.OFPMatch(
+				eth_type=ether_types.ETH_TYPE_ARP,
+			),
+			actions=[parser.OFPActionOutput(ofp.OFPP_CONTROLLER)],
+			table_id=t)
 		self.add_flow(datapath, 1,
 			parser.OFPMatch(
 				eth_type=ipv4_eth,
@@ -119,30 +131,32 @@ class SmartishRouter(app_manager.RyuApp):
 
 		t = 3
 
-		dpid = full_dpid(datapath.id)
-
-		if dpid in self.entry_map:
-			l_dict = self.entry_map[dpid]
-			for ip, port in l_dict.iteritems():
-				self.add_flow(datapath, 1,
-					parser.OFPMatch(
-						eth_type=ipv4_eth,
-						ipv4_dst=(ip, "255.255.255.255"),
-					),
-					actions=[parser.OFPActionOutput(port)],
-					table_id=t
-				)
-		else:
+		#if dpid in self.entry_map:
+		l_dict = self.entry_map[dpid]
+		for ip, (port, adjacent) in l_dict.iteritems():
+			print ip, "on port", port, "is adjacent?", adjacent
+			rewrites = [] if not adjacent else [
+				parser.OFPActionSetField(eth_dst=self.macs[ip])
+			]
 			self.add_flow(datapath, 1,
 				parser.OFPMatch(
 					eth_type=ipv4_eth,
-					ipv4_dst=("10.0.0.1", "255.255.255.255"),
+					ipv4_dst=(ip, "255.255.255.255"),
 				),
-				actions=[parser.OFPActionOutput(0)],
+				actions=rewrites+[parser.OFPActionOutput(port)],
 				table_id=t
 			)
+		#else:
+		#	self.add_flow(datapath, 1,
+		#		parser.OFPMatch(
+		#			eth_type=ipv4_eth,
+		#			ipv4_dst=("10.0.0.1", "255.255.255.255"),
+		#		),
+		#		actions=[parser.OFPActionOutput(0)],
+		#		table_id=t
+		#	)
 			
-	def add_flow(self, datapath, priority, match, actions=None, table_id=0, next_table=None):
+	def add_flow(self, datapath, priority, match, actions=None, table_id=0, next_table=None, importance=1):
 		ofproto = datapath.ofproto
 		parser = datapath.ofproto_parser
 
@@ -160,23 +174,99 @@ class SmartishRouter(app_manager.RyuApp):
 				parser.OFPInstructionGotoTable(next_table),
 			)
 		mod = parser.OFPFlowMod(datapath=datapath, priority=priority,
-			match=match, instructions=inst, table_id=table_id)
+			match=match, instructions=inst, table_id=table_id,
+			importance=importance)
 
 		datapath.send_msg(mod)
 
 	def table_miss(self, datapath, *args, **kwargs):
 		self.add_flow(datapath, 0, None, *args, **kwargs)
 
+	def arp_reply(self, in_arp):
+		# may want to use the actual outbound mac, later
+		pretend_mac = "00:00:00:01:00:00"
+
+		e = ethernet.ethernet(dst=in_arp.src_mac, src=pretend_mac)
+		a = arp.arp(
+			opcode=arp.ARP_REPLY,
+			src_ip=in_arp.dst_ip,
+			src_mac=pretend_mac,
+			dst_ip=in_arp.src_ip,
+			dst_mac=in_arp.src_mac
+		)
+
+		p = packet.Packet()
+		p.add_protocol(e)
+		p.add_protocol(a)
+		p.serialize()
+
+		return p
+
 	# handling of unseen flow entries/packet-ins
 	@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
 	def packet_in_handler(self, ev):
+		print "been upcalled!"
 		msg = ev.msg
 		dp = msg.datapath
 		ofp = dp.ofproto
 		ofp_parser = dp.ofproto_parser
+		dpid = full_dpid(dp.id)
+
+		in_port = msg.match["in_port"]
+
+		print "by", dpid
+
+		# okay: is this an ARP or IPv4 packet?
+		# if ARP request, we want to send a reply masquerading as the dest
+		# (with dest set to out_port)
+		# if IPv4, register the flow.
 
 		pkt = packet.Packet(msg.data)
+		arp_pkt = pkt.get_protocol(arp.arp)
 		ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
+
+		if arp_pkt is not None:
+			print "it's ARP"
+			# in both cases: build and send a reply
+			reply = self.arp_reply(arp_pkt)
+			print "reply built"
+
+			print "action built"
+			print reply, in_port, reply.data
+			out = ofp_parser.OFPPacketOut(
+				datapath=dp, buffer_id=0xffffffff,
+				in_port=ofp.OFPP_CONTROLLER,
+				actions=[ofp_parser.OFPActionOutput(in_port)],
+				data=reply.data,
+			)
+			dp.send_msg(out)
+
+			print "reply sent"
+
+			if dpid not in self.entry_map:
+				# external: install fast route home + rewrite
+				print "fast return..."
+				actions = [
+					ofp_parser.OFPActionSetField(eth_dst=arp_pkt.src_mac),
+					ofp_parser.OFPActionOutput(in_port)
+				]
+				print "built actions"
+				self.add_flow(dp, 1,
+					ofp_parser.OFPMatch(
+						eth_type=ipv4_eth,
+						ipv4_dst=(arp_pkt.src_ip, "255.255.255.255"),
+					),
+					actions=actions,
+				)
+				print "route home installed for external"
+
+			return
+		elif dpid not in self.entry_map:
+			print "non-arp upcall from external"
+			return
+
+		print "it's ipv4"
+
 		external_ip = ipv4_pkt.src
 
 		# Packet in means we've been notified about a flow (out->in)
@@ -188,35 +278,34 @@ class SmartishRouter(app_manager.RyuApp):
 		# other nodes up the chain, but that might be non-trivial...
 
 		# src recognised
-		self.add_flow(datapath, 1,
-			parser.OFPMatch(
+		self.add_flow(dp, 1,
+			ofp_parser.OFPMatch(
 				eth_type=ipv4_eth,
 				ipv4_src=external_ip,
 			),
 			next_table=3,
-			table_id=1)
+			table_id=1,
+			importance=0)
 
 		# way out being registered for this ip.
-		self.add_flow(datapath, 1,
-			parser.OFPMatch(
+		self.add_flow(dp, 1,
+			ofp_parser.OFPMatch(
 				eth_type=ipv4_eth,
 				ipv4_dst=external_ip,
 			),
-			[parser.OFPActionOutput(msg.in_port)],
-			table_id=2)
+			[ofp_parser.OFPActionOutput(in_port)],
+			table_id=2,
+			importance=0)
 			
-		dpid = full_dpid(datapath.id)
 		print ipv4_pkt.dst
 		port = 1 if dpid not in self.entry_map else self.entry_map[dpid][ipv4_pkt.dst]
 
 		# Don't try and guess where this is to go, let the switch deal with it,
 		# since it's pre-primed with knowledge of internal routes...
 		# note: goto-table is an instr, not action...
-		actions=[parser.OFPActionOutput(port)],
+		actions=[ofp_parser.OFPActionOutput(port)],
 		out = ofp_parser.OFPPacketOut(
-			datapath=dp, buffer_id=msg.buffer_id, in_port=msg.in_port,
-			actions=actions)
+			datapath=dp, buffer_id=msg.buffer_id, in_port=in_port,
+			actions=actions, data=msg.data)
 		dp.send_msg(out)
 
-# TODO:
-# * build groups/starting rules on actor switches/externals
