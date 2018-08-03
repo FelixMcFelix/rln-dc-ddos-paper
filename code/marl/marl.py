@@ -63,6 +63,7 @@ def marlExperiment(
 		model = "tcpreplay",
 
 		use_controller = False,
+		moralise_ips = True,
 
 		dt = 0.001,
 
@@ -473,7 +474,7 @@ def marlExperiment(
 		target_mod = 0 if good else 1
 		god_mod = max_val + 1
 
-		if (value % 2) != target_mod:
+		if moralise_ips and (value % 2) != target_mod:
 			value += 1
 			value %= god_mod
 
@@ -691,16 +692,20 @@ def marlExperiment(
 
 			# handle those conns
 			# now send computed stuff to ctl...
-			with closing(
-				socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			) as sock:
+			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			try:
 				sock.bind(("127.0.0.1", controller_build_port))
 				sock.listen(1)
-				with closing(sock.accept()[0]) as data_sock:
+				data_sock = sock.accept()[0]
+				try:
 					# pickle, send its length, send the pickle...
 					pickle_str = pickle.dumps((entry_map, inner_host_macs))
 					data_sock.sendall(struct.pack("!Q", len(pickle_str)))
 					data_sock.sendall(pickle_str)
+				finally:
+					data_sock.close()
+			finally:
+				sock.close()
 
 			# mininet will automatically link switches to a controller, if it
 			# exists and is registered.
@@ -765,6 +770,13 @@ def marlExperiment(
 
 		# Begin the new episode!
 		net.start()
+
+		# What do the hosts believe their IP to be?
+		# i.e. this won't set correctly until the net has started.
+		for (h, i) in [(host, ip) for (host, _, _, _, ip) in all_hosts] + [(server, server.IP())]:
+			h.setIP(i, 24)
+			h.setDefaultRoute(h.intf())
+
 		alive = True
 		executeRouteQueue()
 

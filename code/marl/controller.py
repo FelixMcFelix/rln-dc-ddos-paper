@@ -26,6 +26,9 @@ class SmartishRouter(app_manager.RyuApp):
 		super(SmartishRouter, self).__init__(*args, **kwargs)
 		self.subnet = "10.0.0.0"
 		self.netmask = "255.255.255.0"
+		# may want to use the actual outbound mac, later
+		self.pretend_mac = "00:00:00:01:00:00"
+
 
 		# probably open a conn to mininet here, and wait to receive params...
 		with closing(
@@ -67,7 +70,7 @@ class SmartishRouter(app_manager.RyuApp):
 		dpid = full_dpid(datapath.id)
 
 		if dpid not in self.entry_map:
-			print "I believe", dpid, "to be external (?)"
+			#print "I believe", dpid, "to be external (?)"
 			# this is an external switch, it's being managed elsewhere...
 			return
 
@@ -134,9 +137,14 @@ class SmartishRouter(app_manager.RyuApp):
 		#if dpid in self.entry_map:
 		l_dict = self.entry_map[dpid]
 		for ip, (port, adjacent) in l_dict.iteritems():
-			print ip, "on port", port, "is adjacent?", adjacent
+			#print ip, "on port", port, "is adjacent?", adjacent
 			rewrites = [] if not adjacent else [
-				parser.OFPActionSetField(eth_dst=self.macs[ip])
+				parser.OFPActionSetField(
+					eth_dst=self.macs[ip],
+				),
+				parser.OFPActionSetField(
+					eth_src=self.pretend_mac,
+				),
 			]
 			self.add_flow(datapath, 1,
 				parser.OFPMatch(
@@ -183,14 +191,14 @@ class SmartishRouter(app_manager.RyuApp):
 		self.add_flow(datapath, 0, None, *args, **kwargs)
 
 	def arp_reply(self, in_arp):
-		# may want to use the actual outbound mac, later
-		pretend_mac = "00:00:00:01:00:00"
-
-		e = ethernet.ethernet(dst=in_arp.src_mac, src=pretend_mac)
+		e = ethernet.ethernet(
+			dst=in_arp.src_mac, src=self.pretend_mac,
+			ethertype=ether_types.ETH_TYPE_ARP,
+		)
 		a = arp.arp(
 			opcode=arp.ARP_REPLY,
 			src_ip=in_arp.dst_ip,
-			src_mac=pretend_mac,
+			src_mac=self.pretend_mac,
 			dst_ip=in_arp.src_ip,
 			dst_mac=in_arp.src_mac
 		)
@@ -205,7 +213,7 @@ class SmartishRouter(app_manager.RyuApp):
 	# handling of unseen flow entries/packet-ins
 	@set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
 	def packet_in_handler(self, ev):
-		print "been upcalled!"
+		#print "been upcalled!"
 		msg = ev.msg
 		dp = msg.datapath
 		ofp = dp.ofproto
@@ -214,7 +222,7 @@ class SmartishRouter(app_manager.RyuApp):
 
 		in_port = msg.match["in_port"]
 
-		print "by", dpid
+		#print "by", dpid
 
 		# okay: is this an ARP or IPv4 packet?
 		# if ARP request, we want to send a reply masquerading as the dest
@@ -226,13 +234,13 @@ class SmartishRouter(app_manager.RyuApp):
 		ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
 
 		if arp_pkt is not None:
-			print "it's ARP"
+			#print "it's ARP"
 			# in both cases: build and send a reply
 			reply = self.arp_reply(arp_pkt)
-			print "reply built"
+			#print "reply built"
 
-			print "action built"
-			print reply, in_port, reply.data
+			#print "action built"
+			#print reply, in_port, reply.data
 			out = ofp_parser.OFPPacketOut(
 				datapath=dp, buffer_id=0xffffffff,
 				in_port=ofp.OFPP_CONTROLLER,
@@ -241,16 +249,21 @@ class SmartishRouter(app_manager.RyuApp):
 			)
 			dp.send_msg(out)
 
-			print "reply sent"
+			#print "reply sent"
 
 			if dpid not in self.entry_map:
 				# external: install fast route home + rewrite
-				print "fast return..."
+				#print "fast return..."
 				actions = [
-					ofp_parser.OFPActionSetField(eth_dst=arp_pkt.src_mac),
+					ofp_parser.OFPActionSetField(
+						eth_dst=arp_pkt.src_mac,
+					),
+					ofp_parser.OFPActionSetField(
+						eth_src=self.pretend_mac,
+					),
 					ofp_parser.OFPActionOutput(in_port)
 				]
-				print "built actions"
+				#print "built actions"
 				self.add_flow(dp, 1,
 					ofp_parser.OFPMatch(
 						eth_type=ipv4_eth,
@@ -258,14 +271,14 @@ class SmartishRouter(app_manager.RyuApp):
 					),
 					actions=actions,
 				)
-				print "route home installed for external"
+				#print "route home installed for external"
 
 			return
 		elif dpid not in self.entry_map:
-			print "non-arp upcall from external"
+			#print "non-arp upcall from external"
 			return
 
-		print "it's ipv4"
+		#print "it's ipv4"
 
 		external_ip = ipv4_pkt.src
 
@@ -297,15 +310,23 @@ class SmartishRouter(app_manager.RyuApp):
 			table_id=2,
 			importance=0)
 			
-		print ipv4_pkt.dst
-		port = 1 if dpid not in self.entry_map else self.entry_map[dpid][ipv4_pkt.dst]
+		#print ipv4_pkt.dst
+		(port, adj) = (1, True) \
+			if dpid not in self.entry_map \
+			else self.entry_map[dpid][ipv4_pkt.dst]
+
+		#rewrites = [] if not adj else [
+		#	ofp_parser.OFPActionSetField(eth_dst=self.macs[ipv4_pkt.dst])
+		#]
 
 		# Don't try and guess where this is to go, let the switch deal with it,
 		# since it's pre-primed with knowledge of internal routes...
 		# note: goto-table is an instr, not action...
-		actions=[ofp_parser.OFPActionOutput(port)],
+		#actions=rewrites + [ofp_parser.OFPActionOutput(port)]
+		actions = [ofp_parser.OFPActionOutput(ofp.OFPP_TABLE)]
 		out = ofp_parser.OFPPacketOut(
 			datapath=dp, buffer_id=msg.buffer_id, in_port=in_port,
 			actions=actions, data=msg.data)
+		#print out, dp, msg.buffer_id, in_port, actions, msg.data.encode("hex_codec"), port, adj
 		dp.send_msg(out)
 
