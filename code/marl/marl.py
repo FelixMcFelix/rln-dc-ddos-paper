@@ -492,18 +492,24 @@ def marlExperiment(
 		hosts = []
 
 		for i in xrange(host_count):
-			new_host = newNamedHost()
 			good = random.random() < P_good
 			bw = (random.uniform(*(good_range if good else evil_range)))
 
-			link = trackedLink(extern, new_host, {"bw": bw} if (old_style or force_host_tc) else {})
-
 			# Make up a wonderful IP.
 			# Last byte => goodness. Even = good.
-			ip_bytes = [random.randint(0,0xff) for i in xrange(4)]
+
+			# The spectre of classful routing still haunts us all.
+			lims = [0xdf,0xff,0xff,0xff]
+			ip_bytes = [random.randint(0,lim) for lim in lims]
+			# 10.*.*.* is a/our PRIVATE space.
+			while ip_bytes[0] == 10 or ip_bytes[0] == 0:
+				ip_bytes[0] = random.randint(1, lims[0])
 			ip_bytes[-1] = moralise(ip_bytes[-1], good)
 
 			ip = "{}.{}.{}.{}".format(*ip_bytes)
+
+			new_host = newNamedHost(ip="{}.{}.{}.{}/24".format(*ip_bytes))
+			link = trackedLink(extern, new_host, {"bw": bw} if (old_style or force_host_tc) else {})
 
 			new_host.setIP(ip, 24)
 
@@ -780,9 +786,6 @@ def marlExperiment(
 		alive = True
 		executeRouteQueue()
 
-		if model == "nginx":
-			net.interact()
-
 		# Spool up the monitoring tool.
 		mon_cmd = server_switch.popen(
 			["../marl-bwmon/marl-bwmon"] + tracked_interfaces,
@@ -790,21 +793,24 @@ def marlExperiment(
 			stderr=sys.stderr
 		)
 
-		server_ip = server.IP()
-
 		# spool up server if need be
 		server_proc = None
 
 		if model == "nginx":
 			cmd = [
 				"nginx",
-				"-p", "$PWD/../traffic-host",
+				"-p", "../traffic-host",
 				"-c", "h1.conf",
 			]
 
 			server_proc = server.popen(
 				cmd, stdin=PIPE, stderr=sys.stderr
 			)
+
+		if model == "nginx":
+			net.interact()
+
+		server_ip = server.IP()
 
 		# gen traffic at each host. This MUST happen after the bootstrap.
 		for (_, _, _, _, hosts, _) in teams:
