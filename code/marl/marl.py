@@ -578,7 +578,7 @@ def marlExperiment(
 	def buildNet(n_teams, team_sarsas=[]):
 		server = newNamedHost()
 		server_switch = newNamedSwitch()
-		server_switch.controlled = True
+		server_switch.controlled = use_controller
 
 		port_dict = {}
 
