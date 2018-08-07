@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Kyle Simpson <kyleandrew.simpson@gmail.com>"]
 
 [dependencies]
+clap = "2"
 futures = "0.1"
 reqwest = "0.8"
 tokio = "0.1"
