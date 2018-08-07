@@ -306,7 +306,8 @@ def marlExperiment(
 #			ofpb.ofp_match(None, None, None),
 			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
 				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
-				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, False, 0, socket.inet_aton(ip), None)
+				#ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, False, 0, socket.inet_aton(ip), None)
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
 			]),
 			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
 				# Looks like 29 is the number I picked for Pdrop.
