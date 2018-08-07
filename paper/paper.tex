@@ -16,6 +16,9 @@
 \usepackage[basic]{complexity}
 \usepackage[super,negative]{nth}
 
+\usepackage[british]{babel}
+\usepackage{csquotes}
+
 \usepackage{booktabs}
 \usepackage[
 activate={true,nocompatibility},
@@ -33,7 +36,7 @@ tracking=true,
 %\titleformat*{\filcenter\scshape}
 
 %bib
-\usepackage[maxnames=3,maxbibnames=99,mincrossrefs=5,style=ieee,sortcites,backend=bibtex]{biblatex}
+\usepackage[style=ieee,maxnames=3,mincitenames=1,maxcitenames=2,maxbibnames=99,mincrossrefs=5,sortcites,backend=bibtex,uniquelist=false]{biblatex}
 \addbibresource{papers-off.bib}
 \addbibresource{confs-off.bib}
 \addbibresource{books-off.bib}
@@ -41,13 +44,18 @@ tracking=true,
 \addbibresource{misc.bib}
 
 %picky abt et al.
-\usepackage{xpatch}
+%\usepackage{xpatch}
 
-\xpatchbibmacro{name:andothers}{%
-	\bibstring{andothers}%
-}{%
-	\bibstring[\emph]{andothers}%
-}{}{}
+%\xpatchbibmacro{name:andothers}{%
+%	\bibstring{andothers}%
+%}{%
+%	\bibstring[\emph]{andothers}%
+%}{}{}
+
+% emph'd et al. for ieee style
+\DefineBibliographyStrings{english}{%
+	andothers = {\emph{et al}\adddot}
+}
 \DeclareFieldFormat[inproceedings]{url}{}
 \DeclareFieldFormat[article]{url}{}
 
@@ -67,7 +75,7 @@ tracking=true,
 	linkcolor=black,
 	urlcolor=black,
 	pdftitle={\mytitle{}},
-	pdfauthor={Kyle A. Simpson}
+	pdfauthor={Kyle A. Simpson, Dimitrios P. Pezaros}
 }
 \newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
 
@@ -125,9 +133,12 @@ tracking=true,
 %-------------------------------------%
 
 \title{\mytitle{}}
-\author{Kyle A. Simpson\thanks{This work was supported by the Engineering and Physical Sciences
-		Research Council [grant number EP/M508056/1]}\\University of Glasgow, Glasgow, Scotland,\\
-		\email{k.simpson.1@research.gla.ac.uk}}
+\author{
+	Kyle A.\ Simpson\thanks{This work was supported by the Engineering and Physical Sciences Research Council [grant number EP/M508056/1].},
+	Dimitrios P.\ Pezaros\\
+	University of Glasgow, Glasgow, Scotland,\\
+	\email{k.simpson.1@research.gla.ac.uk}
+}
 
 % Remove date, leave no spacing.
 \predate{}
@@ -164,7 +175,7 @@ I present...
 Network anomaly detection, intrusion detection and intrusion prevention are continually evolving problems, compounded by the partial, non-IID view of data at each point in the network.
 Attacks and anomalous behaviours evolve, becoming more sophisticated or employing new vectors to harm a network or system's confidentiality, integrity, or availability without being detected.
 These attacks and anomalies have measurable consequences and symptoms which allow a skilled analyst to infer new signatures for detection by misuse-based classifiers, but unseen attacks may only be defended against after-the-fact.
-This issue is inherent to \emph{misuse-based} intrusion detectors, and it has been long-hoped that \emph{anomaly-based} detectors would surpass this by making use of statistical measures.
+This issue is inherent to \emph{misuse-} or \emph{signature-based} intrusion detectors, and it has been long-hoped that \emph{anomaly-based} detectors would surpass this by making use of statistical measures.
 
 While \emph{machine learning} (ML) approaches seem like a sensible fit for this problem, in \citeyear{DBLP:conf/sp/SommerP10} \textcite{DBLP:conf/sp/SommerP10} identified the `failure to launch' of ML-based anomaly detection systems---to quite a large extent, this remains the case today.
 Their application is made difficult due to significant operational differences from standard ML tasks, alongside certain characteristics of network traffic.
@@ -185,9 +196,9 @@ The intent is to augment what existing misuse-based solutions can provide, by au
 
 This paper contributes:
 \begin{itemize}
-	\item A DDoS mitigation system based on direct-control reinforcement learning designed for deployment in real-world software-defined networks.
-	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}---a deconstruction of their ISP-like formulation, and an acknowledgement of the flaws and risk factors of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a}.
-	\item ?? TODO: Advance the use/representation/granularity of state-space in direct-control RL of networked applications.
+	\item A DDoS mitigation system based on direct-control reinforcement learning designed for deployment in real-world software-defined networks (\cref{sec:environment-and-rl-algorithm,sec:rethinking-the-state-space}).
+	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}---a deconstruction of their formulation, and an acknowledgement of the flaws and risk factors of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a} (\cref{sec:performance-in-an-emulated-environment}).
+	\item ?? TODO: Advance the use/representation/granularity of state-space in direct-control RL of networked applications (\cref{sec:rethinking-the-state-space}).
 \end{itemize}
 
 \section{Background}
@@ -219,17 +230,18 @@ Given a weight vector $\wvec{0}=\bm{0}$ and learning rate $\alpha$, we may appro
 \end{subequations}
 
 Computing the approximate value of every action available in the current state forms the basis of a policy.
-Actions with maximal value can be chosen each time (the \emph{greedy} policy), we might modify this by taking random actions with probability $\epsilon$ to encourage early exploration (the \emph{$\epsilon$-greedy policy}), or we might some use some other mechanism.
+Actions with maximal value can be chosen each time (the \emph{greedy} policy), we might modify this by taking random actions with probability $\epsilon$ to encourage early exploration (the \emph{$\epsilon$-greedy policy}), or we might use some other mechanism.
 
-If $\operatorname{A}(s) = \mathcal{A}$ in every state (and actions are themselves discrete), then the implementation of the policy and update rules may be simplified by storing a vector of action values for each state encountered.
-Observing that $\nabla{\acval{s}{a}{\wvec{}}} = \operatorname{\mathbf{x}}(s, a)$, we may gain further optimisations by considering that a tile-coded feature vector is a binary vector of constant Hamming weight (and so is amenable to representation as an array of indices).
-Action values are then simply the sum of all activated tile weight vectors.
-Moreover, we need not store action values for tiles which have not yet been visited.
+If $\operatorname{A}(s) = \mathcal{A}$ in every state (and actions are themselves discrete), these properties of the problem allow a particularly efficient (vectorised) implementation of the policy and update rules by storing a vector of action values for each state encountered.
+Observing that $\nabla{\acval{s}{a}{\wvec{}}} = \operatorname{\mathbf{x}}(s, a)$, further optimisations arise by considering that a tile-coded feature vector is a binary vector of constant Hamming weight (and so is amenable to representation as an array of indices).
+Action values for any state are then obtained by summation of the weight vectors from all activated tiles.
+Moreover, we need not store action values for tiles which have not yet been visited, conserving memory.
 
 %?? Is this \emph{actually} just sarsa? We're using fn approx (of course), but this is fraught with its own difficulties. Is it strictly speaking correct to describe it as Sarsa at this point? It's, at the very least, 1-step semi-gradient Sarsa given that it is clearly on-policy w/ fn approx...
-?? IDEA: try out average reward, TD($\lambda$) methods as future work...
 
 ?? Discuss mininet? Networking terms? SDN stuff?
+
+?? What makes RL a suitable method for network anomaly detection, what features are most relevant?
 
 %\section{A Plan, of Sorts}
 %
@@ -242,11 +254,21 @@ Moreover, we need not store action values for tiles which have not yet been visi
 %	\item Forthcoming: rethinking state/action spaces to operate at a finer level of granularity. New network model (live tcp back-and-forth), allows us to test collateral damage assumptions in a more realistic manner (and show clear case for moving beyond work of malialis and kudenko)
 %\end{enumerate}
 
-\section{Environment and RL Algorithm}
+\section{Environment and RL Algorithm}\label{sec:environment-and-rl-algorithm}
 
-?? STRUCTURE: Either (methodology) -> (results) OR (their stuff + its weaknesses) -> (a new direction) [second is way punchier, but not yet ready to go with that.]
+?? Probably rethink the title of this section.
+
+%?? State the problem and what we want to achieve.
+To best discover how the use of RL techniques in the field of network intrusion prevention may bet be improved, it's prudent that we start by looking for weaknesses in work which exists today.
+The closest approach which is available within this field is that of \textcite{DBLP:journals/eaai/MalialisK15}, and their contribution in applying RL to the task of intrusion prevention is significant:  their work helped to show the viability of live, adaptive, feedback loop-like control of the network to detect and prevent DDoS attacks.
+We begin with a reimplementation and more principled re-examination of their work to further develop the field.
+
+%?? Explicitly say the ``REIMPLEMENTING M\&K THING'' over here, to make later paras make a reasonable amount of sense.
+
+%?? Why are we comparing against/building on/reimplementing M\&K? What was their main contribution? Answer: they helped to show the viability of live, adaptive control of the network to detect/prevent DDoS attacks...
 
 \subsection{Topology}
+
 The network itself is tree-structured, where one server $s$ connects through a dedicated switch to $k$ team leader switches, each connected to $l$ intermediate switches, which in turn each connect to $m$ egress switches.
 Agents are co-located with these egress switches, who control the proportion of upstream packets from $n$ external hosts to discard according to load statistics observed along their path to the server.
 Agents communicate with their co-hosted OpenFlow-enabled switches---running a modified version of \emph{Open vSwitch} (OVS) \cite{open-vswitch}---to install probabilistic packet-drop rules.
@@ -304,6 +326,20 @@ grow'=right
 }
 \end{figure}
 
+Why use this topology, a fan-out tree, in particular?
+While this is taken verbatim from the work we use as a basis, it is presented within the confines of a framework given by \textcite{DBLP:journals/ton/YauLLY05}.
+This framework is, in turn, an extension of the class of topologies examined in the original pushback paper \cite{DBLP:journals/ccr/MahajanBFIPS02a}.
+In actuality, this topology is far closer to the latter; crucially, it seems to not actually represent or correspond to any realistic deployment at all.
+In the words of \citeauthor{DBLP:journals/ccr/MahajanBFIPS02a}:
+\begin{displaycquote}{DBLP:journals/ccr/MahajanBFIPS02a}
+	These simulations do not pretend to use realistic topologies or traffic mixes... the simple simulations in this scenario are instead intended... as a first step towards more rigorous evaluation.
+\end{displaycquote}
+%The topology chosen to evaluate our predecessor, indeed, matches theirs.
+%?? So, why does this proliferate, exist? They effectively disavowed it in their own paper. Reading comprehension is hard, I guess.
+Remarkably, it seems to have propagated in a way which was not originally intended.
+It is clear that such a network topology allows for functional testing, but it is hard to argue its relevance to specific classes of victim or to reason about the interactions it might have with dependent applications.
+We aim to address this, to some extent.
+
 Reimplementation of the network model was performed using mininet \cite{mininet}, a Python-based network emulator.
 Traffic is played back from hosts via Tcpreplay at a bandwidth assigned uniformly from a `good' or `bad' distribution, each using the same pcap file with source and destination IP addresses rewritten.
 While unrealistic with respect to packet content, it was assumed that this would provide representative load and packet inter-arrival characteristics, since the agents as initially defined are blind to such information.
@@ -315,8 +351,9 @@ Agents receive state input from monitors in the environment, a vector of the fou
 At every time step, each agent installs an action via OpenFlow, instructing its host switch to drop each packet with probability $p$.
 Specifically, the agent chooses $p \in \left\{ 0.0, 0.1, \ldots, 0.9 \right\}$, giving a discrete, static action set which cannot completely filter traffic.
 In essence, this means that each agent is in control of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a}.
+It's worth noting that there are various ways that this could be done, and that the application of \emph{programmable data planes} to this end are suggested as future work.
 
-The reward functions as I specify them here were introduced by \textcite{DBLP:journals/eaai/MalialisK15}; in particular, I make use of the global reward as a performance metric and the \emph{coordinated team learning} (CTL) reward for training.
+The reward functions as specified here were introduced by \textcite{DBLP:journals/eaai/MalialisK15}; in particular, we make use of the global reward as a performance metric and the \emph{coordinated team learning} (CTL) reward for training.
 These assume the presence of a classifier, $g(\cdot)$, which estimates the volume of `legitimate traffic' received at any point in the network.
 At time $t$ an agent $v$ (with team leader $l_v$) receives either $R_{t}^{\mathit{Global}}$ or $R_{t}^{\mathit{CTL}}$:
 \begin{subequations}
@@ -334,12 +371,12 @@ where $\load{\mathit{total}}$ and $\load{\mathit{team}}$ refer to the load acros
 The tile-coded state and chosen reward function are then used as input for the \emph{semi-gradient Sarsa} algorithm described in \cref{eqn:sg-sarsa}, making use of $\epsilon$-greedy action selection.
 Each agent has its own internal parameter vector $\wvec{}$, and agents do not share their experience or weight vector updates with one another.
 
-?? M\&K Seem not to have a grasp on the importance of up/down traffic splits. Hmm......... (i.e., both could be relevant?)
+%?? M\&K Seem not to have a grasp on the importance of up/down traffic splits. Hmm......... (i.e., both could be relevant?) Man, who knows.
 
 ?? wrt reward function relying on heuristic elements or perfect knowledge:
 A sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training by a simulated environment to transfer to reality.
 
-\section{Performance in an Emulated Environment}
+\section{Performance in an Emulated Environment}\label{sec:performance-in-an-emulated-environment}
 The original introduction of this approach to direct-control reinforcement learning as introduced by \textcite{DBLP:journals/eaai/MalialisK15} fails to consider key cases: disjoint ranges of traffic distribution (i.e., the presence of benign heavy-hitters), the accurate simulation of TCP-like behaviour (and its effects on collateral damage), and assumes a rigid ISP-like topology.
 The latter two are most deserving of a closer investigation, as they have stronger implications for wide-scale deployment.
 
@@ -351,17 +388,17 @@ All code underpinning these findings is available on a public repository\footnot
 \subsection{Service Guarantees and Host Density}
 In the default topology, $n=2$ hosts per egress point is not a parameter that can be described as realistic for many web service deployments.
 In practice, well-established network topologies such as the fat-tree topology fan out \emph{internally} (to provide efficient replication and scaling of resources) while having comparatively few egress points.
-I feel is most worth examining aspects of such a case, where the host/agent ratio is heavily skewed in favour of hosts and actions as defined become less granular.
+We feel is most worth examining aspects of such a case, where the host/agent ratio is heavily skewed in favour of hosts and actions as defined become less granular.
 
-To test this, I configured the network topology using $k=2$ teams, $l=3$ intermediate nodes per team, $m=2$ agents per intermediate node, and $n \in \{2, 7, 11, 14\}$ hosts per learner.
-I set $\gamma=0$ (leading to opportunistic behaviour), $\alpha=0.05$ and linearly annealed $\epsilon=0.2 \rightarrow 0$ by $t=3000$.
+To test this, we configured the network topology using $k=2$ teams, $l=3$ intermediate nodes per team, $m=2$ agents per intermediate node, and $n \in \{2, 4, 8, 16\}$ hosts per learner.
+The algorithm parameters were set at $\gamma=0$ (leading to opportunistic behaviour), $\alpha=0.05$, having linearly annealed $\epsilon=0.2 \rightarrow 0$ by $t=3000$.
 Benign and malicious hosts uploaded between \SIrange{0}{1}{\mega\bit\per\second} and \SIrange{2.5}{6}{\mega\bit\per\second} respectively, and hosts were redrawn at each episode's start with $\operatorname{P}(\mathit{malicious})=0.4$.
 $U_s$ was fixed at $klmn+2$ \si{\mega\bit\per\second}.
 The performance of each choice of $n$ was averaged over \num{10} episodes of length \num{10000} timesteps (setting each agent's $\wvec{}=\bm{0}$ between episodes).
 Host allocations were generated pseudorandomly to ensure fairness between choices of $n$.
 
 \begin{figure}
-	\includegraphics[width=\linewidth]{../plots/online-varyN-uneven}
+	\includegraphics[width=\linewidth]{../plots/online-varyN-binary}
 	\caption{
 		MARL pushback control system performance plotted over time, for various settings of $n$ hosts per agent.
 		This plot shows that, from the perspective of benign hosts, service guarantees degrade as inference and applied actions become less granular.
@@ -373,8 +410,10 @@ Host allocations were generated pseudorandomly to ensure fairness between choice
 \end{figure}
 
 \Cref{fig:marl-granularity} shows that allocating more hosts to each learner leads to a guaranteed decrease in the amount of benign traffic observed at the server.
+?? TODO: rephrase.
 This manifests in two ways: the best-achievable performance decreases, as does the learning rate.
 Given the UDP-like behaviour of Tcpreplay, being able to replicate the online performance of \citeauthor{DBLP:journals/eaai/MalialisK15} in the $n=2$ case suggests that the numeric simulation their work is entirely based upon does not capture the key interactions between TCP flows and packet drop as a control action.
+?? Expand according to the summary you posted in the notes document.
 
 \subsection{TCP Multiplexing and Fallback Behaviour}
 While Tcpreplay was useful in recreating the original work and examining the above condition, flow behaviour under packet loss is closer to that of UDP when using it to replay traffic.
@@ -418,13 +457,18 @@ This reveals that the original work \emph{does not capture this behaviour}, or e
 
 \section{A New Normal}
 
+?? Full Openflow controller setup (in mininet)
 ?? TODO: everything
 
-\section{Rethinking the State Space}
+?? ANGLE: set up an environment to test \emph{specific} behaviours to examine \emph{specific} problems in past work. I make no claims that it is perfect or representative for all traffic, just for this (likely common) behaviour which I expect to plague almost all legit TCP flows.
+
+\section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
 
 ?? TODO: everything
 
 ?? What concessions will we have to make in order to make per-flow processing more viable? Intelligent sampling/reanalysis of flows when needed (i.e. an external heuristic guiding method)?
+
+?? NOTE: think about how I might need to change/alter the tile-coding when we add extra discriminative features... (i.e., are there better ways to handle covariance between properties of system/flow state, properly capture generalisation?)
 
 \section{The Results of Doing So}
 
@@ -433,13 +477,14 @@ This reveals that the original work \emph{does not capture this behaviour}, or e
 \section{Related Work}
 
 ?? Other recent work in the prevention of DDoS? (i.e., non-RL).
-\emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} had it as oart of their evaluation, BGP-like rerouting techniques (specifically for transit-link attacks, but also for `normal' attacks) \cite{RoutingAroundCongestion}
+\emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} had it as part of their evaluation, BGP-like rerouting techniques (specifically for transit-link attacks, but also for `normal' attacks) \cite{RoutingAroundCongestion}
 
 %?? Abuses of RL 
 Earnest, well-considered application of RL towards the challenge of intrusion detection/prevention has seen comparatively little examination.
 Past work exhibits abuses of the paradigm as a glorified classifier for anomaly detection \cite{shamshirband2014anomaly} and DDoS prevention \cite{DBLP:conf/mates/ServinK08}.
+?? Explain/be less incendiary...
 
-For categorising how RL fits into solving problems, I label works as direct- or indirect-control RL.
+For categorising how RL fits into solving problems, we label works as direct- or indirect-control RL.
 A \emph{direct-control} RL problem is one where the RL agent(s) are learning optimal control over a set of actions to act as the \emph{primary} defence or decision-maker---requiring measurements, reward functions and action sets tailored for this purpose.
 ?? Good Direct-control work? What this work is based on (which directly captures the spirit of ) \cite{DBLP:phd/ethos/Malialis14, DBLP:journals/eaai/MalialisK15}
 
@@ -458,17 +503,21 @@ It all ends here...
 
 ?? Future Work? I.e., \emph{everything}: no one else is really looking at/interested in this specific kind of application of RL yet. \emph{Yet}.
 
-?? Benefit of the more realistic emulation environ is that it is far closer in behaviour and architecture (i.e. viable) to a real SDN-enabled deployment, captures some dynamics which were otherwise hidden/lost by human ignorance. It also allows me to develop the system towards evolving traffic models where it is expected that RL should shine over and above standard ML techniques. THEN: Room to introduce/roll-in dynamic changepoint detection or adaptive exploration \cite{DBLP:conf/ki/Tokic10, DBLP:conf/ki/TokicP11, DBLP:conf/annpr/TokicP12}?
+?? IDEA: try out average reward, TD($\lambda$) methods as future work...
+
+?? IDEA: Apply these techniques to programmable data planes etc. While it's pretty neat that what we have works assuming that ach router is a software (x86) switch running OVS, what might we need to consider when applying this to `real' switches? ``PDP can allow this to be added to real routers to make it efficient to keep \& process state in the manner we require, as well as enabling more adaptive deployment''. Cite P4, BPFabric, other work on PDPs?
+
+?? Benefit of the more realistic emulation environment is that it is far closer in behaviour and architecture (i.e. viable) to a real SDN-enabled deployment, captures some dynamics which were otherwise hidden/lost by human ignorance. It also allows me to develop the system towards evolving traffic models where it is expected that RL should shine over and above standard ML techniques. THEN: Room to introduce/roll-in dynamic changepoint detection or adaptive exploration \cite{DBLP:conf/ki/Tokic10, DBLP:conf/ki/TokicP11, DBLP:conf/annpr/TokicP12}?
 
 ?? Overarching goal: works which \emph{respect the complexity of the network environment} (rather than na\"{i}ve simulation, blind ML applications etc.) and choose well-considered pathways to solution. \emph{Call-to-action}?
 
 ?? Security? I suspect that the very qualities that make inference difficult in IDS/IPS also increase the level of challenge an advanced threat must overcome.
 System state which is dependent on many signals drawn from across a wide network, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
-?? Might want to mention it in related work above, but the recent attention on adversarial examples/tricking models needs to be looked into for RL. Poisoning attacks relevant for online techniques: old bounds exist \textcite{DBLP:journals/jmlr/KloftL10}, new stuff concerns collaborative learners \cite{DBLP:conf/acsac/ShenTS16}, nothing for rl. Hot topic in deep networks \cite{DBLP:conf/eurosp/PapernotMJFCS16, SpInMl}, but naturally still relevant with even linear approximations or exact tabular case due to limits of the PAC assumption.
+?? Might want to mention it in related work above, but the recent attention on adversarial examples/tricking models needs to be looked into for RL. Poisoning attacks relevant for online techniques: old bounds exist \textcite{DBLP:journals/jmlr/KloftL10}, new stuff concerns collaborative learners \cite{DBLP:conf/acsac/ShenTS16}, nothing for rl. Hot topic in deep networks \cite{DBLP:conf/eurosp/PapernotMJFCS16, DBLP:conf/eurosp/PapernotMSW18}, but naturally still relevant with even linear approximations or exact tabular case due to limits of the PAC assumption. There is now examination of evasion attacks wrt.\ RL \cite{DBLP:journals/corr/HuangPGDA17}!
 ?? evasion attacks by \textcite{DBLP:conf/sp/Carlini017}---all of these are computed by way of a general stochastic optimiser, such as \emph{Adam} \cite{DBLP:journals/corr/KingmaB14}. possible to apply something similar to our learned model to assess its security? would the suggested states even be valid? (i.e. since they're monotonically increasing for the most part).
 
 \section*{Acknowledgements}
-My thanks go to Dr.\ Dimitrios Pezaros for his supervision, guidance, and comments relating to the realisation of this work, and to Mircea Iordache and Richard Cziva for their comments and technical assistance.
+My thanks go to Mircea Iordache and Richard Cziva for their comments and technical assistance.
 Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
 
 \printbibliography
