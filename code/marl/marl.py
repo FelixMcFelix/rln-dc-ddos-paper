@@ -809,7 +809,8 @@ def marlExperiment(
 			)
 
 		if model == "nginx":
-			net.interact()
+			#net.interact()
+                        pass
 
 		server_ip = server.IP()
 
@@ -827,7 +828,11 @@ def marlExperiment(
 						[] if old_style else ["-M", str(bw)]
 					) + [(good_file if good else bad_file)]
 				elif model == "nginx":
-					cmd = [] # TODO
+					cmd = [
+						"../traffic-host/target/release/traffic-host",
+						str(bw),
+						"-s", "10.0.0.1"
+					]
 				else:
 					cmd = []
 
