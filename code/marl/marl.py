@@ -13,6 +13,7 @@ import twink.ofp5.parse as ofpp
 from contextlib import closing
 import cPickle as pickle
 import itertools
+import math
 import networkx as nx
 import numpy as np
 import os
@@ -657,6 +658,7 @@ def marlExperiment(
 		controller = None
 		if use_controller:
 			# host the daemon, queue conns
+			#print "I have good reason to believe that I'm creating ryu."
 			ctl_proc = Popen(
 				[
 					"ryu-manager", "controller.py",
@@ -828,17 +830,35 @@ def marlExperiment(
 						[] if old_style else ["-M", str(bw)]
 					) + [(good_file if good else bad_file)]
 				elif model == "nginx":
-					cmd = [
-						"../traffic-host/target/release/traffic-host",
-						str(bw),
-						"-s", "10.0.0.1"
-					]
+					if good:
+						cmd = [
+							"../traffic-host/target/release/traffic-host",
+							str(bw),
+							# temp/testing
+							"-s", "10.0.0.1/gcc-8.2.0.tar.gz"
+						]
+					else:
+						rate_const = 2.0
+						udp_h_size = 28.0
+						bw_MB = (bw / 8.0) * (10.0**6.0)
+						bw_headers = udp_h_size * (10.0**(6.0 - rate_const))
+						bw_pad = bw_MB - bw_headers
+						expand = max(0, int(bw_pad / (10.0 ** (6.0 - rate_const))))
+						print "chose", expand, "to add onto the message length: target", bw, "seeing", (udp_h_size + expand) * (10**(-rate_const) * 8.0)
+	
+						cmd = [
+							"hping3",
+							"--udp",
+							"-i", "u{}".format(rate_const),
+							"-d", str(expand),
+							"10.0.0.1"
+						]
 				else:
 					cmd = []
 
 				if len(cmd) > 0:
 					host_procs.append(host.popen(
-						cmd, stdin=PIPE, stderr=sys.stderr
+						cmd, stdin=sys.stdout, stderr=sys.stderr
 					))
 
 		# Let the pcaps come to life.
@@ -871,7 +891,9 @@ def marlExperiment(
 		last_traffic_ratio = 0.0
 		g_reward = 0.0
 
-		#net.interact()
+		if ep > 0:
+			#net.interact()
+			pass
 
 		for i in xrange(episode_length):
 			# May need to early exit
@@ -941,22 +963,26 @@ def marlExperiment(
 
 		# End this monitoring instance.
 		mon_cmd.stdin.close()
+		#net.interact()
 
 		removeAllSockets()
 
 		if server_proc is not None:
 			server_proc.terminate()
 		if ctl_proc is not None:
+			#print "I have good reason to believe that I'm killing ryu."
 			ctl_proc.terminate()
 		for proc in host_procs:
 			proc.terminate()
 
 		host_procs = []
-		server_prov = None
+		server_proc = None
+		ctl_proc = None
 
 		net.stop()
 
 		store_sarsas = team_sarsas
+		next_ip = [1]
 
 		for sar in store_sarsas:
 			pass#print sar[0].values

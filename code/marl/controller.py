@@ -24,6 +24,7 @@ class SmartishRouter(app_manager.RyuApp):
 	# ctor
 	def __init__(self, *args, **kwargs):
 		super(SmartishRouter, self).__init__(*args, **kwargs)
+		#print "I am large, and in charge"
 		self.subnet = "10.0.0.0"
 		self.netmask = "255.255.255.0"
 		# may want to use the actual outbound mac, later
@@ -47,8 +48,10 @@ class SmartishRouter(app_manager.RyuApp):
 				buf += data_sock.recv(4096)
 
 			(routes, macs) = pickle.loads(buf)
+			#print routes, macs
 			self.entry_map = routes
 			self.macs = macs
+		#print "I am now alive, controlling all...!"
 
 	def local_ip(self):
 	   return (self.subnet, self.netmask)

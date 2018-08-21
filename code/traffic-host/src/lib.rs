@@ -45,7 +45,10 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
                 easy.max_send_speed(options.max_up).unwrap();
                 easy.max_recv_speed(options.max_down).unwrap();
 
-                easy.perform();
+                match easy.perform() {
+                    Err(e) => {},//eprintln!("error making download: {:?}", e),
+                    _ => {},
+                }
             }
             Ok(CliCommand::End) | Err(_) => {break;},
         }

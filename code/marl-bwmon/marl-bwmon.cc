@@ -128,15 +128,27 @@ public:
 	}
 };
 
+uint32_t make_netmask(int len) {
+	return htonl(0xffffffff << (32 - len));
+}
+
 struct PcapLoopParams {
 	PcapLoopParams(InterfaceStats &s, pcap_t *p, int i, int link)
 		: stats(s), iface(p), index(i), linkType(link)
 	{
+		this->netmask = make_netmask(24);
+		inet_pton(AF_INET, "10.0.0.0", reinterpret_cast<in_addr *>(&this->subnet));
 	}
 	InterfaceStats &stats;
 	pcap_t *iface;
 	const int index;
 	const int linkType;
+	uint32_t subnet;
+	uint32_t netmask;
+
+	bool is_ip_local(const uint32_t addr) {
+		return (addr & netmask) == subnet;
+	}
 };
 
 static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_char *data) {
@@ -156,9 +168,21 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 		case DLT_EN10MB: {
 			// jump in 14 bytes, hope for IPv4. Only do v4 because LAZY.
 			// Source addr is 12 further octets in.
-			auto ip = *reinterpret_cast<const uint32_t *>(data + 26);
+			// Dest addr is 16 into IP (adj to src ip.)
+			auto src_ip = *reinterpret_cast<const uint32_t *>(data + 26);
+			auto dst_ip = *reinterpret_cast<const uint32_t *>(data + 30);
+
+			// If src is local, then assess based on dst.
+			auto ip = params->is_ip_local(src_ip)
+				? dst_ip
+				: src_ip;
+
+			if (ip << 16 != 0xa8c00000) {
+				// printf("%x\n", ip);
+			}
 
 			// Another assumption, we're little endian.
+			// this is only troublesome
 			good = !(((ip>>24)&0xff) % 2);
 
 			break;
