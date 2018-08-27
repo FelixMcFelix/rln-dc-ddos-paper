@@ -24,6 +24,7 @@ results = marlExperiment(
 	rf = "ctl"
 )
 
-writeResults("../../results/online-2.csv", results)
+writeResults("../../results/online-2.csv", results,
+	times_dir="../../results/old-calc-times.csv")
 
 makeResultsAverage("../../results/online-2.csv", "../../results/online-2-avg.csv")

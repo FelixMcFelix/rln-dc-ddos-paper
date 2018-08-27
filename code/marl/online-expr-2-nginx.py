@@ -1,5 +1,8 @@
+import logging
 from marl import *
 from writer import writeResults, makeResultsAverage
+
+logging.basicConfig(filename="yawn.log", level=logging.DEBUG)
 
 results = marlExperiment(
 	n_teams = 2,#5,

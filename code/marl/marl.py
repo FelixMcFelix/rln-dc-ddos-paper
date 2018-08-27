@@ -62,6 +62,7 @@ def marlExperiment(
 		break_equal = False,
 
 		model = "tcpreplay",
+		submodel = None,
 
 		use_controller = False,
 		moralise_ips = True,
@@ -89,6 +90,7 @@ def marlExperiment(
 		good_traffic_percents = [],
 		total_loads = [],
 		store_sarsas = [],
+		action_comps = [],
 	):
 
 	# Use any predetermined random state.
@@ -773,6 +775,7 @@ def marlExperiment(
 		rewards.append([])
 		good_traffic_percents.append([])
 		total_loads.append([])
+		action_comps.append([])
 
 		# pre-setup (i.e. controller config...)
 		net.build()
@@ -830,29 +833,41 @@ def marlExperiment(
 						[] if old_style else ["-M", str(bw)]
 					) + [(good_file if good else bad_file)]
 				elif model == "nginx":
-					if good:
+					if submodel == "http" or (submodel is None and good):
 						cmd = [
 							"../traffic-host/target/release/traffic-host",
 							str(bw),
 							# temp/testing
 							"-s", "10.0.0.1/gcc-8.2.0.tar.gz"
 						]
-					else:
-						rate_const = 2.0
+					elif submodel == "udp-flood" or (submodel is None and not good):
+						#rate_const = 3.0 if not good else 4.0
 						udp_h_size = 28.0
 						bw_MB = (bw / 8.0) * (10.0**6.0)
-						bw_headers = udp_h_size * (10.0**(6.0 - rate_const))
-						bw_pad = bw_MB - bw_headers
-						expand = max(0, int(bw_pad / (10.0 ** (6.0 - rate_const))))
-						print "chose", expand, "to add onto the message length: target", bw, "seeing", (udp_h_size + expand) * (10**(-rate_const) * 8.0)
+						#bw_headers = udp_h_size * (10.0**(6.0 - rate_const))
+						#bw_pad = bw_MB - bw_headers
+						#expand = max(0, int(bw_pad / (10.0 ** (6.0 - rate_const))))
+						target = 1500.0
+						s = target - udp_h_size
+						#now, find delay in microseconds between packets of size 1500
+						interval_s = target/bw_MB
+						interval_us = int(interval_s * (10.0 ** 6.0))
+						print interval_s
+						#print "chose", expand, "to add onto the message length: target", bw, "seeing", (udp_h_size + expand) * (10**(-rate_const) * 8.0), "from", ip
+						#print "chose", interval_us, "to send pkts: target", bw, "seeing", (target * (interval_us / (10.0**12.0)) * 8.0), "from", ip
 	
 						cmd = [
 							"hping3",
 							"--udp",
-							"-i", "u{}".format(rate_const),
-							"-d", str(expand),
+							#"-i", "u{}".format(rate_const),
+							#"-d", str(expand),
+							"-i", "u{}".format(interval_us),
+							"-d", str(int(s)),
+							"-a", ip,
 							"10.0.0.1"
 						]
+
+						print cmd
 				else:
 					cmd = []
 
@@ -945,6 +960,10 @@ def marlExperiment(
 
 				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
 					# Encode state (as seen by this learner)
+
+					# Start time of action computation
+					s_t = time.time()
+
 					important_indices = [switch_list_indices[name] for name in [
 						intermediates[learner_no/n_learners].name, node.name
 					]]
@@ -955,12 +974,31 @@ def marlExperiment(
 					# Learn!
 					sarsa.update(state, reward)
 
+					# End time.
+					e_t = time.time()
+
+					action_comps[-1].append((i, e_t - s_t))
+
 			good_traffic_percents[-1].append(last_traffic_ratio)
 			rewards[-1].append(g_reward)
 			total_loads[-1].append(total_mbps[0])
 
+			zeroed = len(total_loads[-1]) > 0
+			for element in total_loads[-1][-3:]:
+				zeroed &= (element == 0.0)
+
+			absurd = total_loads[-1][-1] >= 2 * capacity
+
+			# test behaviour: if last 3 are 0 OR we're 2x max, interact.
+			if zeroed or absurd:
+				#print total_loads[-1][-3:], capacity
+				#print load_mbps
+				#net.interact()
+				pass
+
 		print "good:", last_traffic_ratio, ", g_reward:", g_reward, ", selected:", reward
 
+		#print action_comps[-1]
 		# End this monitoring instance.
 		mon_cmd.stdin.close()
 		#net.interact()
@@ -989,4 +1027,4 @@ def marlExperiment(
 
 	# Okay, done!
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
-	return (rewards, good_traffic_percents, total_loads, store_sarsas, random.getstate())
+	return (rewards, good_traffic_percents, total_loads, store_sarsas, random.getstate(), action_comps)

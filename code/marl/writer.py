@@ -14,13 +14,14 @@ def mkdir_p(path):
         else:
             raise
 
-def writeResults(results_file, results, sarsa_dir=None, append=False):
-	(rewards, good_traffic_percents, total_loads, store_sarsas, rng_state) = results
+def writeResults(results_file, results, sarsa_dir=None, append=False, times_dir=None):
+	(rewards, good_traffic_percents, total_loads, store_sarsas, rng_state, comp_times) = results
 
 	mode = "a" if append else "w"
 
 	# First, handle the actual results.
-	mkdir_p(os.path.split(results_file)[0])
+	pathy = os.path.split(results_file)
+	mkdir_p(pathy[0])
 	with open(results_file, mode) as csvfile:
 		out = csv.writer(csvfile)
 		all_t = 0
@@ -38,6 +39,31 @@ def writeResults(results_file, results, sarsa_dir=None, append=False):
 	if sarsa_dir is not None:
 		# TODO
 		pass
+
+	# Stats about how long computation time takes (as a function of time...)
+	if times_dir is not None:
+		(notext, ext) = os.path.splitext(times_dir)
+		times_avg_dir = "".join([notext, "-avg", ext])
+
+		timeholder = {}
+		with open(times_dir, mode) as csvfile:
+			out = csv.writer(csvfile)
+			for ep, data in enumerate(comp_times):
+				for t, length in data:
+					if t not in timeholder:
+						timeholder[t] = []
+
+					out.writerow([ep, t, length])
+					timeholder[t].append(length)
+
+		avgs = {}
+		for t, lengths in timeholder.iteritems():
+			avgs[t] = np.mean(np.array(lengths))
+
+		with open(times_avg_dir, mode) as csvfile:
+			out = csv.writer(csvfile)
+			for t, cost in avgs.iteritems():
+				out.writerow([t, cost])
 
 def makeResultsAverage(in_path, out_path, drop_zeroes=False):
 	with open(in_path, "r") as f_in:

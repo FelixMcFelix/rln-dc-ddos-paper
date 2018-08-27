@@ -45,7 +45,7 @@ results = marlExperiment(
 	rand_state = random_state,
 )
 
-(_, _, _, store_sarsas, random_state) = results
+(_, _, _, store_sarsas, random_state, _) = results
 
 writeResults("../../results/offline.csv", results, append=True)
 
