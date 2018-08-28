@@ -425,23 +425,34 @@ From the findings of \cref{sec:tcp-multiplexing-and-fallback-behaviour} and the 
 %That the use of UDP-like traffic replicates their experiments, compared against how real tcp behaves in mininet and according to the Mathis equation, shows that they really did not consider the behaviour of benign TCP in this environ (i.e., their results should be considerably worse in practice).
 
 \subsection{TCP Multiplexing and Fallback Behaviour}\label{sec:tcp-multiplexing-and-fallback-behaviour}
+
+?? TODO: Gut this section now...
 While Tcpreplay was useful in recreating the original work and examining the above condition, flow behaviour under packet loss is closer to that of UDP when using it to replay traffic.
 To investigate the effects of collateral damage upon benign TCP flows, an iperf3 test was conducted using mininet.
 Several hosts communicated concurrently to a single server over one switch, with maximum send rates in $\{1,...,5\}$ \si{\mega\bit\per\second} and a constant \SI{40}{\milli\second} latency.
 The rate of packet drop was increased linearly from \SIrange{0}{40}{\percent} and the observed throughput for each host was measured, to show a trend and determine for the mininet environment whether throughput would decrease as expected, at a super-linear rate.
 
+%\begin{figure}
+%	\includegraphics[width=\linewidth]{../plots/mplex}
+%	\caption{
+%		Average TCP upload rate of hosts targeting different bandwidths in \emph{mininet}, computed over 10 runs, for choices of packet drop rate up until throughput is reduced to almost \SI{0}{\mega\bit\per\second}.
+%		As the rate of packet drop increases from \SIrange{0}{40}{\percent}, all flows converge on an extremely low throughput, regardless of the target bandwidth---a super-linear decrease for legitimate TCP traffic.
+%		Prior treatments have ignored such phenomena, which have strong implications on agent and network design.
+%		Malicious flows are not expected to obey the Mathis equation in this way, worsening collateral damage experienced by benign TCP flows.
+%		\label{fig:mplex-tcp}
+%	}
+%\end{figure}
+
 \begin{figure}
-	\includegraphics[width=\linewidth]{../plots/mplex}
+	\includegraphics[width=\linewidth]{../plots/online-varyN-nginx}
 	\caption{
-		Average TCP upload rate of hosts targeting different bandwidths in \emph{mininet}, computed over 10 runs, for choices of packet drop rate up until throughput is reduced to almost \SI{0}{\mega\bit\per\second}.
-		As the rate of packet drop increases from \SIrange{0}{40}{\percent}, all flows converge on an extremely low throughput, regardless of the target bandwidth---a super-linear decrease for legitimate TCP traffic.
-		Prior treatments have ignored such phenomena, which have strong implications on agent and network design.
-		Malicious flows are not expected to obey the Mathis equation in this way, worsening collateral damage experienced by benign TCP flows.
-		\label{fig:mplex-tcp}
+		A more convincing and/or to-the-point figure for getting people to believe I'm doing god's work.
+		\label{fig:nginx-coffin-nail}
 	}
 \end{figure}
 
-\Cref{fig:mplex-tcp} shows that this trend is present.
+%\Cref{fig:mplex-tcp} shows that this trend is present.
+\Cref{fig:nginx-coffin-nail} shows that this trend is present.
 Accordingly, benign TCP flows are severely harmed by \emph{any} packet drop, so collateral damage to these hosts is more significant.
 Good-faith TCP congestion avoidance causes these flows to attempt to back off very quickly.
 %?? Talk about the same major points you made in the presentation here (i.e. TCP interactions) w/ pushback. Or in the evaluation...
@@ -506,6 +517,15 @@ A past example includes learning when best to \emph{communicate} and share knowl
 The position of this work is weakened by its reliance on the discredited `DARPA99' dataset \cite{DARPA-IDD, DBLP:conf/cisda/TavallaeeBLG09, DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
 Outside of anomaly/intrusion detection, there has been growing interest in the use of reinforcement learning in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for resource-constrained process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
 ?? Also adaptively choosing video bitrates based on network conditions \cite{DBLP:conf/sigcomm/MaoNA17}.
+
+?? Completely reword, yikes.
+\citeauthor{DBLP:conf/sigcomm/ChenL0L18}'s \emph{AuTO} \cite{DBLP:conf/sigcomm/ChenL0L18} uses deep RL (the \emph{deterministic policy gradients} algorithm \cite{DBLP:conf/icml/SilverLHDWR14}).
+Crucially, they find that decisions need to be made for the vast majority of (short-lived) flows, sub-millisecond.
+Their work falls between the above two paradigms: to overcome the high latency of action computation via neural network, two agents are trained.
+The first learns to optimise flow size thresholds governing priority (and accordingly demarcate long and short flows).
+All short flows are routed by ECMP.
+The second agent makes decisions about routing, prioritisation etc.\ for these long flows, who are likely to live long enough that any decisions made will have a significant impact.
+
 These works emphasise the necessity of ingenuity in effectively handling how states and actions are represented.
 
 \section{Conclusion}
