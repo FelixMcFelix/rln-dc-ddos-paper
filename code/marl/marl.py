@@ -30,8 +30,8 @@ controller_build_port = 6666
 
 def marlExperiment(
 		linkopts = {
-		#	"bw": 10
-			"delay": 10
+			#"bw": 10,
+			"delay": 10,
 		},
 		n_teams = 1,
 
@@ -79,6 +79,8 @@ def marlExperiment(
 		protect_final_hop = True,
 
 		with_ratio = False,
+		override_action = None,
+		manual_early_limit = None,
 
 		rf = "ctl",
 
@@ -92,6 +94,8 @@ def marlExperiment(
 		store_sarsas = [],
 		action_comps = [],
 	):
+
+	linkopts["bw"] = manual_early_limit
 
 	# Use any predetermined random state.
 	if rand_state is not None:
@@ -219,6 +223,12 @@ def marlExperiment(
 		if port_dict is not None:
 			map_link(port_dict, src, target)
 		return l
+
+	#def limit_bw(link, bw):
+	#	cmds = ['%s qdisc change dev %s root handle 5:0 htb default 1',
+	#		'%s class add dev %s parent 5:0 classid 5:1 htb ' +
+	#		'rate %fMbit burst 15k' % bw ]
+	#	errs = [link.tc(cmd) for cmd in cmds]
 
 	route_commands = [[]]
 	switch_sockets = [{}]
@@ -472,7 +482,8 @@ def marlExperiment(
 	def enactActions(learners, sarsas):
 		for (node, sarsa) in zip(learners, sarsas):
 			(_, action, _) = sarsa.last_act
-			updateUpstreamRoute(node, ac_prob=action)
+			a = action if override_action is None else override_action
+			updateUpstreamRoute(node, ac_prob=a)
 
 	def moralise(value, good, max_val=255, no_goods=[0, 255]):
 		target_mod = 0 if good else 1
@@ -768,8 +779,9 @@ def marlExperiment(
 		capacity = calc_max_capacity(len(all_hosts))
 		print capacity, bw_all
 		if protect_final_hop:
-			core_link.intf1.config(bw=capacity)
-			core_link.intf2.config(bw=capacity)
+			core_link.intf1.bwCmds(bw=float(capacity))
+			core_link.intf2.bwCmds(bw=float(capacity))
+			pass
 
 		# Track the rewards, total load observed and legit rates per step (split by episode)
 		rewards.append([])
@@ -863,7 +875,8 @@ def marlExperiment(
 							#"-d", str(expand),
 							"-i", "u{}".format(interval_us),
 							"-d", str(int(s)),
-							"-a", ip,
+							#"-a", ip,
+							"-I", "h",
 							"10.0.0.1"
 						]
 
