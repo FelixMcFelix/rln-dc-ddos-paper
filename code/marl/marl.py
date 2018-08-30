@@ -84,7 +84,7 @@ def marlExperiment(
 
 		rf = "ctl",
 
-		rand_seed = None,
+		rand_seed = 0xcafed00d,
 		rand_state = None,
 		force_cmd_routes = False,
 
@@ -509,6 +509,7 @@ def marlExperiment(
 		for i in xrange(host_count):
 			good = random.random() < P_good
 			bw = (random.uniform(*(good_range if good else evil_range)))
+			print "drew: good={}, bw={}".format(good, bw)
 
 			# Make up a wonderful IP.
 			# Last byte => goodness. Even = good.
