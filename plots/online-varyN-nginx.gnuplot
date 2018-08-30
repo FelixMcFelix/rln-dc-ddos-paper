@@ -24,5 +24,6 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 
 plot '../results/online-2-avg.csv' u 1:3 w lines smooth sbezier title "tcpreplay", \
-     '../results/online-2-avg-ng.csv' u 1:3 w lines smooth sbezier title "nginx", \
-	 '../results/a-udp-avg.csv' u 1:3 w lines smooth sbezier title "hping3"
+	'../results/online-2-avg-ng.csv' u 1:3 w lines smooth sbezier title "nginx", \
+	'../results/a-udp-avg.csv' u 1:3 w lines smooth sbezier title "hping3", \
+	'../results/baseline-2-avg.csv' u 1:3 w lines smooth sbezier title "baseline-tcpreplay"
