@@ -33,7 +33,11 @@ tracking=true,
 \usepackage{titlesec}
 \titlespacing*{\section}{0pt}{1.5ex}{0.7ex}
 \titlespacing*{\subsection}{0pt}{1.5ex}{0.7ex}
+\titlespacing*{\paragraph}{0pt}{1.5ex}{0.7ex}
 %\titleformat*{\filcenter\scshape}
+
+\usepackage{enumitem}
+\setlist[description]{leftmargin=8em,style=nextline}
 
 %bib
 \usepackage[style=ieee,maxnames=3,mincitenames=1,maxcitenames=2,maxbibnames=99,mincrossrefs=5,sortcites,backend=bibtex,uniquelist=false]{biblatex}
@@ -384,7 +388,7 @@ Each agent has its own internal parameter vector $\wvec{}$, and agents do not sh
 A sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training by a simulated environment to transfer to reality.
 
 \section{Performance in an Emulated Environment}\label{sec:performance-in-an-emulated-environment}
-The original introduction of this approach to direct-control reinforcement learning as introduced by \textcite{DBLP:journals/eaai/MalialisK15} fails to consider key cases: disjoint ranges of traffic distribution (i.e., the presence of benign heavy-hitters), the accurate simulation of TCP-like behaviour (and its effects on collateral damage), and assumes a rigid ISP-like topology.
+The original introduction of this approach to direct-control reinforcement learning as introduced by \textcite{DBLP:journals/eaai/MalialisK15} fails to consider key cases: disjoint ranges of traffic distribution (i.e., the presence of benign heavy-hitters), the accurate simulation of TCP-like behaviour (and its effects on collateral damage), and assumes a rigid and unrepresentative topology.
 The latter two are most deserving of a closer investigation, as they have stronger implications for wide-scale deployment.
 
 All experiments described were executed using an Ubuntu 16.04.4 LTS machine with a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
@@ -425,36 +429,57 @@ From the findings of \cref{sec:tcp-multiplexing-and-fallback-behaviour} and the 
 %That the use of UDP-like traffic replicates their experiments, compared against how real tcp behaves in mininet and according to the Mathis equation, shows that they really did not consider the behaviour of benign TCP in this environ (i.e., their results should be considerably worse in practice).
 
 \subsection{TCP Multiplexing and Fallback Behaviour}\label{sec:tcp-multiplexing-and-fallback-behaviour}
-While Tcpreplay was useful in recreating the original work and examining the above condition, flow behaviour under packet loss is closer to that of UDP when using it to replay traffic.
-To investigate the effects of collateral damage upon benign TCP flows, an iperf3 test was conducted using mininet.
-Several hosts communicated concurrently to a single server over one switch, with maximum send rates in $\{1,...,5\}$ \si{\mega\bit\per\second} and a constant \SI{40}{\milli\second} latency.
-The rate of packet drop was increased linearly from \SIrange{0}{40}{\percent} and the observed throughput for each host was measured, to show a trend and determine for the mininet environment whether throughput would decrease as expected, at a super-linear rate.
+
+?? TODO: Gut this section now...
+%While Tcpreplay was useful in recreating the original work and examining the above condition, flow behaviour under packet loss is closer to that of UDP when using it to replay traffic.
+%To investigate the effects of collateral damage upon benign TCP flows, an iperf3 test was conducted using mininet.
+%Several hosts communicated concurrently to a single server over one switch, with maximum send rates in $\{1,...,5\}$ \si{\mega\bit\per\second} and a constant \SI{40}{\milli\second} latency.
+%The rate of packet drop was increased linearly from \SIrange{0}{40}{\percent} and the observed throughput for each host was measured, to show a trend and determine for the mininet environment whether throughput would decrease as expected, at a super-linear rate.
+
+%\begin{figure}
+%	\includegraphics[width=\linewidth]{../plots/mplex}
+%	\caption{
+%		Average TCP upload rate of hosts targeting different bandwidths in \emph{mininet}, computed over 10 runs, for choices of packet drop rate up until throughput is reduced to almost \SI{0}{\mega\bit\per\second}.
+%		As the rate of packet drop increases from \SIrange{0}{40}{\percent}, all flows converge on an extremely low throughput, regardless of the target bandwidth---a super-linear decrease for legitimate TCP traffic.
+%		Prior treatments have ignored such phenomena, which have strong implications on agent and network design.
+%		Malicious flows are not expected to obey the Mathis equation in this way, worsening collateral damage experienced by benign TCP flows.
+%		\label{fig:mplex-tcp}
+%	}
+%\end{figure}
 
 \begin{figure}
-	\includegraphics[width=\linewidth]{../plots/mplex}
+	\includegraphics[width=\linewidth]{../plots/online-varyN-nginx}
 	\caption{
-		Average TCP upload rate of hosts targeting different bandwidths in \emph{mininet}, computed over 10 runs, for choices of packet drop rate up until throughput is reduced to almost \SI{0}{\mega\bit\per\second}.
-		As the rate of packet drop increases from \SIrange{0}{40}{\percent}, all flows converge on an extremely low throughput, regardless of the target bandwidth---a super-linear decrease for legitimate TCP traffic.
-		Prior treatments have ignored such phenomena, which have strong implications on agent and network design.
-		Malicious flows are not expected to obey the Mathis equation in this way, worsening collateral damage experienced by benign TCP flows.
-		\label{fig:mplex-tcp}
+		A more convincing and/or to-the-point figure for getting people to believe I'm doing god's work.
+		?? TODO: describe 4 real.
+		\label{fig:nginx-coffin-nail}
 	}
 \end{figure}
 
-\Cref{fig:mplex-tcp} shows that this trend is present.
+%\Cref{fig:mplex-tcp} shows that this trend is present.
+\Cref{fig:nginx-coffin-nail} shows that this trend is present.
 Accordingly, benign TCP flows are severely harmed by \emph{any} packet drop, so collateral damage to these hosts is more significant.
 Good-faith TCP congestion avoidance causes these flows to attempt to back off very quickly.
 %?? Talk about the same major points you made in the presentation here (i.e. TCP interactions) w/ pushback. Or in the evaluation...
 UDP, however, behaves as expected---malicious hosts are expected to exhibit the same behaviour, given that congestion is their primary goal.
 
-The performance characteristics of TCP under packet drop  are well-known and well-understood through the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97}:
+?? Quic will probably behave much like TCP.
+
+The performance characteristics of TCP under packet drop are well-known and well-understood through the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97}:
 \begin{equation}
 \operatorname{BW} = \frac{\operatorname{MSS}}{\operatorname{RTT}} \frac{C}{\sqrt{p}},
 \end{equation}
 for the \emph{maximum segment size} (MSS), \emph{round trip time} (RTT), a choice of constant $C \approx{} \sqrt{3/2}$ dependent on system assumptions, and the probability $p \in (0, 1]$ that a packet is lost.
 %The lower bound on $p$ is deliberately open, as packet drop acts as a control signal for the TCP send window size and is an expected part of normal operation.
-TCP flows in Mininet are found to obey this law, as expected.
+%TCP flows in Mininet are found to obey this law, as expected.
 This reveals that the original work \emph{does not capture this behaviour}, or else the initial experiment (UDP-like traffic when $n=2$) wouldn't have achieved similar results to those which were reported.
+
+\Cref{sec:a-new-normal} is where the new normal model arrives. Wow!
+
+\subsection{Computational Cost}
+?? Consider talking about the execution times of the old MARL approach here? They're real nice (as expected), so we have lots of room to play around with while (hopefully) remaining under the 1ms target time given by \textcite{DBLP:conf/sigcomm/ChenL0L18}.
+
+We're in \SIrange{80}{100}{\micro\second}
 
 %\subsection{Synthesis}
 %%It'd be really good if I could figure out a rough proof for the service property...
@@ -465,10 +490,27 @@ This reveals that the original work \emph{does not capture this behaviour}, or e
 %?? Observations: training time lengthier by nature of emulated environment.
 %?? Risk of going for a simulation (i.e. numeric)? Always going to be interesting behaviour that is missed out on (in theory), at the cost of training time/limits of simulation speed
 
-\section{A New Normal}
+\section{A New Normal}\label{sec:a-new-normal}
 
-?? Full Openflow controller setup (in mininet)
-?? TODO: everything
+In establishing...
+
+?? How will I structure this?
+?? Motivation -> Model -> Results?
+?? OR Use the results of the last section to springboard into here?
+
+?? Remember, the motivation is clear. We don't care so much that it is "representative" wrt a specific deployment location or network type. The whole purpose of this is that we aim to test specific behaviour which traces cannot replicate (i.e., correlated back-and-forth, dynamics introduced to congestion-aware protocols, ...)
+?? If we need to, we can codition the distribution of requests according to statistics mined form an existing trace if reviewer number 2 needs that extra push to be convinced.
+
+?? Full Openflow controller setup (in mininet). All internal routers are primed with knowledge of the shortest path to any internal host, while new inbound flows register the ``way back'' for each hop used to maintain consistency over traffic conditions.
+If such information is lost, it suffices to forward an outbound packet on a random (outbound) port, as we assume that any external IP is reachable through any of the test network's egress ports (i.e., that it is not connected to any stub autonomous systems).
+The controller is also responsible for responding to ARP traffic, as a gateway might
+The necessity of this arises due to the realities of relying upon Linux's IP stack, and would not need to be considered for purely trace-based evaluation.
+?? Legitimate traffic: TCP traffic (HTTP clients downloading web pages, dependent resources and files) with a mixture of lifetimes for each request.
+?? Malicious traffic: UDP flood traffic (hping3, MTU-size packets, ). Why not min-size packets? Because the traffic generator gets in a horrible rut if I do so...
+
+\Cref{fig:nginx-coffin-nail} shows the effects of using 
+
+?? Actually describe what I have here, now. I can do this.
 
 ?? ANGLE: set up an environment to test \emph{specific} behaviours to examine \emph{specific} problems in past work. I make no claims that it is perfect or representative for all traffic, just for this (likely common) behaviour which I expect to plague almost all legit TCP flows.
 
@@ -476,11 +518,38 @@ This reveals that the original work \emph{does not capture this behaviour}, or e
 
 \section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
 
+?? What do we want?
+
+\begin{IEEEdescription}[\IEEEsetlabelwidth{Global state}]
+	\item[Global state] space space space
+	\item[Local state]
+\end{IEEEdescription}
+
+\textbf{Global state}---what came before (load statistics from various network locations)
+
+\textbf{Local state}---per-flow data.
+
+?? Last action taken: encodes the notion of current belief of flow maliciousness (default at 0). Potentially allows forgiveness: a mistakenly malicious flow 's falloff after punishment could be used for such purpose (if we're lucky...)
+
+?? Correspondence ratio: ratio (in bytes) between upstream/downstream traffic for a src/dst pair. (Cite the work that suggested this)
+
+?? Source IP, port, protocol (*zzz*)
+
+?? Flow duration, size
+
+?? Change in send/recv rates since last action/check?
+
+?? More things... (look into other works, actually research this...)
+
+\paragraph{Done with that...}
+
 ?? TODO: everything
 
 ?? What concessions will we have to make in order to make per-flow processing more viable? Intelligent sampling/reanalysis of flows when needed (i.e. an external heuristic guiding method)?
 
 ?? NOTE: think about how I might need to change/alter the tile-coding when we add extra discriminative features... (i.e., are there better ways to handle covariance between properties of system/flow state, properly capture generalisation?)
+
+?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other!
 
 \section{The Results of Doing So}
 
@@ -506,6 +575,15 @@ A past example includes learning when best to \emph{communicate} and share knowl
 The position of this work is weakened by its reliance on the discredited `DARPA99' dataset \cite{DARPA-IDD, DBLP:conf/cisda/TavallaeeBLG09, DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
 Outside of anomaly/intrusion detection, there has been growing interest in the use of reinforcement learning in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for resource-constrained process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
 ?? Also adaptively choosing video bitrates based on network conditions \cite{DBLP:conf/sigcomm/MaoNA17}.
+
+?? Completely reword, yikes.
+\citeauthor{DBLP:conf/sigcomm/ChenL0L18}'s \emph{AuTO} \cite{DBLP:conf/sigcomm/ChenL0L18} uses deep RL (the \emph{deterministic policy gradients} algorithm \cite{DBLP:conf/icml/SilverLHDWR14}).
+Crucially, they find that decisions need to be made for the vast majority of (short-lived) flows, sub-millisecond.
+Their work falls between the above two paradigms: to overcome the high latency of action computation via neural network, two agents are trained.
+The first learns to optimise flow size thresholds governing priority (and accordingly demarcate long and short flows).
+All short flows are routed by ECMP.
+The second agent makes decisions about routing, prioritisation etc.\ for these long flows, who are likely to live long enough that any decisions made will have a significant impact.
+
 These works emphasise the necessity of ingenuity in effectively handling how states and actions are represented.
 
 \section{Conclusion}
@@ -529,8 +607,10 @@ System state which is dependent on many signals drawn from across a wide network
 ?? Might want to mention it in related work above, but the recent attention on adversarial examples/tricking models needs to be looked into for RL. Poisoning attacks relevant for online techniques: old bounds exist \textcite{DBLP:journals/jmlr/KloftL10}, new stuff concerns collaborative learners \cite{DBLP:conf/acsac/ShenTS16}, nothing for rl. Hot topic in deep networks \cite{DBLP:conf/eurosp/PapernotMJFCS16, DBLP:conf/eurosp/PapernotMSW18}, but naturally still relevant with even linear approximations or exact tabular case due to limits of the PAC assumption. There is now examination of evasion attacks wrt.\ RL \cite{DBLP:journals/corr/HuangPGDA17}!
 ?? evasion attacks by \textcite{DBLP:conf/sp/Carlini017}---all of these are computed by way of a general stochastic optimiser, such as \emph{Adam} \cite{DBLP:journals/corr/KingmaB14}. possible to apply something similar to our learned model to assess its security? would the suggested states even be valid? (i.e. since they're monotonically increasing for the most part).
 
+?? More future work --- share knowledge between agents. ``Knowledge bases'' for this purpose? (see: Qianru).
+
 \section*{Acknowledgements}
-My thanks go to Mircea Iordache and Richard Cziva for their comments and technical assistance.
+My thanks go to Mircea Iordache, Qianru Zhou, and Richard Cziva for their comments and technical assistance.
 Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
 
 \printbibliography

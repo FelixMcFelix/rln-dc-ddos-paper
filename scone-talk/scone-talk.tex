@@ -1,0 +1,239 @@
+% !TeX program = lualatex
+
+\documentclass[aspectratio=169,xcolor={dvipsnames}
+,hide notes
+%,show only notes
+%,show notes on second screen=right
+]{beamer}
+\usetheme[background=light, numbering=fraction]{metropolis}
+\usepackage{appendixnumberbeamer}
+
+%\usepackage[T1]{fontenc}
+
+\usepackage[labelfont=bf,textfont={it}]{caption}
+\usepackage{subcaption}
+\captionsetup[figure]{justification=centering}
+\captionsetup[subfigure]{justification=centering}
+
+%\usepackage{fontspec}
+%\setsansfont{Fira Sans Mono}
+
+\usepackage[binary-units]{siunitx}
+\sisetup{range-phrase=--, range-units=single}
+
+\usepackage[UKenglish]{babel}
+\usepackage{csquotes}
+
+\usepackage{amssymb}
+
+\usepackage{lipsum}
+\usepackage[basic]{complexity}
+\usepackage[super,negative]{nth}
+
+\usepackage{booktabs}
+
+%bib
+\usepackage[maxnames=3,maxbibnames=99,mincrossrefs=5,sortcites
+,backend=bibtex
+,style=authortitle
+]{biblatex}
+\addbibresource{../paper/papers-off.bib}
+\addbibresource{../paper/confs-off.bib}
+\addbibresource{../paper/books-off.bib}
+\addbibresource{../paper/rfc.bib}
+\addbibresource{../paper/misc.bib}
+
+%picky abt et al.
+\usepackage{xpatch}
+
+\xpatchbibmacro{name:andothers}{%
+	\bibstring{andothers}%
+}{%
+	\bibstring[\emph]{andothers}%
+}{}{}
+
+%opening!
+
+\usepackage{cleveref}
+\newcommand{\crefrangeconjunction}{--}
+
+\usepackage{fontawesome}
+
+%-------------------------------------%
+%-------------------------------------%
+
+\title{Improving Direct-Control Reinforcement Learning for Network Intrusion Prevention (WIP)}
+\author{Kyle A. Simpson\\
+	\small{\faGithub{} \href{https://github.com/felixmcfelix}{FelixMcFelix} \hspace{0.5em} \faGlobe{} \url{https://mcfelix.me}}}
+\institute{University of Glasgow}
+\date{\nth{3} September, 2018}
+
+\begin{document}
+
+\maketitle
+
+\begin{frame}{Introduction}
+	\begin{itemize}
+		\item Network IDS/IPS backed by machine learning haven't taken off as hoped---particularly anomaly-based work.
+		\item Detection problem tricky in this domain:
+		\begin{itemize}
+			\item Evolving: usage shifts, new protocols, new applications.
+			\item Burstiness, seasonal variation.
+			\item Need for correctness, almost no false-positive tolerance.
+			\item Labelling issues.
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{Introduction: Part II}
+\begin{itemize}
+	\item Classes of problem like flooding-based DDoS attacks manifest as a service degradation.
+	\begin{itemize}
+		\item Can these be controlled via feedback loop?
+		\item \alert{``Overcome'' the difficulties of the detection problem} by monitoring and adapting to \emph{performance characteristics and consequences} in real-time
+	\end{itemize}
+	\item Goal: augment signature-based approaches as a last-ditch effort.
+\end{itemize}
+\end{frame}
+
+%\section{Reinforcement learning}
+
+\begin{frame}{RL: The Main Idea\texttrademark}
+	\begin{itemize}
+		\item Goal: train an agent to make optimal decisions based on observed state.
+		\begin{itemize}
+			\item Formally, learn a \alert{policy} to maximise the \alert{expected discounted reward}\footcite{RL2E}.
+		\end{itemize}
+	
+		\item Underlying theory: systems as (discrete-time) \alert{Markov Decision Processes}---states, actions, rewards and transition probabilities.
+		\begin{itemize}
+			\item I.e., choosing action $a_t$ from a policy in state $s_t$, $a_t \sim \pi(s_t)$, induces the next state $s_{t+1}$ and an associated reward $r_{t+1}$.
+			\item Generalises to \alert{value} $Q(s,a)$---how much reward can we \emph{eventually} expect from choosing each action currently available?
+		\end{itemize}
+	
+%		\item The world/environment is believed to be modelled by stochastic state-transition probabilities, reward function distributions...
+%		\begin{itemize}
+%			\item But we don't need to model that!
+%		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{RL: The Main Benefits\texttrademark}
+\begin{itemize}
+	\item We can learn the optimal policy \alert{without modelling the world ourselves}.
+	\item Formulation allows learning adaptively and online, so long as a reward signal is available.
+	\item Variation in available algorithms, update mechanisms, function approximations, dependence on value functions, action selection, exploration...
+	\begin{itemize}
+		\item Orthogonal concerns, allowing tunable algorithm design.
+	\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Where has RL succeeded in networks?}
+	%Link to recent work in data-driven networking/optimisation?
+	%
+	%Link to that one GMM paper w/ RL communication.
+	
+	\begin{itemize}
+		\item \alert{Data-driven networking.} Effectively applied to intra-domain routing \footcite{DBLP:conf/hotnets/ValadarskySST17}, task allocation \footcite{DBLP:conf/hotnets/MaoAMK16}, traffic optimisation \footcite{DBLP:conf/sigcomm/ChenL0L18} and more, each with general and domain-specific insights.
+		
+		\item \alert{In intrusion detectors?} Optimising information sharing in distributed statistical model training \footcite{DBLP:conf/paisi/XuSH07}.
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{What might we gain from RL in DDoS prevention?}
+content...
+\end{frame}
+
+%\section{Existing work}
+
+\begin{frame}{Multiagent RL for DDoS prevention}
+%	Network Model \footcite{DBLP:journals/eaai/MalialisK15}
+%	
+%	Pushback \footcite{DBLP:journals/ccr/MahajanBFIPS02a}
+%	
+%	Group reward functions etc.
+%
+%	Its weaknesses? Strong assumptions about what knowledge the learners really have...
+	
+	\begin{itemize}
+		\item Reimplementing (and poking holes in) MARL\footcite{DBLP:journals/eaai/MalialisK15}.
+		% How? Violation of ISP-like criterion, 
+		
+		\item Network model
+		\begin{itemize}
+			\item Hosts have a fixed probability of being benign/malicious.
+			\item $n$ hosts per learner, $i$ learners to a team, $j$ teams, one server.
+			\item Per-team rewards: \alert{coordinated team learning}.
+			\item Action: (per-timestep) choose $p$, s.t. each learner drops $p\%$ of external traffic.
+		\end{itemize}
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{Flaws/Risks of MARL?}	
+	\begin{itemize}		
+		\item Action mechanism is \emph{pushback}\footcite{DBLP:journals/ccr/MahajanBFIPS02a} (probabilistic packet drop).
+		
+		\item Strong assumptions on benign/malicious packet estimation quality. 
+		\item Pushback is known to be flawed in practice.
+		\item Rigid ISP-like network assumptions.
+		
+		\item FIXME WITH THE NEW GRIPES
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{The case for finer granularity}
+	\begin{columns}
+	\begin{column}{0.45\linewidth}
+		\begin{itemize}
+			\item Learner/host ratio (action/host ratio) affects host QoS.
+			
+			\item Reduced service guarantees by nature of \emph{pushback} model.
+			\begin{itemize}
+				\item \alert{Worse with good-faith TCP congestion avoidance}.
+			\end{itemize}
+			%This is exacerbated by TCP congestion avoidance---legit hosts will be punished far more severely, bad actors don't care!
+			
+			\item More granular $\implies$ should focus on flow stats, \alert{not aggregates} like now! %Alongside this higher-granularity view, reformulation to include flow characteristics in the decision-making process.
+		\end{itemize}
+	\end{column}
+	\begin{column}{0.5\linewidth}
+		\begin{figure}
+%			\includegraphics[width=\linewidth]{../plots/online-pres.pdf}
+			\caption{Service quality decreases as actions become less granular. ??FIXME: MISSING PLOT}
+		\end{figure}
+	\end{column}
+	\end{columns}
+\end{frame}
+
+\begin{frame}{The Immediate Future}
+content...
+\end{frame}
+
+\begin{frame}{The Far Future}
+\begin{itemize}
+	\item Other problems.
+	\begin{itemize}
+		\item New action spaces, careful consideration.
+	\end{itemize}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[standout]{Conclusion}
+	We've looked at...
+	\begin{itemize}
+		\item A quick introduction to RL, and its \alert{importance to future networks}.
+		\item A `direct control' approach to intrusion prevention, and \alert{intended improvements}.
+		\item ?? FIXME
+	\end{itemize}
+	
+	\alert{Questions?}
+\end{frame}
+
+\appendix
+
+\begin{frame}[allowframebreaks]{References}
+\printbibliography[heading=none]
+\end{frame}
+
+\end{document}
