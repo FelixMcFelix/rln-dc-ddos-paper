@@ -1,0 +1,12 @@
+source_data := $(wildcard ../results/*.csv)
+targets := $(patsubst %.gnuplot,%.pdf,$(wildcard *.gnuplot))
+
+marker: $(targets)
+	touch marker
+
+%.pdf: %.tex
+	pdflatex $< > /dev/null 2>&1
+
+%.tex: %.gnuplot $(source_data)
+	gnuplot $<
+
