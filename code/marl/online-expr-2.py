@@ -9,7 +9,7 @@ results = marlExperiment(
 	host_range = [2, 2],
 
 	explore_episodes = 0.3,
-	episodes = 10,#50,#500, Since mininet keeps running out of files even e/ cleanup
+	episodes = 15,#50,#500, Since mininet keeps running out of files even e/ cleanup
 	episode_length = 10000,
 	separate_episodes = True,
 
