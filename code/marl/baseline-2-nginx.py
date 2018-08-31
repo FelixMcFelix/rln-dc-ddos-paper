@@ -11,6 +11,9 @@ results = marlExperiment(
 	n_learners = 3,
 	host_range = [2, 2],
 
+	# test to handle bi-directional
+	evil_range = [7, 15],
+
 	explore_episodes = 0.3,
 	episodes = 10,#50,#500, Since mininet keeps running out of files even e/ cleanup
 	episode_length = 10000,

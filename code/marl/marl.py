@@ -93,6 +93,8 @@ def marlExperiment(
 		total_loads = [],
 		store_sarsas = [],
 		action_comps = [],
+
+		reward_direction = "in",
 	):
 
 	linkopts["bw"] = manual_early_limit
@@ -780,8 +782,8 @@ def marlExperiment(
 		capacity = calc_max_capacity(len(all_hosts))
 		print capacity, bw_all
 		if protect_final_hop:
-			core_link.intf1.bwCmds(bw=float(capacity))
-			core_link.intf2.bwCmds(bw=float(capacity))
+			core_link.intf1.config(bw=float(capacity))
+			core_link.intf2.config(bw=float(capacity))
 			pass
 
 		# Track the rewards, total load observed and legit rates per step (split by episode)
@@ -896,6 +898,7 @@ def marlExperiment(
 		# Now establish the true maximum throughput
 		ratio = 1.0
 		if with_ratio:
+			# FIXME: broken with new stats.
 			mon_cmd.stdin.write("\n")
 			mon_cmd.stdin.flush()
 			data = mon_cmd.stdout.readline().strip().split(",")
@@ -947,13 +950,23 @@ def marlExperiment(
 			data = mon_cmd.stdout.readline().strip().split(",")
 
 			time_ns = int(data[0][:-2])
-			load_mbps = [map(
+			unfused_load_mbps = [map(
 					lambda bytes: (8000*float(bytes))/time_ns,
 					el.strip().split(" ")
 				) for el in data[1:]
 			]
+			load_mbps = [(ig+og, ib+ob) for ((ig, ib), (og, ob)) in zip(unfused_load_mbps[::2], unfused_load_mbps[1::2])]
 
-			total_mbps = [good+bad for (good, bad) in load_mbps]
+			# This now has format: inbound, outbound...
+			unfused_total_mbps = [good+bad for (good, bad) in unfused_load_mbps]
+			total_mbps = [good + bad for (good, bad) in load_mbps]
+
+			# FIXME: need to make this more general to apply to teams etc...
+			reward_src = load_mbps[0]
+			if reward_direction == "in":
+				reward_src = unfused_load_mbps[0]
+			elif reward_direction == "out":
+				reward_src = unfused_load_mbps[1]
 
 			last_traffic_ratio = min(load_mbps[0][0]/bw_all[0], 1.0)
 			if not (i % 10): print "\titer {}/{}, good:{}, load:{}".format(i, episode_length, last_traffic_ratio, total_mbps[0])

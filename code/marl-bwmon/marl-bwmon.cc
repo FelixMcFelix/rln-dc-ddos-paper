@@ -36,17 +36,19 @@ class InterfaceStats
 public:
 	InterfaceStats(int n)
 		: num_interfaces_(n)
-		, bad_byte_counts_(std::vector<uint64_t>(n, 0))
-		, good_byte_counts_(std::vector<uint64_t>(n, 0))
+		, bad_byte_counts_(std::vector<uint64_t>(2*n, 0))
+		, good_byte_counts_(std::vector<uint64_t>(2*n, 0))
 	{ }
 
-	void incrementStat(int interface, bool good, uint32_t packetSize) {
+	void incrementStat(int interface, bool good, uint32_t packetSize, bool inbound) {
 		std::shared_lock<std::shared_mutex> lock(mutex_);
 
+		auto index = 2 * interface + (inbound ? 0 : 1);
+
 		if (good) 
-			good_byte_counts_[interface] += packetSize;
+			good_byte_counts_[index] += packetSize;
 		else
-			bad_byte_counts_[interface] += packetSize;
+			bad_byte_counts_[index] += packetSize;
 	}
 
 	std::chrono::high_resolution_clock::time_point clearAndPrintStats(std::chrono::high_resolution_clock::time_point startTime) {
@@ -160,6 +162,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 	// Establish the facts: HERE.
 	// Okay, we can read up to h->caplen bytes from data.
 	bool good = false;
+	bool inbound = true;
 
 	switch (params->linkType) {
 		case DLT_NULL:
@@ -173,13 +176,10 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 			auto dst_ip = *reinterpret_cast<const uint32_t *>(data + 30);
 
 			// If src is local, then assess based on dst.
-			auto ip = params->is_ip_local(src_ip)
+			inbound = params->is_ip_local(src_ip);
+			auto ip = inbound
 				? dst_ip
 				: src_ip;
-
-			if (ip << 16 != 0xa8c00000) {
-				// printf("%x\n", ip);
-			}
 
 			// Another assumption, we're little endian.
 			// this is only troublesome
@@ -195,7 +195,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 				<< params->index << ": saw " << params->linkType << std::endl;
 	}
 
-	params->stats.incrementStat(params->index, good, h->len);
+	params->stats.incrementStat(params->index, good, h->len, inbound);
 }
 
 static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &stats) {
