@@ -10,6 +10,8 @@
 
 %\usepackage[T1]{fontenc}
 
+\usepackage{bm}
+
 \usepackage[labelfont=bf,textfont={it}]{caption}
 \usepackage{subcaption}
 \captionsetup[figure]{justification=centering}
@@ -215,7 +217,7 @@
 \begin{columns}
 	\begin{column}{0.45\linewidth}
 		\begin{itemize}
-			\item Algorithm: Semi-gradient Sarsa, linear fn approx.
+			\item Algorithm: Semi-gradient Sarsa, linear fn approx, $\epsilon$-greedy selection.
 			\item Actions: Drop [0, 10, ... 90]\si{\percent} upstream traffic.
 			\item State: load vectors of agent and parents ($\mathbb{R}^4$) $\rightarrow$ tile-coded (fixed-weight binary vector).
 			\item Rewards: \num{-1} if $\mathit{load} > U_s$, else fraction of surviving legit traffic.
@@ -275,6 +277,23 @@
 	\end{column}
 \end{columns}
 \end{frame}
+\newcommand{\acval}[3]{\ensuremath{\operatorname{\hat{q}}(#1, #2, #3)}}
+\newcommand{\wvec}[1]{\ensuremath{\bm{w}_{#1}}}
+\begin{frame}{The algorithm?}
+% make math easy
+\begin{subequations}
+A little terse, but the main update rule is:
+\begin{gather}
+\delta_t = R_{t+1} + \gamma \acval{S_{t+1}}{A_{t+1}}{\wvec{t}} - \acval{S_t}{A_t}{\wvec{t}},\\
+\bm{w}_{t+1} = \bm{w}_{t} + \alpha \delta_t \nabla_{\wvec{}}{\acval{S_t}{A_t}{\wvec{t}}}
+\end{gather}
+with linear function approximation:
+\begin{gather}
+\acval{s}{a}{\wvec{}} = \wvec{}^{\top} \operatorname{\mathbf{x}}(s, a), \\
+\nabla_{\wvec{}}{\acval{s}{a}{\wvec{}}} = \operatorname{\mathbf{x}}(s, a)
+\end{gather}
+\end{subequations}
+\end{frame}
 
 \begin{frame}{The case for finer granularity}
 	\begin{columns}
@@ -293,7 +312,7 @@
 	\end{column}
 	\begin{column}{0.5\linewidth}
 		\begin{figure}
-			\includegraphics[width=\linewidth]{../plots/online-varyN-binary.pdf}
+			\includegraphics[width=\linewidth]{../plots/online-varyN-binary-pres.pdf}
 			\caption{Service quality decreases as actions become less granular (affecting $n$ hosts at once).}
 		\end{figure}
 	\end{column}
@@ -302,15 +321,15 @@
 
 \begin{frame}{The case for finer granularity}
 \centering
-\includegraphics[width=0.8\linewidth]{../plots/online-varyN-binary.pdf}
+\includegraphics[width=0.8\linewidth]{../plots/online-varyN-binary-pres.pdf}
 \end{frame}
 
 \begin{frame}{On collateral damage}
 \begin{columns}
 	\begin{column}{0.5\linewidth}
 		\begin{figure}
-			\includegraphics[width=\linewidth]{../plots/online-varyN-nginx.pdf}
-			\caption{Explicit UDP traffic matches replayed traces (tcpreplay vs hping3). TCP traffic (nginx) is severely punished.}
+			\includegraphics[width=\linewidth]{../plots/online-varyN-nginx-pres.pdf}
+			\caption{Explicit UDP traffic matches replayed traces (hping3 vs tcpreplay). TCP traffic (nginx) is severely punished.}
 		\end{figure}
 	\end{column}
 	\begin{column}{0.45\linewidth}
@@ -326,7 +345,7 @@
 
 \begin{frame}{On collateral damage}
 \centering
-\includegraphics[width=0.8\linewidth]{../plots/online-varyN-nginx.pdf}
+\includegraphics[width=0.8\linewidth]{../plots/online-varyN-nginx-pres.pdf}
 \end{frame}
 
 \begin{frame}{And the replication reveals...}	
@@ -345,7 +364,7 @@
 
 \begin{frame}{How can we use these observations? (The Immediate Future)}
 \begin{itemize}
-	\item \textbf{\alert{Why not take actions on a per-flow basis}}?
+	\item \textbf{\alert{Why not take actions on a per-flow basis?}}
 	\begin{itemize}
 		\item Solves the granularity issues by construction.
 		\item Allows different treatment by flow features (i.e., protocol).
@@ -386,6 +405,12 @@ And then finding a suitable discretisation...
 \item Deriving normal model behaviour from traces.
 \begin{itemize}
 	\item We only need to simulate specific behaviour to test these enhancements, but that can become more representative.
+\end{itemize}
+
+\item Investigate other RL algorithms.
+\begin{itemize}
+	\item ``Deep learning'' probably not feasible.
+	\item \alert{$\operatorname{TD}(\lambda)$, actor-critic methods}.
 \end{itemize}
 \end{itemize}
 \end{frame}
