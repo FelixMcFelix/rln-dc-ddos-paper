@@ -3,6 +3,7 @@
 \usepackage[T1]{fontenc}
 \usepackage{amsfonts}
 \usepackage{amsmath}
+\usepackage{amsthm}
 \usepackage{bm}
 
 \usepackage[dvipsnames]{xcolor}
@@ -99,6 +100,10 @@ tracking=true,
 % make math easy
 \newcommand{\acval}[3]{\ensuremath{\operatorname{\hat{q}}(#1, #2, #3)}}
 \newcommand{\wvec}[1]{\ensuremath{\bm{w}_{#1}}}
+
+%thm environments
+\newtheorem{thm}{Theorem}
+\newtheorem{corr}{Corollary}[thm]
 
 \makeatletter
 \DeclareRobustCommand{\rvdots}{%
@@ -265,6 +270,12 @@ Moreover, we need not store action values for tiles which have not yet been visi
 %	\item Forthcoming: rethinking state/action spaces to operate at a finer level of granularity. New network model (live tcp back-and-forth), allows us to test collateral damage assumptions in a more realistic manner (and show clear case for moving beyond work of malialis and kudenko)
 %\end{enumerate}
 
+\section{Threat Model}
+
+?? The fine folks at most security conferences will want to see one. I suppose it serves its purpose by delineating what an attacker can/cannot do.
+
+?? TODO: threat model.
+
 \section{Environment and RL Algorithm}\label{sec:environment-and-rl-algorithm}
 
 ?? Probably rethink the title of this section.
@@ -423,6 +434,26 @@ Host allocations were generated pseudorandomly to ensure fairness between choice
 
 \Cref{fig:marl-granularity} shows that as more hosts are allocated to each learner, the fraction of traffic believed to be good (as observed at the server) decreases.
 This manifests in two ways: the best-achievable performance decreases, as does the learning rate.
+The first consequence arises analytically.
+Given the probability that a host is legitimate, $P_G \in [0,1]$, it follows that a host will be malicious with probability $P_B = 1 - P_G$.
+Defining \emph{imperfect service} to mean any case where all $n$ hosts connecting over a switch do not share the same classification (i.e., a mixture), then the probability that a switch is delivering imperfect service is $P_{M,n} = 1 - (P_G^2 - P_B^2)$.
+\begin{thm}
+	As $n$ increases, it is more likely that a switch will exhibit imperfect service, i.e., $\forall n \in \mathbb{Z}^{+}, P_{M,n} \le P_{M,n+1}$.
+\end{thm}
+\begin{proof}
+	\emph{Base case:} $P_{M,1}=0, P_{M,2} = 1 - P_G^2 - P_B^2 > 0$.
+	
+	\emph{Inductive step:} Assume that the theorem holds for $n$. Observe that $P_G^n \ge P_G^{n+1}$ (resp.\ $P_B$). It then follows that:
+	\begin{align*}
+	P_G^n + P_B^n &\ge P_G^{n+1} + P_B^{n+1}\\
+	1 - (P_G^n + P_B^n) &\le 1 - (P_G^{n+1} + P_B^{n+1})\\
+	P_{M,n} &\le P_{M,n+1}
+	\end{align*}
+\end{proof}
+\begin{corr}
+	Restricting $P_G \in (0,1)$ so that both $P_G$ and $P_B$ are non-zero ensures strict inequality: $P_{M,n} < P_{M,n+1}$.
+\end{corr}
+
 Given the UDP-like behaviour of Tcpreplay, being able to replicate the online performance of \citeauthor{DBLP:journals/eaai/MalialisK15} in the $n=2$ case suggests that the numeric simulation their work is entirely based upon does not capture the key interactions between TCP flows and packet drop as a control action.
 From the findings of \cref{sec:tcp-multiplexing-and-fallback-behaviour} and the Mathis equation, their results should be considerably worse in practice.
 %?? Expand according to the summary you posted in the notes document.
