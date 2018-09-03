@@ -25,5 +25,5 @@ set yrange [0.0:1.0]
 
 plot '../results/online-2-avg.csv' u 1:3 w lines smooth sbezier title "$n=2$", \
      '../results/online-4-avg.csv' u 1:3 w lines smooth sbezier title "$n=4$", \
-     '../results/online-8-avg.csv' u 1:3 w lines smooth sbezier title "$n=7$", \
-     '../results/online-16-avg.csv' u 1:3 w lines smooth sbezier title "$n=11$"
+     '../results/online-8-avg.csv' u 1:3 w lines smooth sbezier title "$n=8$", \
+     '../results/online-16-avg.csv' u 1:3 w lines smooth sbezier title "$n=16$"
