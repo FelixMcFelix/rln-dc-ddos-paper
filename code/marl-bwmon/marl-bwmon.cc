@@ -8,6 +8,7 @@
 #include <shared_mutex>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <arpa/inet.h>
@@ -17,11 +18,32 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
+struct FlowStats
+{
+	//uint32_t ip_addr;
+	uint64_t flow_size_in = 0;
+	uint64_t flow_size_out = 0;
+
+	uint64_t flow_size_in_last = 0;
+	uint64_t flow_size_out_last = 0;
+
+	uint64_t flow_size_in_last_window = 0;
+	uint64_t flow_size_out_last_window = 0;
+
+	std::chrono::high_resolution_clock::duration flow_length;
+	std::chrono::high_resolution_clock::time_point last_entry;
+
+	FlowStats() {};
+};
+
 class InterfaceStats
 {
 	int num_interfaces_;
 	std::vector<uint64_t> bad_byte_counts_;
 	std::vector<uint64_t> good_byte_counts_;
+
+	std::vector<bool> importants_;
+	std::vector<std::unordered_map<uint32_t, FlowStats>> flow_stats_;
 
 	bool limiting_ = false;
 	std::chrono::high_resolution_clock::time_point limit_;
@@ -38,17 +60,34 @@ public:
 		: num_interfaces_(n)
 		, bad_byte_counts_(std::vector<uint64_t>(2*n, 0))
 		, good_byte_counts_(std::vector<uint64_t>(2*n, 0))
+		, importants_(std::vector<bool>(n, false))
+		, flow_stats_(std::vector<std::unordered_map<uint32_t, FlowStats> >(n, std::unordered_map<uint32_t, FlowStats>()))
 	{ }
 
-	void incrementStat(int interface, bool good, uint32_t packetSize, bool inbound) {
+	void markImportant(int n) {
+		importants_[n] = true;
+	}
+
+	bool isImportant(int n) {
+		return importants_.at(n);
+	}
+
+	void incrementStat(uint32_t ip, int interface, bool good, uint32_t packetSize, bool inbound) {
 		std::shared_lock<std::shared_mutex> lock(mutex_);
 
 		auto index = 2 * interface + (inbound ? 0 : 1);
+		auto important = isImportant(interface);
 
 		if (good) 
 			good_byte_counts_[index] += packetSize;
 		else
 			bad_byte_counts_[index] += packetSize;
+
+		if (important) {
+			// first things first: check if the target IP has registered flowstats.
+			auto stat_holder = flow_stats_.at(interface);
+			stat_holder.insert_or_assign(ip, FlowStats());
+		}
 	}
 
 	std::chrono::high_resolution_clock::time_point clearAndPrintStats(std::chrono::high_resolution_clock::time_point startTime) {
@@ -163,6 +202,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 	// Okay, we can read up to h->caplen bytes from data.
 	bool good = false;
 	bool outbound = true;
+	uint32_t ip = 0;
 
 	switch (params->linkType) {
 		case DLT_NULL:
@@ -177,7 +217,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 
 			// If src is local, then assess based on dst.
 			outbound = params->is_ip_local(src_ip);
-			auto ip = outbound
+			ip = outbound
 				? dst_ip
 				: src_ip;
 
@@ -195,7 +235,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 				<< params->index << ": saw " << params->linkType << std::endl;
 	}
 
-	params->stats.incrementStat(params->index, good, h->len, !outbound);
+	params->stats.incrementStat(ip, params->index, good, h->len, !outbound);
 }
 
 static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &stats) {
@@ -302,8 +342,19 @@ int main(int argc, char const *argv[])
 
 	for (int i = 0; i < num_interfaces; ++i)
 	{
-		/* iterate over iface names, spawn threads! */
-		auto p = pcap_create(argv[i+1], errbuf);
+		// iterate over iface names, spawn threads!
+		// We want to catch any which start with a '!', these are]
+		// important 
+		auto name = argv[i+1];
+		auto individual_stats = name[0]=='!';
+		if (individual_stats) {
+			name = &(name[1]);
+			stats.markImportant(i);
+		}
+
+		// TODO: pass knowledge of individual stat gathering to the monitoring child threads.
+
+		auto p = pcap_create(name, errbuf);
 
 		if (p == nullptr) {
 			err = true;
