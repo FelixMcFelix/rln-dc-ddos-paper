@@ -12,7 +12,7 @@ results = marlExperiment(
 	host_range = [2, 2],
 
 	# test to handle bi-directional
-	evil_range = [7, 15],
+	evil_range = [4, 7],
 
 	explore_episodes = 0.3,
 	episodes = 10,#50,#500, Since mininet keeps running out of files even e/ cleanup
@@ -34,6 +34,7 @@ results = marlExperiment(
 
 	override_action = 0.0,
 	manual_early_limit = 26.0,
+	reward_direction = "out",
 )
 
 writeResults("../../results/baseline-2-ng.csv", results)

@@ -162,7 +162,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 	// Establish the facts: HERE.
 	// Okay, we can read up to h->caplen bytes from data.
 	bool good = false;
-	bool inbound = true;
+	bool outbound = true;
 
 	switch (params->linkType) {
 		case DLT_NULL:
@@ -176,8 +176,8 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 			auto dst_ip = *reinterpret_cast<const uint32_t *>(data + 30);
 
 			// If src is local, then assess based on dst.
-			inbound = params->is_ip_local(src_ip);
-			auto ip = inbound
+			outbound = params->is_ip_local(src_ip);
+			auto ip = outbound
 				? dst_ip
 				: src_ip;
 
@@ -195,7 +195,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 				<< params->index << ": saw " << params->linkType << std::endl;
 	}
 
-	params->stats.incrementStat(params->index, good, h->len, inbound);
+	params->stats.incrementStat(params->index, good, h->len, !outbound);
 }
 
 static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &stats) {

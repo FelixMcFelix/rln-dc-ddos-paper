@@ -95,6 +95,7 @@ def marlExperiment(
 		action_comps = [],
 
 		reward_direction = "in",
+		state_direction = "in",
 	):
 
 	linkopts["bw"] = manual_early_limit
@@ -961,14 +962,25 @@ def marlExperiment(
 			unfused_total_mbps = [good+bad for (good, bad) in unfused_load_mbps]
 			total_mbps = [good + bad for (good, bad) in load_mbps]
 
-			# FIXME: need to make this more general to apply to teams etc...
-			reward_src = load_mbps[0]
-			if reward_direction == "in":
-				reward_src = unfused_load_mbps[0]
-			elif reward_direction == "out":
-				reward_src = unfused_load_mbps[1]
+			def get_data(n):
+				reward_src = load_mbps[n]
+				if reward_direction == "in":
+					reward_src = unfused_load_mbps[2*n]
+				elif reward_direction == "out":
+					reward_src = unfused_load_mbps[2*n + 1]
+				return reward_src
 
-			last_traffic_ratio = min(load_mbps[0][0]/bw_all[0], 1.0)
+			def get_total(n):
+				reward_src = total_mbps[n]
+				if reward_direction == "in":
+					reward_src = unfused_total_mbps[2*n]
+				elif reward_direction == "out":
+					reward_src = unfused_total_mbps[2*n + 1]
+				return reward_src
+
+			l_cap = (2.0 if state_direction == "fuse" else 1.0) * capacity
+
+			last_traffic_ratio = min(get_data(0)[0]/bw_all[0], 1.0)
 			if not (i % 10): print "\titer {}/{}, good:{}, load:{}".format(i, episode_length, last_traffic_ratio, total_mbps[0])
 
 			for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
@@ -977,13 +989,13 @@ def marlExperiment(
 				leader_index = switch_list_indices[leader.name]
 
 				# Compute reward!
-				reward = safe_reward_func(reward_func, total_mbps[0], load_mbps[0][0], bw_all[0],
-					total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
-					n_teams, capacity, ratio)
+				reward = safe_reward_func(reward_func, get_total(0), get_data(0)[0], bw_all[0],
+					get_total(leader_index), get_data(leader_index)[0], bw_teams[team_no][0],
+					n_teams, l_cap, ratio)
 
-				g_reward = safe_reward_func(std_marl, total_mbps[0], load_mbps[0][0], bw_all[0],
-					total_mbps[leader_index], load_mbps[leader_index][0], bw_teams[team_no][0],
-					n_teams, capacity, ratio)
+				g_reward = safe_reward_func(std_marl, get_total(0), get_data(0)[0], bw_all[0],
+					get_total(leader_index), get_data(leader_index)[0], bw_teams[team_no][0],
+					n_teams, l_cap, ratio)
 
 				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
 					# Encode state (as seen by this learner)

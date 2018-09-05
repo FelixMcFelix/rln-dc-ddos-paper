@@ -28,6 +28,7 @@ results = marlExperiment(
 
 	rf = "ctl",
 	use_controller = True,
+	reward_direction = "out",
 )
 
 writeResults("../../results/online-2-ng.csv", results)
