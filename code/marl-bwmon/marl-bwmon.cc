@@ -18,22 +18,149 @@
 #include <sys/select.h>
 #include <sys/time.h>
 
+namespace ch = std::chrono;
+
+ch::high_resolution_clock::time_point stdifyTimeval(const struct timeval tv) {
+	return ch::high_resolution_clock::time_point(
+		ch::seconds(tv.tv_sec)
+		+ ch::microseconds(tv.tv_usec)
+	);
+}
+
+// Store and update some stats about float64s.
+struct Stat {
+	double total = 0.0;
+	double std = 0.0;
+	double mean = 0.0;
+	uint64_t k = 0;
+
+	Stat() {}
+
+	void clear() {
+		total = 0.0;
+		std = 0.0;
+		mean = 0.0;
+		k = 0;
+	}
+
+	// formulae courtesy of https://www.johndcook.com/blog/standard_deviation/
+	void update(double value) {
+		auto i = k++;
+		total += value;
+
+		if (i == 0) {
+			mean = value;
+			return;
+		}
+
+		auto new_m = mean + (value - mean) / i;
+		auto new_s = std + (value - mean) * (value - new_m);
+
+		mean = new_m;
+		std = new_s;
+	}
+
+	double variance() const {
+		return k >= 2
+			? std / (k - 1)
+			: 0.0;
+	}
+};
+
 struct FlowStats
 {
-	//uint32_t ip_addr;
+	// flow size
 	uint64_t flow_size_in = 0;
 	uint64_t flow_size_out = 0;
 
-	uint64_t flow_size_in_last = 0;
-	uint64_t flow_size_out_last = 0;
+	// needed for delta rate
+	uint64_t flow_size_in_prev = 0;
+	uint64_t flow_size_out_prev = 0;
 
-	uint64_t flow_size_in_last_window = 0;
-	uint64_t flow_size_out_last_window = 0;
+	// packet stats in this window
+	Stat in_packets = Stat();
+	Stat out_packets = Stat();
+	Stat in_packets_window = Stat();
+	Stat out_packets_window = Stat();
 
-	std::chrono::high_resolution_clock::duration flow_length;
-	std::chrono::high_resolution_clock::time_point last_entry;
+	// interarrival times
+	Stat interarrivals = Stat();
+	Stat interarrivals_window = Stat();
+
+	// flow length
+	ch::high_resolution_clock::time_point flow_start;
+	ch::high_resolution_clock::time_point last_entry;
 
 	FlowStats() {};
+
+	void update(ch::high_resolution_clock::time_point arr_time, uint64_t size, bool inbound) {
+		auto dbl_size = (double)size;
+		ch::duration<double, std::milli> iat = arr_time - last_entry;
+
+		if (inbound) {
+			flow_size_in += size;
+			in_packets.update(dbl_size);
+			in_packets_window.update(dbl_size);
+
+			// for now, only track IATs on inbound packets.
+			interarrivals.update(iat.count());
+			interarrivals_window.update(iat.count());
+		} else {
+			flow_size_out += size;
+			out_packets.update(dbl_size);
+			out_packets_window.update(dbl_size);
+		}
+
+		last_entry = arr_time;
+	}
+
+	bool clearAndPrintStats(char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
+		auto prune_age = ch::seconds(10);
+
+		// prune here if last packet rx'd was of a certain age,
+		// AND there was no info gleaned in this window.
+		// Don't print stats in that case.
+
+		auto duration = endTime - flow_start;
+		auto silent_duration = endTime - last_entry;
+
+		if (silent_duration > prune_age && last_entry < startTime) {
+			return false;
+		}
+
+		std::cout
+			<< "(" << ip_str << ","
+			<< ch::nanoseconds(duration).count() << ","
+			<< flow_size_in << ","
+			<< flow_size_out << ","
+			<< flow_size_in - flow_size_in_prev << ","
+			<< flow_size_out - flow_size_out_prev << ","
+			<< in_packets_window.mean << ","
+			<< in_packets_window.variance() << ","
+			<< in_packets_window.k << ","
+			<< out_packets_window.mean << ","
+			<< out_packets_window.variance() << ","
+			<< out_packets_window.k << ","
+			<< interarrivals_window.mean << ","
+			<< interarrivals_window.variance() << ","
+			<< ")";
+		clear();
+
+		flow_size_in_prev = flow_size_in;
+		flow_size_out_prev = flow_size_out;
+
+		return true;
+	}
+
+	void clear() {
+		in_packets_window.clear();
+		out_packets_window.clear();
+		interarrivals_window.clear();
+	}
+
+	void clear_full() {
+		clear();
+	}
 };
 
 class InterfaceStats
@@ -46,7 +173,7 @@ class InterfaceStats
 	std::vector<std::unordered_map<uint32_t, FlowStats>> flow_stats_;
 
 	bool limiting_ = false;
-	std::chrono::high_resolution_clock::time_point limit_;
+	ch::high_resolution_clock::time_point limit_;
 	std::atomic<int> to_go_ = std::atomic<int>(0);
 
 	bool end_ = false;
@@ -72,28 +199,37 @@ public:
 		return importants_.at(n);
 	}
 
-	void incrementStat(uint32_t ip, int interface, bool good, uint32_t packetSize, bool inbound) {
+	void incrementStat(uint32_t ip, int interface, bool good, uint32_t packetSize, bool inbound, ch::high_resolution_clock::time_point arr_time) {
 		std::shared_lock<std::shared_mutex> lock(mutex_);
 
 		auto index = 2 * interface + (inbound ? 0 : 1);
 		auto important = isImportant(interface);
 
-		if (good) 
+		if (good) {
 			good_byte_counts_[index] += packetSize;
-		else
+		} else {
 			bad_byte_counts_[index] += packetSize;
+		}
 
 		if (important) {
 			// first things first: check if the target IP has registered flowstats.
-			auto stat_holder = flow_stats_.at(interface);
-			stat_holder.insert_or_assign(ip, FlowStats());
+			auto &stat_holder = flow_stats_.at(interface);
+			auto it = stat_holder.find(ip);
+
+			if (it != stat_holder.end()) {
+				it->second.update(arr_time, packetSize, inbound);
+			} else {
+				FlowStats new_stat;
+				new_stat.update(arr_time, packetSize, inbound);
+				stat_holder[ip] = new_stat;
+			}
 		}
 	}
 
-	std::chrono::high_resolution_clock::time_point clearAndPrintStats(std::chrono::high_resolution_clock::time_point startTime) {
+	ch::high_resolution_clock::time_point clearAndPrintStats(ch::high_resolution_clock::time_point startTime) {
 		std::unique_lock<std::shared_mutex> lock(mutex_);
 
-		auto endTime = std::chrono::high_resolution_clock::now();
+		auto endTime = ch::high_resolution_clock::now();
 		auto duration = endTime - startTime;
 
 		// First, tell the threads they have a limit TO WORK UP TO.
@@ -106,13 +242,45 @@ public:
 		while ((t_g = to_go_.load()) > 0) hit_limit_.wait(lock);
 
 		// Then, we need to wait for them to finish before we do all this...
-		std::cout << std::chrono::nanoseconds(duration).count() << "ns";
+		std::cout << ch::nanoseconds(duration).count() << "ns";
 		
 		for (unsigned int i = 0; i < bad_byte_counts_.size(); ++i)
 		{
 			std::cout << ", ";
 
 			std::cout << good_byte_counts_[i] << " " << bad_byte_counts_[i];
+		}
+
+		std::cout << std::endl;
+
+		// print (on a seperate line) the stats that concern the flows at each learner.
+		for (unsigned int i = 0; i < flow_stats_.size(); ++i)
+		{
+			if (!isImportant(i)) {
+				continue;
+			}
+
+			std::cout << "[";
+			auto &ip_map = flow_stats_.at(i);
+			auto to_prune = std::vector<uint32_t>();
+
+			for (auto &el: ip_map) {
+				// el = (ip_as_u32, FlowStat)
+				char ip_str[INET_ADDRSTRLEN];
+				auto c_ip = reinterpret_cast<const in_addr *>(&el.first);
+				inet_ntop(AF_INET, c_ip, ip_str, INET_ADDRSTRLEN);
+
+				auto active = el.second.clearAndPrintStats(ip_str, startTime, endTime);
+				if (!active) {
+					to_prune.emplace_back(el.first);
+				}
+			}
+
+			for (auto &ip: to_prune) {
+				ip_map.erase(ip);
+			}
+
+			std::cout << "]";
 		}
 
 		std::cout << std::endl;
@@ -142,16 +310,12 @@ public:
 	}
 
 	void checkCanRecord(const struct timeval tv, const int id) {
-		auto tv_convert =
-			std::chrono::high_resolution_clock::time_point(
-				std::chrono::seconds(tv.tv_sec)
-				+ std::chrono::microseconds(tv.tv_usec)
-			);
+		auto tv_convert = stdifyTimeval(tv);
 
 		checkCanRecord(tv_convert, id);
 	}
 
-	void checkCanRecord(const std::chrono::high_resolution_clock::time_point tv_convert, const int id) {
+	void checkCanRecord(const ch::high_resolution_clock::time_point tv_convert, const int id) {
 		std::shared_lock<std::shared_mutex> lock(mutex_);
 
 		// Need to (if we hit the limit), signal that we *have*,
@@ -194,8 +358,9 @@ struct PcapLoopParams {
 
 static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_char *data) {
 	PcapLoopParams *params = reinterpret_cast<PcapLoopParams *>(user);
+	auto arr_time = stdifyTimeval(h->ts);
 
-	params->stats.checkCanRecord(h->ts, params->index);
+	params->stats.checkCanRecord(arr_time, params->index);
 
 	// Look at the packet, decide good/bad, then increment!
 	// Establish the facts: HERE.
@@ -235,7 +400,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 				<< params->index << ": saw " << params->linkType << std::endl;
 	}
 
-	params->stats.incrementStat(ip, params->index, good, h->len, !outbound);
+	params->stats.incrementStat(ip, params->index, good, h->len, !outbound, arr_time);
 }
 
 static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &stats) {
@@ -288,7 +453,7 @@ static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &sta
 					iface, -1, perPacketHandle, reinterpret_cast<u_char *>(&params)
 				);
 			if (n_evts == 0 || !count_processed)
-				stats.checkCanRecord(std::chrono::high_resolution_clock::now(), index);
+				stats.checkCanRecord(ch::high_resolution_clock::now(), index);
 
 			if (stats.finished()) {
 				break;
@@ -336,7 +501,7 @@ int main(int argc, char const *argv[])
 		return 0;
 	}
 
-	auto startTime = std::chrono::high_resolution_clock::now();
+	auto startTime = ch::high_resolution_clock::now();
 
 	bool err = false;
 
