@@ -34,6 +34,8 @@ struct Stat {
 	double mean = 0.0;
 	uint64_t k = 0;
 
+	bool report_update = false;
+
 	Stat() {}
 
 	void clear() {
@@ -52,12 +54,18 @@ struct Stat {
 			mean = value;
 			return;
 		}
+		auto delta = value - mean;
+		mean = mean + delta / i;
 
-		auto new_m = mean + (value - mean) / i;
-		auto new_s = std + (value - mean) * (value - new_m);
+		auto delta2 = value - mean;
+		std = std + delta * delta2;
 
-		mean = new_m;
-		std = new_s;
+		if (report_update) {
+			std::cout << "sample: " << value
+				<< " gave deltas " << delta
+				<< " and " << delta2
+				<< std::endl;
+		}
 	}
 
 	double variance() const {
@@ -91,7 +99,9 @@ struct FlowStats
 	ch::high_resolution_clock::time_point flow_start;
 	ch::high_resolution_clock::time_point last_entry;
 
-	FlowStats() {};
+	FlowStats() {
+		//interarrivals.report_update = true;
+	};
 
 	void update(ch::high_resolution_clock::time_point arr_time, uint64_t size, bool inbound) {
 		auto dbl_size = (double)size;
@@ -142,7 +152,7 @@ struct FlowStats
 			<< out_packets_window.variance() << ","
 			<< out_packets_window.k << ","
 			<< interarrivals_window.mean << ","
-			<< interarrivals_window.variance() << ","
+			<< interarrivals_window.variance()
 			<< ")";
 		clear();
 

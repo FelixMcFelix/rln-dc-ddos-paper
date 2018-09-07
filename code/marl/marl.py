@@ -96,6 +96,7 @@ def marlExperiment(
 
 		reward_direction = "in",
 		state_direction = "in",
+		actions_target_flows = False,
 	):
 
 	linkopts["bw"] = manual_early_limit
@@ -660,11 +661,23 @@ def marlExperiment(
 		# EVERY TIME, because scorched-earth is the only language mininet speaks
 		(server, server_switch, core_link, teams, team_sarsas, graph, port_dict) = buildNet(n_teams, team_sarsas=store_sarsas)
 
+		learner_pos = {}
+		learner_name = []
 		tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
 			[leader] + intermediates + learners for (leader, intermediates, learners, _, _, _) in teams
 		]))
 
-		tracked_interfaces = ["{}-eth1".format(el.name) for el in tracked_switches]
+		for (_, _, learners, _, _, _) in teams:
+			for learner in learners:
+				learner_pos[learner.name] = len(learner_name)
+				learner_name.append(learner.name)
+
+		tracked_interfaces = [
+			"{}{}-eth1".format(
+				"!" if actions_target_flows and el.name in learner_pos else "",
+				el.name,
+			) for el in tracked_switches
+		]
 
 		switch_list_indices = {}
 		for i, sw in enumerate(tracked_switches):
@@ -899,10 +912,11 @@ def marlExperiment(
 		# Now establish the true maximum throughput
 		ratio = 1.0
 		if with_ratio:
-			# FIXME: broken with new stats.
 			mon_cmd.stdin.write("\n")
 			mon_cmd.stdin.flush()
 			data = mon_cmd.stdout.readline().strip().split(",")
+
+			_flow_stat_str = mon_cmd.stdout.readline()
 
 			time_ns = int(data[0][:-2])
 			load_mbps = [map(
@@ -928,6 +942,8 @@ def marlExperiment(
 			#net.interact()
 			pass
 
+		learner_stats = [{} for _ in learner_pos]
+
 		for i in xrange(episode_length):
 			# May need to early exit
 			if interrupted[0]:
@@ -950,9 +966,25 @@ def marlExperiment(
 			mon_cmd.stdin.flush()
 			data = mon_cmd.stdout.readline().strip().split(",")
 
+			flow_stat_str = mon_cmd.stdout.readline().strip()
+			flow_stat_break = flow_stat_str.split("]")
+			split_stats = [s.strip().split("[")[-1] for s in flow_stat_break]
+			# now split into flow-keys. (ip, ...)(ip, ...)
+			almost_subs = [s.split(")") for s in split_stats]
+			subs = [a.split("(")[-1].split(",") for a in s.split(")") for s in split_stats]
+
+			# (ip, props)
+			# props: (len_ns, sz_in, sz_out, wnd_sz_in, wnd_sz_out, pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, wnd_iat_mean, wnd_iat_var)
+			print flow_stat_break
+			print almost_subs 
+			print subs
+			parsed_flows = [] if len(flow_stat_str) == 0 else [[(props[0], tuple([float(b) for b in props[1:]])) for props in s_arr] for s_arr in subs]
 			time_ns = int(data[0][:-2])
+			def mbpsify(bts):
+				return 8000*float(bts)/time_ns
+
 			unfused_load_mbps = [map(
-					lambda bytes: (8000*float(bytes))/time_ns,
+					mbpsify,
 					el.strip().split(" ")
 				) for el in data[1:]
 			]
@@ -998,6 +1030,43 @@ def marlExperiment(
 					n_teams, l_cap, ratio)
 
 				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
+					# if on hard mode, do some other stuff instead.
+					if actions_target_flows:
+						# props: (
+						#  len_ns, sz_in, sz_out, [0-2]
+						#  wnd_sz_in, wnd_sz_out, [3-4]
+						#  pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, [5-7]
+						#  pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, [8-10]
+						#  wnd_iat_mean, wnd_iat_var [11-12]
+						# )
+						# som
+						flow_space = learner_stats[learner_no]
+						flows_seen = parsed_flows[learner_no]
+						for ip, props in flows_seen:
+							if ip not in flow_space:
+								flow_space[ip] = {
+									"ip": socket.inet_pton(socket.AF_INET, ip),
+									"last_act": 0,
+									"last_rate_in": -1.0,
+									"last_rate_out": -1.0}
+							l = flow_space[ip]
+
+							l["cx_ratio"] = min(*props[1:2]) / max(*props[1:2])
+							l["length"] = props[0]
+							l["mean_iat"] = props[11]
+							observed_rate_in = mbpsify(props[3])
+							observed_rate_out = mbpsify(props[4])
+
+							if l["last_rate_in"] < 0.0:
+								l["last_rate_in"] = observed_rate_in
+								l["last_rate_out"] = observed_rate_out
+							l["delta_in"] = observed_rate_in - l["last_rate_in"]
+							l["delta_out"] = observed_rate_out - l["last_rate_out"]
+
+							flow_space[ip] = l
+							print l
+						# Eh
+
 					# Encode state (as seen by this learner)
 
 					# Start time of action computation
