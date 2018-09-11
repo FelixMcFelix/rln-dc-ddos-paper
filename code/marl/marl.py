@@ -179,7 +179,33 @@ def marlExperiment(
 		"epsilon_falloff": explore_episodes * episode_length
 	}
 
+	if actions_target_flows:
+		# order of the features:
+		#  ip, last_act, len, size, cx_ratio,
+		#  mean_iat, delta_in, delta_out
+		sarsaParams["extended_mins"] = [
+			0.0, 0.0, 0.0, 0.0, 0.0,
+			0.0, -50.0, -50.0
+		]
+		sarsaParams["extended_maxes"] = [
+			4294967296.0, 0.9, 2000.0, float(10 * (1024 ** 2)), 1.0,
+			10000.0, 50.0, 50.0
+		]
+
 	# helpers
+
+	def flow_to_state_vec(flow_set):
+		return [
+			float(struct.unpack("I", flow_set["ip"])),
+			float(flow_set["last_act"]) / 10.0,
+			# conert from ns to ms
+			flow_set["length"] / 1000000,
+			flow_set["size"],
+			flow_set["cx_ratio"],
+			flow_set["mean_iat"],
+			flow_set["delta_in"],
+			flow_set["delta_out"],
+		]
 
 	initd_host_count = [1]
 	initd_switch_count = [1]
@@ -294,10 +320,15 @@ def marlExperiment(
 		(rhs,) = struct.unpack("I", socket.inet_aton(subnet))
 		return struct.pack("I", lhs & rhs)
 
-	def internal_choose_group(group, ip="10.0.0.1", subnet="255.255.255.0"):
+	def internal_choose_group(group, ip="10.0.0.1", subnet="255.255.255.0", target_ip=None):
+		importance = 1 if target_ip is None else 0
+		priority = 1 if target_ip is None else 2
+
+		source_matcher = [] if target_ip is None else [ofpm.build(None, ofp.OFPXMT_OFB_IPV4_SRC, True, 0, netip(target_ip, "255.255.255.255"), socket.inet_aton("255.255.255.255"))]
+
 		return ofpb.ofp_flow_mod(
 			None, 0, 0, 0, ofp.OFPFC_ADD,
-			0, 0, 1, None, None, None, 0, 1,
+			0, 0, priority, None, None, None, 0, importance,
 			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
 				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
 				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
@@ -426,7 +457,7 @@ def marlExperiment(
 			else:
 				route_commands[0].append((switch, cmd_list, msg))
 
-	def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0):
+	def updateUpstreamRoute(switch, out_port=1, ac_prob=0.0, target_ip=None):
 		if switch.controlled:
 			return
 
@@ -458,7 +489,7 @@ def marlExperiment(
 				msg = copy_msg[:-20] + ofpb._pack("I", p_drop_num) + copy_msg[-16:]
 		else:
 			cmd_list = []
-			msg = internal_choose_group(int(ac_prob * 10))
+			msg = internal_choose_group(int(ac_prob * 10), target_ip=target_ip)
 
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
@@ -483,11 +514,18 @@ def marlExperiment(
 			sw.controlled = True
 		return sw
 
-	def enactActions(learners, sarsas):
-		for (node, sarsa) in zip(learners, sarsas):
-			(_, action, _) = sarsa.last_act
-			a = action if override_action is None else override_action
-			updateUpstreamRoute(node, ac_prob=a)
+	def enactActions(learners, sarsas, flow_action_sets):
+		if actions_target_flows:
+			for (node, sarsa, maps) in zip(learners, sarsas, flow_action_sets):
+				for ip, state in maps.iteritems():
+					(_, action, _) = state
+					a = action if override_action is None else override_action
+					updateUpstreamRoute(node, ac_prob=a, target_ip=ip)
+		else:
+			for (node, sarsa) in zip(learners, sarsas):
+				(_, action, _) = sarsa.last_act
+				a = action if override_action is None else override_action
+				updateUpstreamRoute(node, ac_prob=a)
 
 	def moralise(value, good, max_val=255, no_goods=[0, 255]):
 		target_mod = 0 if good else 1
@@ -873,17 +911,12 @@ def marlExperiment(
 						#rate_const = 3.0 if not good else 4.0
 						udp_h_size = 28.0
 						bw_MB = (bw / 8.0) * (10.0**6.0)
-						#bw_headers = udp_h_size * (10.0**(6.0 - rate_const))
-						#bw_pad = bw_MB - bw_headers
-						#expand = max(0, int(bw_pad / (10.0 ** (6.0 - rate_const))))
 						target = 1500.0
 						s = target - udp_h_size
 						#now, find delay in microseconds between packets of size 1500
 						interval_s = target/bw_MB
 						interval_us = int(interval_s * (10.0 ** 6.0))
 						print interval_s
-						#print "chose", expand, "to add onto the message length: target", bw, "seeing", (udp_h_size + expand) * (10**(-rate_const) * 8.0), "from", ip
-						#print "chose", interval_us, "to send pkts: target", bw, "seeing", (target * (interval_us / (10.0**12.0)) * 8.0), "from", ip
 	
 						cmd = [
 							"hping3",
@@ -896,8 +929,6 @@ def marlExperiment(
 							"-I", "h",
 							"10.0.0.1"
 						]
-
-						print cmd
 				else:
 					cmd = []
 
@@ -943,6 +974,7 @@ def marlExperiment(
 			pass
 
 		learner_stats = [{} for _ in learner_pos]
+		learner_traces = [{} for _ in learner_pos]
 
 		for i in xrange(episode_length):
 			# May need to early exit
@@ -950,7 +982,7 @@ def marlExperiment(
 				break
 			# Make the last actions a reality!
 			for (_, _, learners, _, _, sarsas) in teams:
-				enactActions(learners, sarsas)
+				enactActions(learners, sarsas, learner_traces)
 
 			presleep = time.time()
 
@@ -968,17 +1000,35 @@ def marlExperiment(
 
 			flow_stat_str = mon_cmd.stdout.readline().strip()
 			flow_stat_break = flow_stat_str.split("]")
-			split_stats = [s.strip().split("[")[-1] for s in flow_stat_break]
+			split_stats = [s.strip().split("[")[-1] for s in flow_stat_break if len(s) > 0]
 			# now split into flow-keys. (ip, ...)(ip, ...)
-			almost_subs = [s.split(")") for s in split_stats]
-			subs = [a.split("(")[-1].split(",") for a in s.split(")") for s in split_stats]
+			almost_subs = [s.split(")") for s in split_stats if len(s) > 0]
+			subs = []
+			for set_str in almost_subs:
+				if len(set_str) == 0:
+					continue
+				subs.append([a.split("(")[-1].split(",") for a in set_str])
 
 			# (ip, props)
 			# props: (len_ns, sz_in, sz_out, wnd_sz_in, wnd_sz_out, pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, wnd_iat_mean, wnd_iat_var)
-			print flow_stat_break
-			print almost_subs 
-			print subs
-			parsed_flows = [] if len(flow_stat_str) == 0 else [[(props[0], tuple([float(b) for b in props[1:]])) for props in s_arr] for s_arr in subs]
+			parsed_flows = []
+
+			for i, l in enumerate(subs):
+				if len(l) == 0:
+					continue
+
+				layer = []
+				for j, e in enumerate(l):
+					if len(e[0]) == 0:
+						continue
+
+					sublayer = []
+					for item in e[1:]:
+						sublayer.append(float(item))
+					layer.append((e[0], sublayer))
+					
+				parsed_flows.append(layer)
+
 			time_ns = int(data[0][:-2])
 			def mbpsify(bts):
 				return 8000*float(bts)/time_ns
@@ -1030,6 +1080,12 @@ def marlExperiment(
 					n_teams, l_cap, ratio)
 
 				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
+					important_indices = [switch_list_indices[name] for name in [
+						intermediates[learner_no/n_learners].name, node.name
+					]]
+
+					#state_vec = np.array([total_mbps[index] for index in [0, leader_index]+important_indices])
+					state_vec = [total_mbps[index] for index in [0, leader_index]+important_indices]
 					# if on hard mode, do some other stuff instead.
 					if actions_target_flows:
 						# props: (
@@ -1041,8 +1097,12 @@ def marlExperiment(
 						# )
 						# som
 						flow_space = learner_stats[learner_no]
+						flow_traces = learner_traces[learner_no]
 						flows_seen = parsed_flows[learner_no]
-						for ip, props in flows_seen:
+
+						# TODO: strip old entries?
+
+						for (ip, props) in flows_seen:
 							if ip not in flow_space:
 								flow_space[ip] = {
 									"ip": socket.inet_pton(socket.AF_INET, ip),
@@ -1051,8 +1111,9 @@ def marlExperiment(
 									"last_rate_out": -1.0}
 							l = flow_space[ip]
 
-							l["cx_ratio"] = min(*props[1:2]) / max(*props[1:2])
+							l["cx_ratio"] = min(*props[1:3]) / max(*props[1:3])
 							l["length"] = props[0]
+							l["size"] = props[1] + props[2]
 							l["mean_iat"] = props[11]
 							observed_rate_in = mbpsify(props[3])
 							observed_rate_out = mbpsify(props[4])
@@ -1063,29 +1124,41 @@ def marlExperiment(
 							l["delta_in"] = observed_rate_in - l["last_rate_in"]
 							l["delta_out"] = observed_rate_out - l["last_rate_out"]
 
+							state = sarsa.to_state(np.array(state_vec + flow_to_state_vec(l)))
+
+							# if there was an earlier decision made on this flow, then update the past state estimates associated.
+							# Compute and store the intended update for each flow.
+							if ip in flow_traces:
+								l_action = sarsa.update(state, reward, flow_traces[ip])
+							else:
+								l_action = sarsa.bootstrap(state)
+
+							flow_traces[ip] = sarsa.last_act
+
+							# TODO: maybe only update this whole thing if we're choosing to examine this flow.
+							l["last_act"] = l_action 
+							l["last_rate_in"] = observed_rate_in
+							l["last_rate_out"] = observed_rate_out
+
 							flow_space[ip] = l
-							print l
-						# Eh
+							#print l
 
-					# Encode state (as seen by this learner)
+						learner_traces[learner_no] = flow_traces
+					else:
+						# Encode state (as seen by this learner)
 
-					# Start time of action computation
-					s_t = time.time()
+						# Start time of action computation
+						s_t = time.time()
 
-					important_indices = [switch_list_indices[name] for name in [
-						intermediates[learner_no/n_learners].name, node.name
-					]]
+						state = sarsa.to_state(np.array(state_vec))
 
-					state_vec = np.array([total_mbps[index] for index in [0, leader_index]+important_indices])
-					state = sarsa.to_state(state_vec)
+						# Learn!
+						sarsa.update(state, reward)
 
-					# Learn!
-					sarsa.update(state, reward)
+						# End time.
+						e_t = time.time()
 
-					# End time.
-					e_t = time.time()
-
-					action_comps[-1].append((i, e_t - s_t))
+						action_comps[-1].append((i, e_t - s_t))
 
 			good_traffic_percents[-1].append(last_traffic_ratio)
 			rewards[-1].append(g_reward)

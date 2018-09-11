@@ -14,8 +14,12 @@ class SarsaLearner:
 				epsilon=0.3, learn_rate=0.05, discount=0,
 				tile_c=6, tilings_c=8, default_q=0.0,
 				epsilon_falloff=1000,
-				break_equal=False):
-		state_range = [[0 for i in xrange(vec_size)], [max_bw for i in xrange(vec_size)]]
+				break_equal=False,
+				extended_mins=[], extended_maxes=[]):
+		state_range = [
+			[0 for i in xrange(vec_size)] + extended_mins,
+			[max_bw for i in xrange(vec_size)]+ extended_maxes,
+		]
 		self.tc = r.TileCoding(
 			input_indices = [np.arange(vec_size)],
 			ntiles = [tile_c],
@@ -81,8 +85,8 @@ class SarsaLearner:
 		return action
 
 	# Ditto. run self.tc(...) on state observation
-	def update(self, state, reward):
-		(last_state, last_action, last_values) = self.last_act
+	def update(self, state, reward, subs_last_act=None):
+		(last_state, last_action, last_values) = (self.last_act if subs_last_act is None else subs_last_act)
 
 		# First, what is the value of the action would we choose in the new state w/ old model
 		(new_action, new_values) = self._select_action(state)
