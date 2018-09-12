@@ -32,6 +32,7 @@ results = marlExperiment(
 
 	reward_direction = "out",
 	actions_target_flows = True,
+	manual_early_limit = 26.0,
 )
 
 writeResults("../../results/soln-2-ng.csv", results,

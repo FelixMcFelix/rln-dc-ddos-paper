@@ -196,7 +196,7 @@ def marlExperiment(
 
 	def flow_to_state_vec(flow_set):
 		return [
-			float(struct.unpack("I", flow_set["ip"])),
+			float(struct.unpack("I", flow_set["ip"])[0]),
 			float(flow_set["last_act"]) / 10.0,
 			# conert from ns to ms
 			flow_set["length"] / 1000000,
@@ -332,7 +332,7 @@ def marlExperiment(
 			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
 				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
 				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
-			]),
+			] + source_matcher),
 			ofpb.ofp_instruction_actions(ofp.OFPIT_APPLY_ACTIONS, None, [
 				ofpb.ofp_action_group(None, 8, group)
 			])
@@ -984,6 +984,11 @@ def marlExperiment(
 			for (_, _, learners, _, _, sarsas) in teams:
 				enactActions(learners, sarsas, learner_traces)
 
+			if i == 10:
+				#net.interact()
+				#quit()
+				pass
+
 			presleep = time.time()
 
 			# Wait, somehow
@@ -1013,19 +1018,20 @@ def marlExperiment(
 			# props: (len_ns, sz_in, sz_out, wnd_sz_in, wnd_sz_out, pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, wnd_iat_mean, wnd_iat_var)
 			parsed_flows = []
 
-			for i, l in enumerate(subs):
+			for l in subs:
 				if len(l) == 0:
 					continue
 
 				layer = []
-				for j, e in enumerate(l):
+				for e in l:
 					if len(e[0]) == 0:
 						continue
 
 					sublayer = []
 					for item in e[1:]:
 						sublayer.append(float(item))
-					layer.append((e[0], sublayer))
+					if e[0] != "0.0.0.0":
+						layer.append((e[0], sublayer))
 					
 				parsed_flows.append(layer)
 
@@ -1063,7 +1069,7 @@ def marlExperiment(
 			l_cap = (2.0 if state_direction == "fuse" else 1.0) * capacity
 
 			last_traffic_ratio = min(get_data(0)[0]/bw_all[0], 1.0)
-			if not (i % 10): print "\titer {}/{}, good:{}, load:{}".format(i, episode_length, last_traffic_ratio, total_mbps[0])
+			if not (i % 10): print "\titer {}/{}, good:{}, load:{:.2f} ({:.2f},{:.2f})".format(i, episode_length, last_traffic_ratio, total_mbps[0], *unfused_total_mbps[0:2])
 
 			for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
 				team_true_loads = bw_teams[team_no]
@@ -1103,6 +1109,8 @@ def marlExperiment(
 						# TODO: strip old entries?
 
 						for (ip, props) in flows_seen:
+							s_t = time.time()
+
 							if ip not in flow_space:
 								flow_space[ip] = {
 									"ip": socket.inet_pton(socket.AF_INET, ip),
@@ -1141,9 +1149,15 @@ def marlExperiment(
 							l["last_rate_out"] = observed_rate_out
 
 							flow_space[ip] = l
-							#print l
+							# print l
+							# End time.
+							e_t = time.time()
 
-						learner_traces[learner_no] = flow_traces
+							#print "computed action: it took {}s".format(e_t - s_t)
+
+							action_comps[-1].append((i, e_t - s_t))
+
+							learner_traces[learner_no] = flow_traces
 					else:
 						# Encode state (as seen by this learner)
 
