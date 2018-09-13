@@ -191,6 +191,7 @@ def marlExperiment(
 			4294967296.0, 0.9, 2000.0, float(10 * (1024 ** 2)), 1.0,
 			10000.0, 50.0, 50.0
 		]
+		sarsaParams["vec_size"] += len(sarsaParams["extended_maxes"])
 
 	# helpers
 
@@ -1132,7 +1133,11 @@ def marlExperiment(
 							l["delta_in"] = observed_rate_in - l["last_rate_in"]
 							l["delta_out"] = observed_rate_out - l["last_rate_out"]
 
-							state = sarsa.to_state(np.array(state_vec + flow_to_state_vec(l)))
+							temp = flow_to_state_vec(l)
+
+							#state = sarsa.to_state(np.array(state_vec + flow_to_state_vec(l)))
+							state = sarsa.to_state(np.array(state_vec + temp))
+							#print state, "and the lengths are: final ({}) initial ({}) new ({}) sum ({})".format(len(state), len(state_vec), len(temp), len(state_vec + temp))
 
 							# if there was an earlier decision made on this flow, then update the past state estimates associated.
 							# Compute and store the intended update for each flow.
@@ -1218,7 +1223,8 @@ def marlExperiment(
 		next_ip = [1]
 
 		for sar in store_sarsas:
-			pass#print sar[0].values
+			#print sar[0].values
+			pass
 
 	# Okay, done!
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
