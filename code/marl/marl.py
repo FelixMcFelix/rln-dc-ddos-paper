@@ -81,6 +81,7 @@ def marlExperiment(
 		with_ratio = False,
 		override_action = None,
 		manual_early_limit = None,
+		estimate_const_limit = False,
 
 		rf = "ctl",
 
@@ -99,7 +100,8 @@ def marlExperiment(
 		actions_target_flows = False,
 	):
 
-	linkopts["bw"] = manual_early_limit
+	linkopts_core = linkopts
+	linkopts_core["bw"] = manual_early_limit
 
 	# Use any predetermined random state.
 	if rand_state is not None:
@@ -127,6 +129,11 @@ def marlExperiment(
 
 	if calc_max_capacity is None:
 		calc_max_capacity = lambda hosts: good_range[1]*hosts + 2
+
+	if manual_early_limit is None and estimate_const_limit:
+		linkopts_core["bw"] = calc_max_capacity(
+			host_range[1] * n_teams * n_inters * n_learners
+		)
 
 	# reward functions: choose wisely!
 
@@ -641,7 +648,7 @@ def marlExperiment(
 
 		port_dict = {}
 
-		core_link = trackedLink(server, server_switch)#, port_dict=port_dict)
+		core_link = trackedLink(server, server_switch, extras=linkopts_core)#, port_dict=port_dict)
 		updateUpstreamRoute(server_switch)
 		assignIP(server)
 		map_link(port_dict, server, server_switch)
