@@ -4,3 +4,6 @@
 [submodule "code/ovs"]
 	path = code/ovs
 	url = https://github.com/felixmcfelix/ovs
+[submodule "code/traffic-host/mcfelix.me"]
+	path = code/traffic-host/mcfelix.me
+	url = https://github.com/FelixMcFelix/mcfelix.me

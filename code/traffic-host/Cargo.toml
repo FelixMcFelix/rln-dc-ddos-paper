@@ -6,6 +6,5 @@ authors = ["Kyle Simpson <kyleandrew.simpson@gmail.com>"]
 [dependencies]
 clap = "2"
 curl = "0.4"
-#futures = "0.1"
-#reqwest = "0.8"
-#tokio = "0.1"
+ron = "0.4"
+serde = "1.0"
