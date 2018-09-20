@@ -2,6 +2,9 @@ use std::borrow::Cow;
 
 #[derive(Debug)]
 pub struct Config<'a> {
+	/// Path to the dependency list structure.
+    pub dep_list_dir: Cow<'a, str>,
+
     /// Directory to use as basis for requests.
     pub http_dir: Cow<'a, str>,
 

@@ -52,6 +52,13 @@ fn main() {
 				.index(2)
 				// .conflicts_with("bless")
 				.default_value("-1"))
+			.arg(Arg::with_name("dep-list")
+				.short("l")
+				.long("dep-list")
+				.value_name("path")
+				.help("Location to read/store file dependency information.")
+				.takes_value(true)
+				.default_value("./htdoc-deps.ron"))
 			.get_matches();
 
 	let url = Cow::from(
@@ -66,10 +73,17 @@ fn main() {
 			.to_string()
 	);
 
+	let dep_list_dir = Cow::from(
+		matches.value_of_lossy("dep-list")
+			.expect("Dep-list directory always guaranteed to exist...")
+			.to_string()
+	);
+
 	if matches.is_present("bless") {
 		println!("Bless mode!");
 
 		let config = traffic_host::Config {
+			dep_list_dir,
 			http_dir,
 			max_down: 0,
 			max_up: 0,
@@ -82,6 +96,7 @@ fn main() {
 		let max_up = parse_dl_rate(&matches, "MAX_UP");
 
 		let config = traffic_host::Config {
+			dep_list_dir,
 			http_dir,
 			max_down,
 			max_up,

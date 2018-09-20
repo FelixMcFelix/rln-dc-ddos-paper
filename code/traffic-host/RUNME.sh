@@ -1,3 +1,5 @@
+mkdir -p htdocs
+
 # Build a blog-like site in place
 hugo -b "http://10.0.0.1/" -d "../htdocs" -s "./mcfelix.me"
 
