@@ -43,6 +43,10 @@ fn main() {
 				.short("b")
 				.long("bless")
 				.help("Regenerate file dependency lists, then exit."))
+			.arg(Arg::with_name("random")
+				.short("r")
+				.long("random")
+				.help("Request random files from the preset directory. Requires file dependency lists."))
 			.arg(Arg::with_name("MAX_DOWN")
 				.help("Maximum download rate from the target server (Mbps). If rate <= 0, then no limit is set.")
 				.required_unless("bless")
@@ -79,6 +83,8 @@ fn main() {
 			.to_string()
 	);
 
+	let randomise = matches.is_present("random");
+
 	if matches.is_present("bless") {
 		println!("Bless mode!");
 
@@ -87,6 +93,7 @@ fn main() {
 			http_dir,
 			max_down: 0,
 			max_up: 0,
+			randomise,
 			url,
 		};
 
@@ -100,6 +107,7 @@ fn main() {
 			http_dir,
 			max_down,
 			max_up,
+			randomise,
 			url,
 		};
 
