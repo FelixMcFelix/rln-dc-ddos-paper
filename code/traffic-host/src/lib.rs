@@ -165,9 +165,9 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 				// Go over deps, add them.
 				if let DependencyList::Indexed(ref deps) = req.deps {
 					for index in deps {
-						if !visited[index] {
+						if !visited[*index] {
 							enqueue(
-								&dep_list.files[index],
+								&dep_list.files[*index],
 								&mut work_queue,
 								&mut visited,
 								&dep_list.name_map);
@@ -178,16 +178,16 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 
 				// add random element, wipe the visited list.
 				if work_queue.is_empty() {
+					for i in 0..visited.len() {
+						visited[i] = false;
+					}
+					
 					enqueue(
 						available_targets.get(draw.sample(&mut rng_local))
 							.expect("Guaranteed by bounds"),
 						&mut work_queue,
 						&mut visited,
 						&dep_list.name_map);
-
-					for i in 0..visited.len() {
-						visited[i] = false;
-					}
 				}
 			}
 			Ok(CliCommand::End) | Err(_) => {break;},

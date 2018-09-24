@@ -1,10 +1,17 @@
+use cssparser::{
+	Parser,
+	ParserInput,
+};
 use select::{
 	document::Document,
 	predicate::{Name, Or},
 };
 use std::{
 	collections::HashMap,
-	fs::File,
+	fs::{
+		read,
+		File,
+	},
 	path::{Path, PathBuf},
 };
 use url::Url;
@@ -163,7 +170,17 @@ fn js_deps(path: &Path, base: &Url, curr_url: &Url) -> Vec<String> {
 }
 
 fn css_deps(path: &Path, base: &Url, curr_url: &Url) -> Vec<String> {
-	// TODO
+	// TODO?
+	
+	// let file = fs::read(path)
+	// 	.expect("file guaranteed to exist");
+	// let mut input = ParserInput::new(&file);
+	// let mut parser = Parser::new(&mut input);
+
+	// while let Ok(token) = parser::next() {
+
+	// }
+
 	vec![]
 }
 
