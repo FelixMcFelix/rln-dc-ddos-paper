@@ -14,6 +14,9 @@ pub struct Config<'a> {
     /// Maximum upload rate, in bytes/s.
     pub max_up: u64,
 
+    /// Random request mode enabled.
+    pub randomise: bool,
+
     /// Base url for the domain to make requests from.
     pub url: Cow<'a, str>,
 }

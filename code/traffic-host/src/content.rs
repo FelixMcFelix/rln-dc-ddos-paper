@@ -1,10 +1,17 @@
+use cssparser::{
+	Parser,
+	ParserInput,
+};
 use select::{
 	document::Document,
 	predicate::{Name, Or},
 };
 use std::{
 	collections::HashMap,
-	fs::File,
+	fs::{
+		read,
+		File,
+	},
 	path::{Path, PathBuf},
 };
 use url::Url;
@@ -16,6 +23,16 @@ pub enum FileType {
 	Stylesheet,
 	Image,
 	Other,
+}
+
+impl FileType {
+	pub fn can_start_chain(&self) -> bool {
+		use content::FileType::*;
+		match self {
+			Page | Image | Other => true,
+			_ => false
+		}
+	}
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -52,9 +69,9 @@ impl DependencyList {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FileDesc {
-	path: PathBuf,
-	file_type: FileType,
-	deps: DependencyList,
+	pub path: PathBuf,
+	pub file_type: FileType,
+	pub deps: DependencyList,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -91,6 +108,10 @@ impl FileDesc {
 	pub fn to_indexed(&mut self, map: &HashMap<String, usize>){
 		self.deps = self.deps.to_indexed(map);
 	}
+
+	pub fn can_start_chain(&self) -> bool {
+		self.file_type.can_start_chain()
+	}
 }
 
 fn classify_file_type(path: &PathBuf) -> FileType {
@@ -121,7 +142,7 @@ fn classify_file_type(path: &PathBuf) -> FileType {
 
 fn html_deps(path: &Path, base: &Url, curr_url: &Url) -> Vec<String> {
 	let mut out = vec![];
-	let mut file = File::open(path)
+	let file = File::open(path)
 		.expect("file guaranteed to exist");
 
 	let doc = Document::from_read(file);
@@ -149,7 +170,17 @@ fn js_deps(path: &Path, base: &Url, curr_url: &Url) -> Vec<String> {
 }
 
 fn css_deps(path: &Path, base: &Url, curr_url: &Url) -> Vec<String> {
-	// TODO
+	// TODO?
+	
+	// let file = fs::read(path)
+	// 	.expect("file guaranteed to exist");
+	// let mut input = ParserInput::new(&file);
+	// let mut parser = Parser::new(&mut input);
+
+	// while let Ok(token) = parser::next() {
+
+	// }
+
 	vec![]
 }
 

@@ -5,8 +5,10 @@ authors = ["Kyle Simpson <kyleandrew.simpson@gmail.com>"]
 
 [dependencies]
 clap = "2"
+cssparser = "0.24"
 curl = "0.4"
 parking_lot = "0.6"
+rand = "0.5"
 rayon = "1.0"
 ron = "0.4"
 select = "0.4"
