@@ -1,5 +1,5 @@
 set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}'
-set output "soln-reward-binary.tex"
+set output "soln-ext-varyN-binary.tex"
 
 load "parula.pal"
 
@@ -23,7 +23,7 @@ set ylabel "Ratio Legit Traffic Preserved"
 
 set yrange [0.0:1.0]
 
-plot '../results/soln-2-avg.csv' u 1:2 w lines title "$n=2$", \
-     '../results/soln-4-avg.csv' u 1:2 w lines title "$n=4$", \
-     '../results/soln-8-avg.csv' u 1:2 w lines title "$n=8$", \
-     '../results/soln-16-avg.csv' u 1:2 w lines title "$n=16$"
+plot '../results/soln-ext-2-avg.csv' u 1:3 w lines smooth sbezier title "$n=2$"#, \
+#     '../results/soln-ext-4-avg.csv' u 1:3 w lines smooth sbezier title "$n=4$", \
+#     '../results/soln-ext-8-avg.csv' u 1:3 w lines smooth sbezier title "$n=8$", \
+#     '../results/soln-ext-16-avg.csv' u 1:3 w lines smooth sbezier title "$n=16$"
