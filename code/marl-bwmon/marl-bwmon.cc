@@ -3,6 +3,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <mutex>
 #include <shared_mutex>
@@ -12,11 +13,14 @@
 #include <vector>
 
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <poll.h>
 #include <sys/select.h>
+#include <sys/socket.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 namespace ch = std::chrono;
 
@@ -26,6 +30,8 @@ ch::high_resolution_clock::time_point stdifyTimeval(const struct timeval tv) {
 		+ ch::microseconds(tv.tv_usec)
 	);
 }
+
+const int LISTEN_PORT = 9932;
 
 // Store and update some stats about float64s.
 struct Stat {
@@ -343,7 +349,7 @@ public:
 	}
 };
 
-uint32_t make_netmask(int len) {
+static uint32_t make_netmask(int len) {
 	return htonl(0xffffffff << (32 - len));
 }
 
@@ -477,12 +483,133 @@ static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &sta
 	std::this_thread::yield();
 }
 
-void do_join(std::thread& t)
+
+static bool read_val(int fd, void *location, size_t len, InterfaceStats &stats) {
+	auto remaining = len;
+	auto err = false;
+
+	timeval tv;
+	fd_set selector;
+
+	while (remaining && !err) {
+		tv.tv_sec = 1;
+		tv.tv_usec = 0;
+
+		FD_ZERO(&selector);
+		FD_SET(fd, &selector);
+		select(fd + 1, &selector, nullptr, nullptr, &tv);
+
+		auto bytes_read = 0;
+
+		if (FD_ISSET(fd, &selector)) {
+			bytes_read = recv(
+				fd,
+				(reinterpret_cast<char *>(location)) + (len - remaining),
+				remaining,
+				0
+			);
+		}
+
+		if (bytes_read < 0 || stats.finished()) {
+			err = true;
+			break;
+		} else {
+			remaining -= bytes_read;
+		}
+	}
+
+	return err;
+}
+
+static void server_runner(InterfaceStats &stats) {
+	int server_fd;
+	sockaddr_in address, remote;
+	auto opt = 1;
+
+	if (!(server_fd = socket(PF_INET, SOCK_STREAM, 0))) {
+		perror("couldn't create socket");
+		exit(EXIT_FAILURE);
+	}
+
+	if(setsockopt(
+			server_fd,
+			SOL_SOCKET,
+			SO_REUSEADDR | SO_REUSEPORT | SO_KEEPALIVE,
+			&opt,
+			sizeof(opt))) {
+		perror("couldn't set socket options");
+		close(server_fd);
+		exit(EXIT_FAILURE);
+	}
+
+	address.sin_family = AF_INET;
+	address.sin_addr.s_addr = INADDR_ANY;
+	address.sin_port = htons(LISTEN_PORT);
+
+	if (bind(server_fd, (sockaddr *)&address, sizeof(address)) < 0) {
+		perror("failed to bind port...");
+		close(server_fd);
+		exit(EXIT_FAILURE);
+	}
+	if (listen(server_fd, 1) < 0) {
+		perror("failed to listen on local address");
+		close(server_fd);
+		exit(EXIT_FAILURE);
+	}
+
+	// First, select the fd with a timeout.
+	// Accept if it didn't time out.
+	// Don't accept a new conn if stats.finished()
+	// and break out of a conn if the whole shebang ended.
+	// (Note: only doing 1 connection at the moment.)
+	// (Probably need non-blocking sockets?)
+	unsigned int addr_sz = sizeof(remote);
+	auto new_conn = accept4(server_fd, (sockaddr *)&remote, &addr_sz, SOCK_NONBLOCK);
+	if (new_conn < 0) {
+		perror("failed to listen on local address");
+		close(server_fd);
+		exit(EXIT_FAILURE);
+	}
+
+	// Loop on reads, exit on stats.finished()
+	while (!stats.finished()) {
+		// read a u32. (network order).
+		uint32_t n_flow_queries;
+
+		if (read_val(new_conn, &n_flow_queries, sizeof(n_flow_queries), stats)) {
+			break;
+		}
+
+		n_flow_queries = ntohl(n_flow_queries);
+
+		// read that many IP addresses now.
+		auto flow_ips = std::vector<uint32_t>(n_flow_queries);
+		auto fip_size = n_flow_queries * sizeof(uint32_t);
+
+		if (read_val(new_conn, flow_ips.data(), fip_size, stats)) {
+			break;
+		}
+
+		// Okay, send float values for all the standard loads...
+		// TODO
+
+		// And now, use the acquired ip addresses to
+		// ping along the relevant stat blocks!
+		// TODO
+	}
+
+	// Donezo.
+	close(new_conn);
+	close(server_fd);
+	std::this_thread::yield();
+}
+
+static void do_join(std::thread& t)
 {
 	t.join();
 }
 
-void listDevices(char *errbuf) {
+static void listDevices(char *errbuf) {
 	pcap_if_t *devs = nullptr;
 	pcap_findalldevs(&devs, errbuf);
 
@@ -502,9 +629,18 @@ int main(int argc, char const *argv[])
 {
 	char errbuf[PCAP_ERRBUF_SIZE];
 	auto num_interfaces = argc - 1;
+	auto start_pos = 1;
+	auto server = false;
 	auto stats = InterfaceStats(num_interfaces);
 
 	std::vector<std::thread> workers;
+
+	// catch server flag
+	if (num_interfaces > 0 && !strcmp("-s", argv[start_pos])) {
+		server = true;
+		start_pos += 1;
+		num_interfaces -= 1;
+	}
 
 	if (num_interfaces == 0) {
 		listDevices(errbuf);
@@ -520,14 +656,12 @@ int main(int argc, char const *argv[])
 		// iterate over iface names, spawn threads!
 		// We want to catch any which start with a '!', these are]
 		// important 
-		auto name = argv[i+1];
+		auto name = argv[start_pos + i];
 		auto individual_stats = name[0]=='!';
 		if (individual_stats) {
 			name = &(name[1]);
 			stats.markImportant(i);
 		}
-
-		// TODO: pass knowledge of individual stat gathering to the monitoring child threads.
 
 		auto p = pcap_create(name, errbuf);
 
@@ -542,6 +676,13 @@ int main(int argc, char const *argv[])
 		workers.emplace_back(std::thread(monitorInterface, p, i, std::ref(stats)));
 	}
 
+	// If we're doing the server thing, we want a thread running that.
+	// Its job is to handle connections (one at a time, allowing reconnection),
+	// and respond to more granular stat requests as they come in.
+	if (server) {
+		workers.emplace_back(std::thread(server_runner, std::ref(stats)));
+	}
+
 	// Now block on next user input.
 	std::string lineInput;
 
@@ -552,7 +693,9 @@ int main(int argc, char const *argv[])
 
 			if (std::cin.eof()) break;
 
-			startTime = stats.clearAndPrintStats(startTime);
+			if (!server) {
+				startTime = stats.clearAndPrintStats(startTime);
+			}
 		}
 	}
 
