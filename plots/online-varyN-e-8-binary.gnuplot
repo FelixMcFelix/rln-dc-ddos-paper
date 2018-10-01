@@ -1,5 +1,5 @@
 set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}'
-set output "soln-ext-reward-binary.tex"
+set output "online-varyN-e-8-binary.tex"
 
 load "parula.pal"
 
@@ -21,10 +21,9 @@ set datafile separator ","
 set xlabel "Iteration ($t \\cdot{} \\SI{50}{\\milli\\second}$)"
 set ylabel "Ratio Legit Traffic Preserved"
 
-set yzeroaxis
-set yrange [-1.0:1.0]
+set yrange [0.0:1.0]
 
-plot '../results/soln-ext-2-avg.csv' u 1:2 w lines smooth sbezier title "$n=2$", \
-     '../results/soln-ext-4-avg.csv' u 1:2 w lines smooth sbezier title "$n=4$", \
-     '../results/soln-ext-8-avg.csv' u 1:2 w lines smooth sbezier title "$n=8$"#, \
-#     '../results/soln-ext-16-avg.csv' u 1:2 w lines smooth sbezier title "$n=16$"
+plot '../results/online-2-e-8-avg.csv' u 1:3 w lines smooth sbezier title "$n=2$", \
+     '../results/online-4-e-8-avg.csv' u 1:3 w lines smooth sbezier title "$n=4$", \
+     '../results/online-8-e-8-avg.csv' u 1:3 w lines smooth sbezier title "$n=8$", \
+     '../results/online-16-e-8-avg.csv' u 1:3 w lines smooth sbezier title "$n=16$"

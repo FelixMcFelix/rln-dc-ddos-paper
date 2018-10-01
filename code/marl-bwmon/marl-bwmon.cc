@@ -179,6 +179,20 @@ struct FlowStats
 	}
 };
 
+// TODO: think about this harder.
+// this is complicated severely by new flows...
+// should flows which have never been reported be given a mandatory measurement?
+// in that case, we're obliged to pass the IP for all entries...
+struct FlowMeasurement {
+
+}
+
+struct ValueSet {
+	ch::high_resolution_clock::time_point time;
+	std::vector<float> loads;
+	std::vector<FlowMeasurement> flows;
+}
+
 class InterfaceStats
 {
 	int num_interfaces_;
@@ -240,6 +254,79 @@ public:
 				stat_holder[ip] = new_stat;
 			}
 		}
+	}
+
+	ch::high_resolution_clock::time_point clearAndRetrieveStats(ch::high_resolution_clock::time_point startTime) {
+		std::unique_lock<std::shared_mutex> lock(mutex_);
+
+		auto endTime = ch::high_resolution_clock::now();
+		auto duration = endTime - startTime;
+
+		// First, tell the threads they have a limit TO WORK UP TO.
+		limiting_ = true;
+		limit_ = endTime;
+		to_go_.store(num_interfaces_);
+
+		// Okay, now await the signal from all the workers...
+		int t_g = num_interfaces_;
+		while ((t_g = to_go_.load()) > 0) hit_limit_.wait(lock);
+
+		// Then, we need to wait for them to finish before we do all this...
+		std::cout << ch::nanoseconds(duration).count() << "ns";
+		
+		for (unsigned int i = 0; i < bad_byte_counts_.size(); ++i)
+		{
+			std::cout << ", ";
+
+			std::cout << good_byte_counts_[i] << " " << bad_byte_counts_[i];
+		}
+
+		std::cout << std::endl;
+
+		// print (on a seperate line) the stats that concern the flows at each learner.
+		for (unsigned int i = 0; i < flow_stats_.size(); ++i)
+		{
+			if (!isImportant(i)) {
+				continue;
+			}
+
+			std::cout << "[";
+			auto &ip_map = flow_stats_.at(i);
+			auto to_prune = std::vector<uint32_t>();
+
+			for (auto &el: ip_map) {
+				// el = (ip_as_u32, FlowStat)
+				char ip_str[INET_ADDRSTRLEN];
+				auto c_ip = reinterpret_cast<const in_addr *>(&el.first);
+				inet_ntop(AF_INET, c_ip, ip_str, INET_ADDRSTRLEN);
+
+				auto active = el.second.clearAndPrintStats(ip_str, startTime, endTime);
+				if (!active) {
+					to_prune.emplace_back(el.first);
+				}
+			}
+
+			for (auto &ip: to_prune) {
+				ip_map.erase(ip);
+			}
+
+			std::cout << "]";
+		}
+
+		std::cout << std::endl;
+
+		// Empty the stats.
+		for (auto &el: good_byte_counts_)
+			el = 0;
+		for (auto &el: bad_byte_counts_)
+			el = 0;
+
+		limiting_ = false;
+
+		// Signal done.
+		stopped_limiting_.notify_all();
+		
+		return endTime;
 	}
 
 	ch::high_resolution_clock::time_point clearAndPrintStats(ch::high_resolution_clock::time_point startTime) {
@@ -522,6 +609,8 @@ static bool read_val(int fd, void *location, size_t len, InterfaceStats &stats) 
 }
 
 static void server_runner(InterfaceStats &stats) {
+	auto startTime = ch::high_resolution_clock::now();
+
 	int server_fd;
 	sockaddr_in address, remote;
 	auto opt = 1;
@@ -589,6 +678,8 @@ static void server_runner(InterfaceStats &stats) {
 		if (read_val(new_conn, flow_ips.data(), fip_size, stats)) {
 			break;
 		}
+
+		// Hacky -- assumes both ends are IEEE-754 compliant floats.
 
 		// Okay, send float values for all the standard loads...
 		// TODO

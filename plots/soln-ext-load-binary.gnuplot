@@ -21,7 +21,7 @@ set datafile separator ","
 set xlabel "Iteration ($t \\cdot{} \\SI{50}{\\milli\\second}$)"
 set ylabel "Total load (\\SI{50}{\\mega\\bit\\per\\second})"
 
-plot '../results/soln-ext-2-avg.csv' u 1:4 w lines smooth sbezier title "$n=2$"#, \
-#     '../results/soln-ext-4-avg.csv' u 1:4 w lines smooth sbezier title "$n=4$", \
-#     '../results/soln-ext-8-avg.csv' u 1:4 w lines smooth sbezier title "$n=8$", \
+plot '../results/soln-ext-2-avg.csv' u 1:4 w lines smooth sbezier title "$n=2$", \
+     '../results/soln-ext-4-avg.csv' u 1:4 w lines smooth sbezier title "$n=4$", \
+     '../results/soln-ext-8-avg.csv' u 1:4 w lines smooth sbezier title "$n=8$"#, \
 #     '../results/soln-ext-16-avg.csv' u 1:4 w lines smooth sbezier title "$n=16$"
