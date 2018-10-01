@@ -179,19 +179,30 @@ struct FlowStats
 	}
 };
 
-// TODO: think about this harder.
-// this is complicated severely by new flows...
-// should flows which have never been reported be given a mandatory measurement?
-// in that case, we're obliged to pass the IP for all entries...
 struct FlowMeasurement {
-
-}
+	uint32_t ip;
+	uint64_t flow_length;
+	uint64_t size_in;
+	uint64_t size_out;
+	uint64_t delta_in;
+	uint64_t delta_out;
+	double packets_in_mean;
+	double packets_in_variance;
+	uint64_t packets_in_count;
+	double packets_out_mean;
+	double packets_out_variance;
+	uint64_t packets_out_count;
+	double iat_mean;
+	double iat_variance;
+};
 
 struct ValueSet {
 	ch::high_resolution_clock::time_point time;
-	std::vector<float> loads;
+	int64_t duration_ns;
+	std::vector<uint64_t> good_bytes;
+	std::vector<uint64_t> bad_bytes;
 	std::vector<FlowMeasurement> flows;
-}
+};
 
 class InterfaceStats
 {
@@ -256,7 +267,7 @@ public:
 		}
 	}
 
-	ch::high_resolution_clock::time_point clearAndRetrieveStats(ch::high_resolution_clock::time_point startTime) {
+	ValueSet clearAndRetrieveStats(ch::high_resolution_clock::time_point startTime) {
 		std::unique_lock<std::shared_mutex> lock(mutex_);
 
 		auto endTime = ch::high_resolution_clock::now();
@@ -272,17 +283,11 @@ public:
 		while ((t_g = to_go_.load()) > 0) hit_limit_.wait(lock);
 
 		// Then, we need to wait for them to finish before we do all this...
-		std::cout << ch::nanoseconds(duration).count() << "ns";
-		
-		for (unsigned int i = 0; i < bad_byte_counts_.size(); ++i)
-		{
-			std::cout << ", ";
+		auto duration_ns = ch::nanoseconds(duration).count();
+		auto goods = good_byte_counts_;
+		auto bads = bad_byte_counts_;
 
-			std::cout << good_byte_counts_[i] << " " << bad_byte_counts_[i];
-		}
-
-		std::cout << std::endl;
-
+		// TODO: modernise.
 		// print (on a seperate line) the stats that concern the flows at each learner.
 		for (unsigned int i = 0; i < flow_stats_.size(); ++i)
 		{
@@ -325,8 +330,15 @@ public:
 
 		// Signal done.
 		stopped_limiting_.notify_all();
-		
-		return endTime;
+
+		return ValueSet {
+			endTime,
+			duration_ns,
+			goods,
+			bads,
+			// TODO: replace w real measurements...
+			std::vector<FlowMeasurement>(),
+		};
 	}
 
 	ch::high_resolution_clock::time_point clearAndPrintStats(ch::high_resolution_clock::time_point startTime) {
@@ -608,6 +620,30 @@ static bool read_val(int fd, void *location, size_t len, InterfaceStats &stats) 
 	return err;
 }
 
+static bool send_val(int fd, void *location, size_t len, InterfaceStats &stats) {
+	auto remaining = len;
+	auto err = false;
+
+	while (remaining && !err) {
+		auto bytes_read = 0;
+		bytes_read = send(
+			fd,
+			(reinterpret_cast<char *>(location)) + (len - remaining),
+			remaining,
+			0
+		);
+
+		if (bytes_read < 0 || stats.finished()) {
+			err = true;
+			break;
+		} else {
+			remaining -= bytes_read;
+		}
+	}
+
+	return err;
+}
+
 static void server_runner(InterfaceStats &stats) {
 	auto startTime = ch::high_resolution_clock::now();
 
@@ -680,16 +716,35 @@ static void server_runner(InterfaceStats &stats) {
 		}
 
 		// Hacky -- assumes both ends are IEEE-754 compliant floats.
+		// This should give us everything we need though, gcc won't
+		// reorder structs thankfully.
+		auto stat_block = stats.clearAndRetrieveStats(startTime);
 
-		// Okay, send float values for all the standard loads...
-		// TODO
+		// Okay, send byte values for all the standard loads...
+		for (auto b_val : stat_block.good_bytes) {
+			if (send_val(new_conn, &b_val, sizeof(int64_t), stats)) {
+				goto escape;
+			}
+		}
+		for (auto b_val : stat_block.bad_bytes) {
+			if (send_val(new_conn, &b_val, sizeof(int64_t), stats)) {
+				goto escape;
+			}
+		}
 
 		// And now, use the acquired ip addresses to
 		// ping along the relevant stat blocks!
-		// TODO
+		for (auto flow : stat_block.flows) {
+			if (send_val(new_conn, &flow, sizeof(FlowMeasurement), stats)) {
+				goto escape;
+			}
+		}
+
+		startTime = stat_block.time;
 	}
 
 	// Donezo.
+escape:
 	close(new_conn);
 	close(server_fd);
 	std::this_thread::yield();
@@ -735,6 +790,7 @@ int main(int argc, char const *argv[])
 
 	if (num_interfaces == 0) {
 		listDevices(errbuf);
+		printf("Struct size? %" PRIu64 "\n", sizeof(FlowMeasurement));
 		return 0;
 	}
 
