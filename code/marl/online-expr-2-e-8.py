@@ -1,15 +1,17 @@
 from marl import *
 from writer import writeResults, makeResultsAverage
 
+host_p = 2
+
 results = marlExperiment(
 	n_teams = 2,#5,
 
 	n_inters = 2,
 	n_learners = 3,
-	host_range = [2, 2],
+	host_range = [host_p, host_p],
 
 	explore_episodes = 0.8,
-	episodes = 15,#50,#500, Since mininet keeps running out of files even e/ cleanup
+	episodes = 10,#50,#500, Since mininet keeps running out of files even e/ cleanup
 	episode_length = 10000,
 	separate_episodes = True,
 
