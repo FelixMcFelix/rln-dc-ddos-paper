@@ -81,6 +81,23 @@ struct Stat {
 	}
 };
 
+struct FlowMeasurement {
+	int64_t flow_length;
+	uint64_t size_in;
+	uint64_t size_out;
+	uint64_t delta_in;
+	uint64_t delta_out;
+	uint64_t packets_in_count;
+	uint64_t packets_out_count;
+	float packets_in_mean;
+	float packets_in_variance;
+	float packets_out_mean;
+	float packets_out_variance;
+	float iat_mean;
+	float iat_variance;
+	uint32_t ip;
+};
+
 struct FlowStats
 {
 	// flow size
@@ -168,6 +185,62 @@ struct FlowStats
 		return true;
 	}
 
+	std::optional<FlowMeasurement> clearAndRetrieveStats(uint32_t ip, char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
+		auto prune_age = ch::seconds(10);
+
+		// prune here if last packet rx'd was of a certain age,
+		// AND there was no info gleaned in this window.
+		// Don't print stats in that case.
+
+		auto duration = endTime - flow_start;
+		auto silent_duration = endTime - last_entry;
+
+		if (silent_duration > prune_age && last_entry < startTime) {
+			return std::nullopt;
+		}
+
+		// std::cout
+		// 	<< "(" << ip_str << ","
+		// 	<< ch::nanoseconds(duration).count() << ","
+		// 	<< flow_size_in << ","
+		// 	<< flow_size_out << ","
+		// 	<< flow_size_in - flow_size_in_prev << ","
+		// 	<< flow_size_out - flow_size_out_prev << ","
+		// 	<< in_packets_window.mean << ","
+		// 	<< in_packets_window.variance() << ","
+		// 	<< in_packets_window.k << ","
+		// 	<< out_packets_window.mean << ","
+		// 	<< out_packets_window.variance() << ","
+		// 	<< out_packets_window.k << ","
+		// 	<< interarrivals_window.mean << ","
+		// 	<< interarrivals_window.variance()
+		// 	<< ")";
+
+		auto fm = FlowMeasurement {
+			ch::nanoseconds(duration).count(),
+			flow_size_in,
+			flow_size_out,
+			flow_size_in - flow_size_in_prev,
+			flow_size_out - flow_size_out_prev,
+			in_packets_window.k,
+			out_packets_window.k,
+			(float) in_packets_window.mean,
+			(float) in_packets_window.variance(),
+			(float) out_packets_window.mean,
+			(float) out_packets_window.variance(),
+			(float) interarrivals_window.mean,
+			(float) interarrivals_window.variance(),
+			ip,
+		};
+
+		clear();
+
+		flow_size_in_prev = flow_size_in;
+		flow_size_out_prev = flow_size_out;
+
+		return std::optional<FlowMeasurement> {fm};
+	}
+
 	void clear() {
 		in_packets_window.clear();
 		out_packets_window.clear();
@@ -177,23 +250,6 @@ struct FlowStats
 	void clear_full() {
 		clear();
 	}
-};
-
-struct FlowMeasurement {
-	uint32_t ip;
-	uint64_t flow_length;
-	uint64_t size_in;
-	uint64_t size_out;
-	uint64_t delta_in;
-	uint64_t delta_out;
-	double packets_in_mean;
-	double packets_in_variance;
-	uint64_t packets_in_count;
-	double packets_out_mean;
-	double packets_out_variance;
-	uint64_t packets_out_count;
-	double iat_mean;
-	double iat_variance;
 };
 
 struct ValueSet {
@@ -267,7 +323,7 @@ public:
 		}
 	}
 
-	ValueSet clearAndRetrieveStats(ch::high_resolution_clock::time_point startTime) {
+	ValueSet clearAndRetrieveStats(ch::high_resolution_clock::time_point startTime, std::vector<uint32_t> &allowed_ips) {
 		std::unique_lock<std::shared_mutex> lock(mutex_);
 
 		auto endTime = ch::high_resolution_clock::now();
@@ -286,16 +342,16 @@ public:
 		auto duration_ns = ch::nanoseconds(duration).count();
 		auto goods = good_byte_counts_;
 		auto bads = bad_byte_counts_;
+		auto flows = std::vector<FlowMeasurement>();
 
-		// TODO: modernise.
-		// print (on a seperate line) the stats that concern the flows at each learner.
+		// capture all relevant flow info...
+		// use allowed_ips
 		for (unsigned int i = 0; i < flow_stats_.size(); ++i)
 		{
 			if (!isImportant(i)) {
 				continue;
 			}
 
-			std::cout << "[";
 			auto &ip_map = flow_stats_.at(i);
 			auto to_prune = std::vector<uint32_t>();
 
@@ -305,17 +361,19 @@ public:
 				auto c_ip = reinterpret_cast<const in_addr *>(&el.first);
 				inet_ntop(AF_INET, c_ip, ip_str, INET_ADDRSTRLEN);
 
-				auto active = el.second.clearAndPrintStats(ip_str, startTime, endTime);
-				if (!active) {
+				auto maybe_flow_stat = el.second.clearAndRetrieveStats(el.first, ip_str, startTime, endTime);
+				if (maybe_flow_stat == std::nullopt) {
 					to_prune.emplace_back(el.first);
+				} else {
+					if (std::find(allowed_ips.begin(), allowed_ips.end(), el.first) != allowed_ips.end()) {
+						flows.emplace_back(maybe_flow_stat.value());
+					}
 				}
 			}
 
 			for (auto &ip: to_prune) {
 				ip_map.erase(ip);
 			}
-
-			std::cout << "]";
 		}
 
 		std::cout << std::endl;
@@ -336,8 +394,7 @@ public:
 			duration_ns,
 			goods,
 			bads,
-			// TODO: replace w real measurements...
-			std::vector<FlowMeasurement>(),
+			flows,
 		};
 	}
 
@@ -718,7 +775,7 @@ static void server_runner(InterfaceStats &stats) {
 		// Hacky -- assumes both ends are IEEE-754 compliant floats.
 		// This should give us everything we need though, gcc won't
 		// reorder structs thankfully.
-		auto stat_block = stats.clearAndRetrieveStats(startTime);
+		auto stat_block = stats.clearAndRetrieveStats(startTime, flow_ips);
 
 		// Okay, send byte values for all the standard loads...
 		for (auto b_val : stat_block.good_bytes) {
