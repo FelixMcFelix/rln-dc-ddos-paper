@@ -27,6 +27,7 @@ import sys
 import time
 
 controller_build_port = 6666
+stats_port = 9932
 
 def marlExperiment(
 		linkopts = {
@@ -98,6 +99,8 @@ def marlExperiment(
 		reward_direction = "in",
 		state_direction = "in",
 		actions_target_flows = False,
+
+		bw_mon_socketed = True,
 	):
 
 	linkopts_core = linkopts
@@ -779,6 +782,14 @@ def marlExperiment(
 			# now send computed stuff to ctl...
 			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			try:
+				try:
+					socket.SO_REUSEPORT
+				except AttributeError:
+					pass
+				else:
+					sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+
+				sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 				sock.bind(("127.0.0.1", controller_build_port))
 				sock.listen(1)
 				data_sock = sock.accept()[0]
@@ -869,10 +880,164 @@ def marlExperiment(
 
 		# Spool up the monitoring tool.
 		mon_cmd = server_switch.popen(
-			["../marl-bwmon/marl-bwmon"] + tracked_interfaces,
+			["../marl-bwmon/marl-bwmon"]
+			+ (["-s"] if bw_mon_socketed else [])
+			+ tracked_interfaces,
 			stdin=PIPE,
 			stderr=sys.stderr
 		)
+		# IF USING SOCKET TO TALK...
+		# this should save a lot on I/O + BW.
+		#struct FlowMeasurement {
+		#	int64_t flow_length;
+		#	uint64_t size_in;
+		#	uint64_t size_out;
+		#	uint64_t delta_in;
+		#	uint64_t delta_out;
+		#	uint64_t packets_in_count;
+		#	uint64_t packets_out_count;
+		#	float packets_in_mean;
+		#	float packets_in_variance;
+		#	float packets_out_mean;
+		#	float packets_out_variance;
+		#	float iat_mean;
+		#	float iat_variance;
+		#	uint32_t ip;
+		#};
+		# repack into...
+		# props: (
+		#  len_ns, sz_in, sz_out, [0-2]
+		#  wnd_sz_in, wnd_sz_out, [3-4]
+		#  pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, [5-7]
+		#  pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, [8-10]
+		#  wnd_iat_mean, wnd_iat_var [11-12]
+		# )
+		if bw_mon_socketed:
+			# need to mix this with connection management
+			# i.e. open a socket out here, have this function make use of it...
+			# remember to close this at the end...!
+			bw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			try:
+				socket.SO_REUSEPORT
+			except AttributeError:
+				pass
+			else:
+				bw_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+
+			bw_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			bw_sock.create_connection(("127.0.0.1", stats_port))
+
+			# "flows" should be an array of u32s
+			def ask_stats(flows, n_ifs):
+				# to the socket, send |flows| as u32
+				# as well as each flow ip, as a u32.
+				bw_sock.sendall(struct.pack("!L", len(flows)))
+				flow_data = ""
+				for flow in flows:
+					flow_data += struct.pack("L", flow)
+				bw_sock.sendall(flow_data)
+
+				recvd = ""
+				def read_n(n):
+					while len(recvd) < n:
+						recvd += bw_sock.recv(4096)
+
+				# read time in ns...
+				len_ns = 8
+				read_n(len_ns)
+				(time_ns,) = struct.unpack("q", recvd[:len_ns])
+				recvd = recvd[len_ns:]
+
+				# then, read n_if * (u64 * 2)
+				#  [good per if], [bad per if]
+				list_sz = n_ifs * 8
+				full = list_sz * 2
+				read_n(full)
+
+				goods = []
+				bads = []
+				for i in xrange(n_ifs * 2):
+					index = i * 8
+					val = struct.unpack("Q", recvd[index: index+8])
+					if i < n_ifs:
+						goods.append(val)
+					else:
+						bads.append(val)
+				recvd = recvd[full:]
+
+				# read a u32,
+				# then read that many size 88 structs
+				len_u32 = 8
+				read_n(len_u32)
+				(n_flow_entries,) = struct.unpack("L", recvd[:len_u32])
+				recvd = recvd[len_u32:]
+				# (ip, stats)
+				parsed_flows = []
+				stat_struct_len = 88
+				stat_struct_len_nopad = stat_struct_len - 4
+				for i in xrange(n_flow_entries):
+					read_n(stat_struct_len)
+					datas = struct.unpack(
+						"q6Q6fL",
+						recvd[:stat_struct_len_nopad]
+					)
+					recvd = recvd[stat_struct_len:]
+					# TODO: reshape and place into parsed_flows
+
+				# repack it as the rest of the model expects
+				return (time_ns, unfused_load_mps, parsed_flows)
+		else:
+			# no granularity, get all flow info
+			def ask_stats(_flows, _n_ifs):
+				# Measure good/bad loads!
+				mon_cmd.stdin.write("\n")
+				mon_cmd.stdin.flush()
+				data = mon_cmd.stdout.readline().strip().split(",")
+
+				flow_stat_str = mon_cmd.stdout.readline().strip()
+				flow_stat_break = flow_stat_str.split("]")
+				split_stats = [s.strip().split("[")[-1] for s in flow_stat_break if len(s) > 0]
+				# now split into flow-keys. (ip, ...)(ip, ...)
+				almost_subs = [s.split(")") for s in split_stats if len(s) > 0]
+				subs = []
+				for set_str in almost_subs:
+					if len(set_str) == 0:
+						continue
+					subs.append([a.split("(")[-1].split(",") for a in set_str])
+
+				# (ip, props)
+				# props: (len_ns, sz_in, sz_out, wnd_sz_in, wnd_sz_out, pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, wnd_iat_mean, wnd_iat_var)
+				parsed_flows = []
+
+				for l in subs:
+					if len(l) == 0:
+						continue
+
+					layer = []
+					for e in l:
+						if len(e[0]) == 0:
+							continue
+
+						sublayer = []
+						for item in e[1:]:
+							sublayer.append(float(item))
+						if e[0] != "0.0.0.0":
+							layer.append((e[0], sublayer))
+						
+					parsed_flows.append(layer)
+
+				time_ns = int(data[0][:-2])
+
+				def mbpsify(bts):
+					return 8000*float(bts)/time_ns
+
+				unfused_load_mbps = [map(
+						mbpsify,
+						el.strip().split(" ")
+					) for el in data[1:]
+				]
+
+				return (time_ns, unfused_load_mbps, parsed_flows)
 
 		# spool up server if need be
 		server_proc = None
@@ -950,7 +1115,7 @@ def marlExperiment(
 
 		# Now establish the true maximum throughput
 		ratio = 1.0
-		if with_ratio:
+		if with_ratio and not bw_mon_socketed:
 			mon_cmd.stdin.write("\n")
 			mon_cmd.stdin.flush()
 			data = mon_cmd.stdout.readline().strip().split(",")
@@ -983,6 +1148,7 @@ def marlExperiment(
 
 		learner_stats = [{} for _ in learner_pos]
 		learner_traces = [{} for _ in learner_pos]
+		flows_to_query = []
 
 		for i in xrange(episode_length):
 			# May need to early exit
@@ -1005,53 +1171,11 @@ def marlExperiment(
 			postsleep = time.time()
 
 			#print postsleep - presleep
+			(time_ns, unfused_load_mbps, parsed_flows) = ask_stats(flows_to_query)
 
-			# Measure good/bad loads!
-			mon_cmd.stdin.write("\n")
-			mon_cmd.stdin.flush()
-			data = mon_cmd.stdout.readline().strip().split(",")
-
-			flow_stat_str = mon_cmd.stdout.readline().strip()
-			flow_stat_break = flow_stat_str.split("]")
-			split_stats = [s.strip().split("[")[-1] for s in flow_stat_break if len(s) > 0]
-			# now split into flow-keys. (ip, ...)(ip, ...)
-			almost_subs = [s.split(")") for s in split_stats if len(s) > 0]
-			subs = []
-			for set_str in almost_subs:
-				if len(set_str) == 0:
-					continue
-				subs.append([a.split("(")[-1].split(",") for a in set_str])
-
-			# (ip, props)
-			# props: (len_ns, sz_in, sz_out, wnd_sz_in, wnd_sz_out, pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, wnd_iat_mean, wnd_iat_var)
-			parsed_flows = []
-
-			for l in subs:
-				if len(l) == 0:
-					continue
-
-				layer = []
-				for e in l:
-					if len(e[0]) == 0:
-						continue
-
-					sublayer = []
-					for item in e[1:]:
-						sublayer.append(float(item))
-					if e[0] != "0.0.0.0":
-						layer.append((e[0], sublayer))
-					
-				parsed_flows.append(layer)
-
-			time_ns = int(data[0][:-2])
 			def mbpsify(bts):
-				return 8000*float(bts)/time_ns
+					return 8000*float(bts)/time_ns
 
-			unfused_load_mbps = [map(
-					mbpsify,
-					el.strip().split(" ")
-				) for el in data[1:]
-			]
 			load_mbps = [(ig+og, ib+ob) for ((ig, ib), (og, ob)) in zip(unfused_load_mbps[::2], unfused_load_mbps[1::2])]
 
 			# This now has format: inbound, outbound...

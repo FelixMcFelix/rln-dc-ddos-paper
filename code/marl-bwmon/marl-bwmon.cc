@@ -199,23 +199,6 @@ struct FlowStats
 			return std::nullopt;
 		}
 
-		// std::cout
-		// 	<< "(" << ip_str << ","
-		// 	<< ch::nanoseconds(duration).count() << ","
-		// 	<< flow_size_in << ","
-		// 	<< flow_size_out << ","
-		// 	<< flow_size_in - flow_size_in_prev << ","
-		// 	<< flow_size_out - flow_size_out_prev << ","
-		// 	<< in_packets_window.mean << ","
-		// 	<< in_packets_window.variance() << ","
-		// 	<< in_packets_window.k << ","
-		// 	<< out_packets_window.mean << ","
-		// 	<< out_packets_window.variance() << ","
-		// 	<< out_packets_window.k << ","
-		// 	<< interarrivals_window.mean << ","
-		// 	<< interarrivals_window.variance()
-		// 	<< ")";
-
 		auto fm = FlowMeasurement {
 			ch::nanoseconds(duration).count(),
 			flow_size_in,
@@ -356,7 +339,6 @@ public:
 			auto to_prune = std::vector<uint32_t>();
 
 			for (auto &el: ip_map) {
-				// el = (ip_as_u32, FlowStat)
 				char ip_str[INET_ADDRSTRLEN];
 				auto c_ip = reinterpret_cast<const in_addr *>(&el.first);
 				inet_ntop(AF_INET, c_ip, ip_str, INET_ADDRSTRLEN);
@@ -777,14 +759,19 @@ static void server_runner(InterfaceStats &stats) {
 		// reorder structs thankfully.
 		auto stat_block = stats.clearAndRetrieveStats(startTime, flow_ips);
 
+		// send time since last read in ns...
+		if (send_val(new_conn, &stat_block.duration_ns, sizeof(int64_t), stats)) {
+			break;
+		}
+
 		// Okay, send byte values for all the standard loads...
 		for (auto b_val : stat_block.good_bytes) {
-			if (send_val(new_conn, &b_val, sizeof(int64_t), stats)) {
+			if (send_val(new_conn, &b_val, sizeof(uint64_t), stats)) {
 				goto escape;
 			}
 		}
 		for (auto b_val : stat_block.bad_bytes) {
-			if (send_val(new_conn, &b_val, sizeof(int64_t), stats)) {
+			if (send_val(new_conn, &b_val, sizeof(uint64_t), stats)) {
 				goto escape;
 			}
 		}
