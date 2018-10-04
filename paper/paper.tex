@@ -163,11 +163,11 @@ tracking=true,
 
 \begin{abstract}
 Network intrusion detection and prevention systems backed by machine learning (and the autonomous operation they promise) have been long-heralded, but face problems hampering effective deployment.
-The detection problem in this domain is fraught with difficulty; it is an evolving, non-stationary problem as usage patterns shift, new protocols and applications are introduced, compounded by burstiness and seasonal variation.
+The detection problem in this domain is fraught with difficulty; it is an evolving, non-stationary problem as usage patterns shift, new protocols and applications are introduced, and is compounded by burstiness and seasonal variation.
 
 \emph{Reinforcement learning} (RL) may overcome the detection problem for certain classes of anomaly by managing and monitoring \emph{consequences}; an agent's role is to learn to optimise performance criteria (which are always available).
 
-I present...
+We present...
 ?? Contribs
 
 ?? Taking up space to figure out how much room I have for an intro
@@ -184,41 +184,42 @@ I present...
 Network anomaly detection, intrusion detection and intrusion prevention are continually evolving problems, compounded by the partial, non-IID view of data at each point in the network.
 Attacks and anomalous behaviours evolve, becoming more sophisticated or employing new vectors to harm a network or system's confidentiality, integrity, or availability without being detected.
 These attacks and anomalies have measurable consequences and symptoms which allow a skilled analyst to infer new signatures for detection by misuse-based classifiers, but unseen attacks may only be defended against after-the-fact.
-This issue is inherent to \emph{misuse-} or \emph{signature-based} intrusion detectors, and it has been long-hoped that \emph{anomaly-based} detectors would surpass this by making use of statistical measures.
+This issue is inherent to \emph{misuse-} or \emph{signature-based} intrusion detectors, and it has been long-hoped that \emph{anomaly-based} detectors would surpass this by making effective use of statistical measures.
 
 While \emph{machine learning} (ML) approaches seem like a sensible fit for this problem, in \citeyear{DBLP:conf/sp/SommerP10} \textcite{DBLP:conf/sp/SommerP10} identified the `failure to launch' of ML-based anomaly detection systems---to quite a large extent, this remains the case today.
 Their application is made difficult due to significant operational differences from standard ML tasks, alongside certain characteristics of network traffic.
 Briefly, these are the diversity of network traffic across varying timescales \cite{DBLP:conf/sp/SommerP10} and significant burstiness \cite{DBLP:journals/ccr/LelandWTW95}.
 Above the aggregate level, the constant deployment of new services and new protocols means that traffic is \emph{non-stationary} and displays an evolving notion of normality.
-Further issues arise from the extraordinarily low tolerance for false positives inherent to network intrusion detection \cite{DBLP:conf/ccs/Axelsson99}, and the challenges of learning from unlabelled (often partial) data.
+Further issues arise from the extraordinarily low tolerance for false positives inherent to network intrusion detection \cite{DBLP:conf/ccs/Axelsson99}, and the challenges encountered when learning from unlabelled (often partial) data.
 All of these factors greatly inflate the difficulty of the detection problem.
 
-For certain classes of problem like flooding-based DDoS attacks, \emph{reinforcement learning} (RL) offers another perspective for adaptively reacting to certain classes of threat by assuming the role of a feedback loop for network optimisation, typically to safeguard service guarantees.
-In a sense, this allows us to ``overcome'' the difficulties of the detection problem by monitoring \emph{performance characteristics and consequences} in real-time, by looking for the effect rather than the cause.
+For certain classes of problem like flooding-based DDoS attacks, \emph{reinforcement learning} (RL) offers another perspective.
+The role of an RL agent differs from that of a standard classifier, adaptively reacting to threats by assuming the role of a feedback loop for network optimisation, typically to safeguard service guarantees.
+In a sense, this allows us to ``overcome'' the difficulties of the detection problem by monitoring \emph{performance characteristics and consequences} in real-time; by looking for the effect rather than the cause.
 The intent is to augment what existing misuse-based solutions can provide, by automatically alerting, recording and controlling what are believed to be illegal system states.
 %Whether it takes direct control of the network, or is used indirectly to optimise a key part of another system, more powerful `deep' RL techniques (and well-founded action spaces) aren't yet well explored for network IDS/IPS.
 %These range from more modern training algorithms \cite{DBLP:journals/corr/SchulmanWDRK17, DBLP:conf/icml/SchulmanLAJM15}, to evolutionary strategies \cite{DBLP:journals/corr/SalimansHCS17, DBLP:journals/corr/abs-1802-08842}, hierarchical action composition \cite{DBLP:journals/corr/abs-1710-09767}, and competitive multi-agent learning \cite{DBLP:journals/corr/abs-1710-03748}.
 
 ?? Reference to the possible mistreatment of RL in our domain? The problem of ``blind application'' so hated by \textcite{DBLP:conf/sp/SommerP10}.
 
-?? RL as a mechanism to protect systems by monitoring performance characteristics---overcome the detection problem (different handle on the key problems of burstiness, evolution, non-stationarity).
-
 This paper contributes:
 \begin{itemize}
 	\item A DDoS mitigation system based on direct-control reinforcement learning designed for deployment in real-world software-defined networks (\cref{sec:environment-and-rl-algorithm,sec:rethinking-the-state-space}).
-	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}---a deconstruction of their formulation, and an acknowledgement of the flaws and risk factors of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a} (\cref{sec:performance-in-an-emulated-environment}).
-	\item ?? TODO: Advance the use/representation/granularity of state-space in direct-control RL of networked applications (\cref{sec:rethinking-the-state-space}).
+	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}---a deconstruction and empirical study on their formulation, flaws and risk factors concerning many traffic distributions (\cref{sec:performance-in-an-emulated-environment}).
+	\item A reactive simulation of web-server traffic, designed to test system characteristics which packet trace playback fails to capture (\cref{sec:a-new-normal}).
+	\item A flow-level granularity approach to RL-driven DDoS prevention, improving upon past aggregate-based approaches (\cref{sec:rethinking-the-state-space}), alongside an empirical evaluation (\cref{sec:the-results-of-doing-so}).
 \end{itemize}
 
 \section{Background}
 %?? Introduce RL, related definitions etc.
+\subsection{Reinforcement Learning}
 \emph{Reinforcement learning} (RL) is a variant of machine learning principally concerned with with training an agent to choose an optimal sequence of actions in the pursuit of a given task \cite{RL2E}.
 We assume the agent has a certain amount of knowledge whenever a decision must be made: at any point in time $t$ it knows which \emph{state} it is in ($S_t \in \mathcal{S}$), the set of \emph{actions} which are available to it ($\operatorname{A}(S_t) \subseteq \mathcal{A}$) and, if available, a numeric \emph{reward} obtained from the last action chosen ($R_t \in \mathbb{R}, A_{t-1} \in \operatorname{A}(S_{t-1})$).
-This formulation of interaction with a system is best described as a \emph{Markov decision process} (MDP).
+This model of system interaction is best described as a \emph{Markov decision process} (MDP).
 RL methods combine this information with a current \emph{policy} $\pi$ to determine which action should be taken: such a choice need not be optimal, if an agent needs to further explore some region of the state space.
-The policy is then further refined by updating value estimates for state-action pairs or via policy gradient methods, meaning that RL-based approaches learn adaptively and online if reward functions are available in their deployment environment.
+The policy is then further refined by updating value estimates for state-action pairs or via policy gradient methods, meaning that RL-based approaches learn adaptively and online if reward functions are available in the environment they are deployed in.
 From any point in a sequence of decisions, we may describe the sum of rewards yet to come as the \emph{discounted return}, $G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+2} + \ldots$, choosing the discount factor $\gamma \in [0,1]$ to determine how crucial future rewards are vis-\`{a}-vis the current state.
-Formally then, the goal is to choose actions which maximise the \emph{expected discounted return} $\operatorname{\mathbb{E}_{\pi}}[G_t]$.
+Formally, an agent's goal is to choose actions which maximise the \emph{expected discounted return} $\operatorname{\mathbb{E}_{\pi}}[G_t]$.
 
 %?? Include some details of function approximation in the formalisation? I.e. tile coding, stability and convergence guarantees...
 
@@ -241,18 +242,35 @@ Given a weight vector $\wvec{0}=\bm{0}$ and learning rate $\alpha$, we may appro
 Computing the approximate value of every action available in the current state forms the basis of a policy.
 Actions with maximal value can be chosen each time (the \emph{greedy} policy), we might modify this by taking random actions with probability $\epsilon$ to encourage early exploration (the \emph{$\epsilon$-greedy policy}), or we might use some other mechanism.
 
-If $\operatorname{A}(s) = \mathcal{A}$ in every state (and actions are themselves discrete), these properties of the problem allow a particularly efficient (vectorised) implementation of the policy and update rules by storing a vector of action values for each state encountered.
+If $\operatorname{A}(s) = \mathcal{A}$ in every state (and actions are themselves discrete), these properties allow a particularly efficient (vectorised) implementation of the policy and update rules by storing a vector of action values for each state encountered.
 Observing that $\nabla{\acval{s}{a}{\wvec{}}} = \operatorname{\mathbf{x}}(s, a)$, further optimisations arise by considering that a tile-coded feature vector is a binary vector of constant Hamming weight (and so is amenable to representation as an array of indices).
 Action values for any state are then obtained by summation of the weight vectors from all activated tiles.
 Moreover, we need not store action values for tiles which have not yet been visited, conserving memory.
 
 %?? Is this \emph{actually} just sarsa? We're using fn approx (of course), but this is fraught with its own difficulties. Is it strictly speaking correct to describe it as Sarsa at this point? It's, at the very least, 1-step semi-gradient Sarsa given that it is clearly on-policy w/ fn approx...
 
-?? Discuss mininet? Networking terms? SDN stuff?
+%\subsection{Intrusion Detection}
+%Probably want to talk about NIDS/IPS,
+%?? Discuss mininet? Networking terms? SDN stuff?
 
-?? Probably want to talk about NIDS/IPS, DDoS attack variants (leading into characteristics, supporting features). Amplification (UDP \cite{DBLP:conf/ndss/Rossow14}, TCP \cite{DBLP:conf/uss/KuhrerHRH14}), Transit-link (Crossfire \cite{DBLP:conf/sp/KangLG13}, Coremelt \cite{DBLP:conf/esorics/StuderP09}). Mirai botnet's involvement \cite{DBLP:conf/uss/AntonakakisABBB17}.
+\subsection{Distributed Denial of Service (DDoS)}
+%?? DDoS attack variants (leading into characteristics, supporting features). Amplification (UDP \cite{DBLP:conf/ndss/Rossow14}, TCP \cite{DBLP:conf/uss/KuhrerHRH14}), Transit-link (Crossfire \cite{DBLP:conf/sp/KangLG13}, Coremelt \cite{DBLP:conf/esorics/StuderP09}). Mirai botnet's involvement \cite{DBLP:conf/uss/AntonakakisABBB17}.
 
-?? What makes RL a suitable method for network anomaly detection, what features are most relevant?
+%?? Explain amplification attack, maybe transit-link?
+
+DDoS attacks are concentrated efforts by many hosts to reduce the availability of a service, typically to inflict financial harm or as an act of vandalism.
+Attackers achieve this either by exploiting peculiarities of operating system or application behaviour (e.g., \emph{SYN flooding attacks}), or overwhelming their target through sheer volume of requests or inbound packets (\emph{flooding-based attacks}).
+Hosts often participate unwillingly, often having been recruited into a \emph{botnet} by malware infection to be orchestrated from elsewhere \cite{DBLP:conf/uss/AntonakakisABBB17}.
+
+Although there are variations of each class of attack, flooding attacks are the most relevant to our work.
+\emph{Amplification attacks} exploit the presence of services who eagerly send large replies in response to small requests, where UDP-based services like DNS and NTP are most vulnerable \cite{DBLP:conf/ndss/Rossow14, DBLP:conf/uss/KuhrerHRH14}.
+Malicious hosts send many small requests, spoofed to appear as though the originated from the victim, significantly increasing a botnet's throughput while masking the identity of each participant.
+\emph{Transit-link attacks} have been the subject of recent attention, wherein malicious traffic is forwarded across core links needed to reach a target (but not to the target itself) \cite{DBLP:conf/sp/KangLG13, DBLP:conf/esorics/StuderP09}.
+
+\subsection{Motivation}
+%?? What makes RL a suitable method for network anomaly detection, what features are most relevant?
+%?? Point I was thinking of: feedback-loop-like model allows monitoring \emph{after} an action is taken to (in theory) allow forgiveness of mistakenly punished flows. This does hinge on taking a flow-by-flow look at the state space, but if we can combine knowledge of current state (duh!), the last action taken (i.e. an indicator of our previous assessment [such as high pdrop $\implies$ bad]) then perhaps a flow which falls off identically to a legit flow can be rescued.
+Moving beyond the overt benefits of choosing RL-based defences for coping with non-stationary problems, we believe that there are concrete benefits associated with this problem.
 ?? Point I was thinking of: feedback-loop-like model allows monitoring \emph{after} an action is taken to (in theory) allow forgiveness of mistakenly punished flows. This does hinge on taking a flow-by-flow look at the state space, but if we can combine knowledge of current state (duh!), the last action taken (i.e. an indicator of our previous assessment [such as high pdrop $\implies$ bad]) then perhaps a flow which falls off identically to a legit flow can be rescued.
 
 ?? Relevant features: aggregate network state (load at various points [this has been done, of course]), flow-specific measurements (upload/download ratio when bandwidth above threshold \cite{DBLP:conf/ndss/Rossow14}, packet inter-arrival times, etc.)
@@ -272,9 +290,13 @@ Moreover, we need not store action values for tiles which have not yet been visi
 
 \section{Threat Model}
 
-?? The fine folks at most security conferences will want to see one. I suppose it serves its purpose by delineating what an attacker can/cannot do.
+%?? The fine folks at most security conferences will want to see one. I suppose it serves its purpose by delineating what an attacker can/cannot do.
 
-?? TODO: threat model.
+We assume that attacks are flooding-based DDoS attacks with the structure of an \emph{amplification attack}, and that traffic aggregates at the target (unlike in a \emph{transit-link attack}).
+The addresses of any machines taking part in an attack are not revealed to the target, save for the fairly stable set of unwitting reflector nodes.
+Finally, we do not assume that an attacker has white-box access to the parameters underlying an agent's policy, or that they will attempt to intelligently modify flow/system state to indirectly control an agent \cite{DBLP:conf/eurosp/PapernotMJFCS16, DBLP:conf/eurosp/PapernotMSW18, DBLP:journals/corr/HuangPGDA17, DBLP:conf/sp/Carlini017}.
+While they may be able to perform some degree of reverse engineering by observing the health of their own legitimate canary flows, ``stealing'' the policy through observation \cite{DBLP:conf/uss/TramerZJRR16}, investigating whether perturbations would persist in a medium as volatile as network traffic statistics falls outside of the scope of this work.
+The same observation extends to the possibility of poisoning attacks \cite{DBLP:journals/jmlr/KloftL10, DBLP:conf/acsac/ShenTS16}; to the best of our knowledge, no studies have been undertaken surrounding the mis-training of RL agents.
 
 \section{Environment and RL Algorithm}\label{sec:environment-and-rl-algorithm}
 
@@ -282,7 +304,7 @@ Moreover, we need not store action values for tiles which have not yet been visi
 
 %?? State the problem and what we want to achieve.
 To best discover how the use of RL techniques in the field of network intrusion prevention may bet be improved, it's prudent that we start by looking for weaknesses in work which exists today.
-The closest approach which is available within this field is that of \textcite{DBLP:journals/eaai/MalialisK15}, and their contribution in applying RL to the task of intrusion prevention is significant:  their work helped to show the viability of live, adaptive, feedback loop-like control of the network to detect and prevent DDoS attacks.
+The closest approach which is available within this field is that of \textcite{DBLP:journals/eaai/MalialisK15}, and their contribution in applying RL to the task of intrusion prevention is significant: their work helped to show the viability of live, adaptive, feedback loop-like control of the network to detect and prevent DDoS attacks.
 We begin with a reimplementation and more principled re-examination of their work to further develop the field.
 
 %?? Explicitly say the ``REIMPLEMENTING M\&K THING'' over here, to make later paras make a reasonable amount of sense.
@@ -397,6 +419,8 @@ Each agent has its own internal parameter vector $\wvec{}$, and agents do not sh
 
 ?? wrt reward function relying on heuristic elements or perfect knowledge:
 A sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training by a simulated environment to transfer to reality.
+?? BUT, if we don't have reward functions which are available at runtime, then we've lost out on what is arguably one of the main benefits that RL can give us!
+?? Need to tie in the concept of ``meaningful work''?
 
 \section{Performance in an Emulated Environment}\label{sec:performance-in-an-emulated-environment}
 The original introduction of this approach to direct-control reinforcement learning as introduced by \textcite{DBLP:journals/eaai/MalialisK15} fails to consider key cases: disjoint ranges of traffic distribution (i.e., the presence of benign heavy-hitters), the accurate simulation of TCP-like behaviour (and its effects on collateral damage), and assumes a rigid and unrepresentative topology.
@@ -436,13 +460,12 @@ Host allocations were generated pseudorandomly to ensure fairness between choice
 This manifests in two ways: the best-achievable performance decreases, as does the learning rate.
 The first consequence arises analytically.
 Given the probability that a host is legitimate, $P_G \in [0,1]$, it follows that a host will be malicious with probability $P_B = 1 - P_G$.
-Defining \emph{imperfect service} to mean any case where all $n$ hosts connecting over a switch do not share the same classification (i.e., a mixture), then the probability that a switch is delivering imperfect service is $P_{M,n} = 1 - (P_G^2 - P_B^2)$.
+Defining \emph{imperfect service} to mean any case where all $n$ hosts connecting over a switch do not share the same classification (i.e., a mixture), then the probability that a switch is delivering imperfect service is $P_{M,n} = 1 - (P_G^n + P_B^n)$.
 \begin{thm}
-	As $n$ increases, it is more likely that a switch will exhibit imperfect service, i.e., $\forall n \in \mathbb{Z}^{+}, P_{M,n} \le P_{M,n+1}$.
+	As $n$ increases, it is more likely that a throttling switch will exhibit imperfect service: $\forall n \in \mathbb{Z}^{+}, P_{M,n} \le P_{M,n+1}$.
 \end{thm}
 \begin{proof}
 	\emph{Base case:} $P_{M,1}=0, P_{M,2} = 1 - P_G^2 - P_B^2 > 0$.
-	
 	\emph{Inductive step:} Assume that the theorem holds for $n$. Observe that $P_G^n \ge P_G^{n+1}$ (resp.\ $P_B$). It then follows that:
 	\begin{align*}
 	P_G^n + P_B^n &\ge P_G^{n+1} + P_B^{n+1}\\
@@ -549,6 +572,8 @@ The necessity of this arises due to the realities of relying upon Linux's IP sta
 
 \section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
 
+?? Mention Colin/Qianru's concerns about Quic, IPv6. At this point, src/dst IP is the only ``traditional'' characteristics. Even then, IPv6 can have a different IP for each application ON A HOST. Port number meaningless...
+
 ?? What do we want?
 
 \begin{IEEEdescription}[\IEEEsetlabelwidth{Global state}]
@@ -582,7 +607,7 @@ The necessity of this arises due to the realities of relying upon Linux's IP sta
 
 ?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other!
 
-\section{The Results of Doing So}
+\section{The Results of Doing So}\label{sec:the-results-of-doing-so}
 
 ?? They'd probably look real nice...
 
