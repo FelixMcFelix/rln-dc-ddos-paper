@@ -207,7 +207,7 @@ def marlExperiment(
 
 	def flow_to_state_vec(flow_set):
 		return [
-			float(struct.unpack("I", flow_set["ip"])[0]),
+			float(flow_set["ip"]),
 			float(flow_set["last_act"]) / 10.0,
 			# conert from ns to ms
 			flow_set["length"] / 1000000,
@@ -963,13 +963,14 @@ def marlExperiment(
 						goods.append(val)
 					else:
 						bads.append(val)
+				unfused_load_mbps = [val for pair in zip(goods, bads) for val in pair]
 				recvd = recvd[full:]
 
-				# read a u32,
+				# read a u32 (network order),
 				# then read that many size 88 structs
 				len_u32 = 8
 				read_n(len_u32)
-				(n_flow_entries,) = struct.unpack("L", recvd[:len_u32])
+				(n_flow_entries,) = struct.unpack("!L", recvd[:len_u32])
 				recvd = recvd[len_u32:]
 				# (ip, stats)
 				parsed_flows = []
@@ -978,11 +979,16 @@ def marlExperiment(
 				for i in xrange(n_flow_entries):
 					read_n(stat_struct_len)
 					datas = struct.unpack(
-						"q6Q6fL",
+						"q6Q6f!L",
 						recvd[:stat_struct_len_nopad]
 					)
 					recvd = recvd[stat_struct_len:]
-					# TODO: reshape and place into parsed_flows
+					parsed_flows.append(
+						(datas[-1], tuple(
+							datas[0:5] + datas[7:9] + [datas[5]] +
+							datas[9:11] + [datas[6]] + datas[11:13]
+						))
+					)
 
 				# repack it as the rest of the model expects
 				return (time_ns, unfused_load_mps, parsed_flows)
@@ -1022,7 +1028,8 @@ def marlExperiment(
 						for item in e[1:]:
 							sublayer.append(float(item))
 						if e[0] != "0.0.0.0":
-							layer.append((e[0], sublayer))
+							ip_bytes = socket.inet_pton(socket.AF_INET, e[0])
+							layer.append((struct.unpack("!L", ip_bytes), sublayer))
 						
 					parsed_flows.append(layer)
 
@@ -1233,7 +1240,6 @@ def marlExperiment(
 						#  pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, [8-10]
 						#  wnd_iat_mean, wnd_iat_var [11-12]
 						# )
-						# som
 						flow_space = learner_stats[learner_no]
 						flow_traces = learner_traces[learner_no]
 						flows_seen = parsed_flows[learner_no]
@@ -1245,7 +1251,7 @@ def marlExperiment(
 
 							if ip not in flow_space:
 								flow_space[ip] = {
-									"ip": socket.inet_pton(socket.AF_INET, ip),
+									"ip": ip,
 									"last_act": 0,
 									"last_rate_in": -1.0,
 									"last_rate_out": -1.0}

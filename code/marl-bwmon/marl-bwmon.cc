@@ -776,6 +776,12 @@ static void server_runner(InterfaceStats &stats) {
 			}
 		}
 
+		// How many stat blocks are we about to send?
+		auto num_blocks = htonl((uint32_t) stat_block.flows.size());
+		if (send_val(new_conn, &num_blocks, sizeof(uint32_t), stats)) {
+			break;
+		}
+
 		// And now, use the acquired ip addresses to
 		// ping along the relevant stat blocks!
 		for (auto flow : stat_block.flows) {
