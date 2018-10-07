@@ -5,7 +5,7 @@ marker: $(targets)
 	touch marker
 
 %.pdf: %.tex
-	lualatex $< > /dev/null 2>&1
+	latexmk -lualatex -pdf $< > /dev/null 2>&1
 
 %.tex: %.gnuplot $(source_data)
 	gnuplot $<

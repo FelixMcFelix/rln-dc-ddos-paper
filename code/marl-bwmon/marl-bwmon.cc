@@ -81,6 +81,23 @@ struct Stat {
 	}
 };
 
+struct FlowMeasurement {
+	int64_t flow_length;
+	uint64_t size_in;
+	uint64_t size_out;
+	uint64_t delta_in;
+	uint64_t delta_out;
+	uint64_t packets_in_count;
+	uint64_t packets_out_count;
+	float packets_in_mean;
+	float packets_in_variance;
+	float packets_out_mean;
+	float packets_out_variance;
+	float iat_mean;
+	float iat_variance;
+	uint32_t ip;
+};
+
 struct FlowStats
 {
 	// flow size
@@ -168,6 +185,45 @@ struct FlowStats
 		return true;
 	}
 
+	std::optional<FlowMeasurement> clearAndRetrieveStats(uint32_t ip, char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
+		auto prune_age = ch::seconds(10);
+
+		// prune here if last packet rx'd was of a certain age,
+		// AND there was no info gleaned in this window.
+		// Don't print stats in that case.
+
+		auto duration = endTime - flow_start;
+		auto silent_duration = endTime - last_entry;
+
+		if (silent_duration > prune_age && last_entry < startTime) {
+			return std::nullopt;
+		}
+
+		auto fm = FlowMeasurement {
+			ch::nanoseconds(duration).count(),
+			flow_size_in,
+			flow_size_out,
+			flow_size_in - flow_size_in_prev,
+			flow_size_out - flow_size_out_prev,
+			in_packets_window.k,
+			out_packets_window.k,
+			(float) in_packets_window.mean,
+			(float) in_packets_window.variance(),
+			(float) out_packets_window.mean,
+			(float) out_packets_window.variance(),
+			(float) interarrivals_window.mean,
+			(float) interarrivals_window.variance(),
+			ip,
+		};
+
+		clear();
+
+		flow_size_in_prev = flow_size_in;
+		flow_size_out_prev = flow_size_out;
+
+		return std::optional<FlowMeasurement> {fm};
+	}
+
 	void clear() {
 		in_packets_window.clear();
 		out_packets_window.clear();
@@ -177,6 +233,14 @@ struct FlowStats
 	void clear_full() {
 		clear();
 	}
+};
+
+struct ValueSet {
+	ch::high_resolution_clock::time_point time;
+	int64_t duration_ns;
+	std::vector<uint64_t> good_bytes;
+	std::vector<uint64_t> bad_bytes;
+	std::vector<FlowMeasurement> flows;
 };
 
 class InterfaceStats
@@ -240,6 +304,80 @@ public:
 				stat_holder[ip] = new_stat;
 			}
 		}
+	}
+
+	ValueSet clearAndRetrieveStats(ch::high_resolution_clock::time_point startTime, std::vector<uint32_t> &allowed_ips) {
+		std::unique_lock<std::shared_mutex> lock(mutex_);
+
+		auto endTime = ch::high_resolution_clock::now();
+		auto duration = endTime - startTime;
+
+		// First, tell the threads they have a limit TO WORK UP TO.
+		limiting_ = true;
+		limit_ = endTime;
+		to_go_.store(num_interfaces_);
+
+		// Okay, now await the signal from all the workers...
+		int t_g = num_interfaces_;
+		while ((t_g = to_go_.load()) > 0) hit_limit_.wait(lock);
+
+		// Then, we need to wait for them to finish before we do all this...
+		auto duration_ns = ch::nanoseconds(duration).count();
+		auto goods = good_byte_counts_;
+		auto bads = bad_byte_counts_;
+		auto flows = std::vector<FlowMeasurement>();
+
+		// capture all relevant flow info...
+		// use allowed_ips
+		for (unsigned int i = 0; i < flow_stats_.size(); ++i)
+		{
+			if (!isImportant(i)) {
+				continue;
+			}
+
+			auto &ip_map = flow_stats_.at(i);
+			auto to_prune = std::vector<uint32_t>();
+
+			for (auto &el: ip_map) {
+				char ip_str[INET_ADDRSTRLEN];
+				auto c_ip = reinterpret_cast<const in_addr *>(&el.first);
+				inet_ntop(AF_INET, c_ip, ip_str, INET_ADDRSTRLEN);
+
+				auto maybe_flow_stat = el.second.clearAndRetrieveStats(el.first, ip_str, startTime, endTime);
+				if (maybe_flow_stat == std::nullopt) {
+					to_prune.emplace_back(el.first);
+				} else {
+					if (std::find(allowed_ips.begin(), allowed_ips.end(), el.first) != allowed_ips.end()) {
+						flows.emplace_back(maybe_flow_stat.value());
+					}
+				}
+			}
+
+			for (auto &ip: to_prune) {
+				ip_map.erase(ip);
+			}
+		}
+
+		std::cout << std::endl;
+
+		// Empty the stats.
+		for (auto &el: good_byte_counts_)
+			el = 0;
+		for (auto &el: bad_byte_counts_)
+			el = 0;
+
+		limiting_ = false;
+
+		// Signal done.
+		stopped_limiting_.notify_all();
+
+		return ValueSet {
+			endTime,
+			duration_ns,
+			goods,
+			bads,
+			flows,
+		};
 	}
 
 	ch::high_resolution_clock::time_point clearAndPrintStats(ch::high_resolution_clock::time_point startTime) {
@@ -521,7 +659,33 @@ static bool read_val(int fd, void *location, size_t len, InterfaceStats &stats) 
 	return err;
 }
 
+static bool send_val(int fd, void *location, size_t len, InterfaceStats &stats) {
+	auto remaining = len;
+	auto err = false;
+
+	while (remaining && !err) {
+		auto bytes_read = 0;
+		bytes_read = send(
+			fd,
+			(reinterpret_cast<char *>(location)) + (len - remaining),
+			remaining,
+			0
+		);
+
+		if (bytes_read < 0 || stats.finished()) {
+			err = true;
+			break;
+		} else {
+			remaining -= bytes_read;
+		}
+	}
+
+	return err;
+}
+
 static void server_runner(InterfaceStats &stats) {
+	auto startTime = ch::high_resolution_clock::now();
+
 	int server_fd;
 	sockaddr_in address, remote;
 	auto opt = 1;
@@ -590,15 +754,47 @@ static void server_runner(InterfaceStats &stats) {
 			break;
 		}
 
-		// Okay, send float values for all the standard loads...
-		// TODO
+		// Hacky -- assumes both ends are IEEE-754 compliant floats.
+		// This should give us everything we need though, gcc won't
+		// reorder structs thankfully.
+		auto stat_block = stats.clearAndRetrieveStats(startTime, flow_ips);
+
+		// send time since last read in ns...
+		if (send_val(new_conn, &stat_block.duration_ns, sizeof(int64_t), stats)) {
+			break;
+		}
+
+		// Okay, send byte values for all the standard loads...
+		for (auto b_val : stat_block.good_bytes) {
+			if (send_val(new_conn, &b_val, sizeof(uint64_t), stats)) {
+				goto escape;
+			}
+		}
+		for (auto b_val : stat_block.bad_bytes) {
+			if (send_val(new_conn, &b_val, sizeof(uint64_t), stats)) {
+				goto escape;
+			}
+		}
+
+		// How many stat blocks are we about to send?
+		auto num_blocks = htonl((uint32_t) stat_block.flows.size());
+		if (send_val(new_conn, &num_blocks, sizeof(uint32_t), stats)) {
+			break;
+		}
 
 		// And now, use the acquired ip addresses to
 		// ping along the relevant stat blocks!
-		// TODO
+		for (auto flow : stat_block.flows) {
+			if (send_val(new_conn, &flow, sizeof(FlowMeasurement), stats)) {
+				goto escape;
+			}
+		}
+
+		startTime = stat_block.time;
 	}
 
 	// Donezo.
+escape:
 	close(new_conn);
 	close(server_fd);
 	std::this_thread::yield();
@@ -644,6 +840,7 @@ int main(int argc, char const *argv[])
 
 	if (num_interfaces == 0) {
 		listDevices(errbuf);
+		printf("Struct size? %" PRIu64 "\n", sizeof(FlowMeasurement));
 		return 0;
 	}
 
