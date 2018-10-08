@@ -19,7 +19,7 @@ set ytics nomirror
 set datafile separator ","
 
 set xlabel "Iteration ($t \\cdot{} \\SI{50}{\\milli\\second}$)"
-set ylabel "Ratio Legit Traffic Preserved"
+set ylabel "Reward"
 
 set yzeroaxis
 set yrange [-1.0:1.0]

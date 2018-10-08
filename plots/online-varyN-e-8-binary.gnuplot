@@ -14,6 +14,7 @@ set border 3
 set grid x y
 set xtics nomirror
 set ytics nomirror
+#set key above
 
 #set key autotitle columnhead
 set datafile separator ","
