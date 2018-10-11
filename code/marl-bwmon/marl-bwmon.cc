@@ -14,12 +14,15 @@
 
 #include <arpa/inet.h>
 #include <fcntl.h>
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <netinet/in.h>
 #include <pcap/pcap.h>
 #include <poll.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/un.h>
 #include <unistd.h>
 
 namespace ch = std::chrono;
@@ -32,6 +35,9 @@ ch::high_resolution_clock::time_point stdifyTimeval(const struct timeval tv) {
 }
 
 const int LISTEN_PORT = 9932;
+const bool TIME_PRINT_ERR = false;
+const bool USE_UNIX_SOCK = true;
+const char *SOCKET_PATH = "bwmon-sock";
 
 // Store and update some stats about float64s.
 struct Stat {
@@ -122,6 +128,9 @@ struct FlowStats
 	ch::high_resolution_clock::time_point flow_start;
 	ch::high_resolution_clock::time_point last_entry;
 
+	// unseen?
+	bool unseen = true;
+
 	FlowStats() {
 		//interarrivals.report_update = true;
 	};
@@ -182,10 +191,11 @@ struct FlowStats
 		flow_size_in_prev = flow_size_in;
 		flow_size_out_prev = flow_size_out;
 
+		unseen = false;
 		return true;
 	}
 
-	std::optional<FlowMeasurement> clearAndRetrieveStats(uint32_t ip, char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
+	std::optional<std::pair<bool, FlowMeasurement>> clearAndRetrieveStats(uint32_t ip, char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
 		auto prune_age = ch::seconds(10);
 
 		// prune here if last packet rx'd was of a certain age,
@@ -221,7 +231,10 @@ struct FlowStats
 		flow_size_in_prev = flow_size_in;
 		flow_size_out_prev = flow_size_out;
 
-		return std::optional<FlowMeasurement> {fm};
+		auto new_data = unseen;
+		unseen = false;
+
+		return std::optional<std::pair<bool, FlowMeasurement>> {std::make_pair(new_data, fm)};
 	}
 
 	void clear() {
@@ -240,7 +253,7 @@ struct ValueSet {
 	int64_t duration_ns;
 	std::vector<uint64_t> good_bytes;
 	std::vector<uint64_t> bad_bytes;
-	std::vector<FlowMeasurement> flows;
+	std::vector<std::vector<FlowMeasurement>> flows;
 };
 
 class InterfaceStats
@@ -319,13 +332,15 @@ public:
 
 		// Okay, now await the signal from all the workers...
 		int t_g = num_interfaces_;
-		while ((t_g = to_go_.load()) > 0) hit_limit_.wait(lock);
+		while ((t_g = to_go_.load()) > 0) {
+			hit_limit_.wait(lock);
+		}
 
 		// Then, we need to wait for them to finish before we do all this...
 		auto duration_ns = ch::nanoseconds(duration).count();
 		auto goods = good_byte_counts_;
 		auto bads = bad_byte_counts_;
-		auto flows = std::vector<FlowMeasurement>();
+		auto flows = std::vector<std::vector<FlowMeasurement>>();
 
 		// capture all relevant flow info...
 		// use allowed_ips
@@ -337,6 +352,7 @@ public:
 
 			auto &ip_map = flow_stats_.at(i);
 			auto to_prune = std::vector<uint32_t>();
+			auto local_flows = std::vector<FlowMeasurement>();
 
 			for (auto &el: ip_map) {
 				char ip_str[INET_ADDRSTRLEN];
@@ -347,18 +363,19 @@ public:
 				if (maybe_flow_stat == std::nullopt) {
 					to_prune.emplace_back(el.first);
 				} else {
-					if (std::find(allowed_ips.begin(), allowed_ips.end(), el.first) != allowed_ips.end()) {
-						flows.emplace_back(maybe_flow_stat.value());
+					auto d = maybe_flow_stat.value();
+					// Need to bypass this if flow is new.
+					if (d.first || std::find(allowed_ips.begin(), allowed_ips.end(), el.first) != allowed_ips.end()) {
+						local_flows.emplace_back(d.second);
 					}
 				}
 			}
+			flows.emplace_back(local_flows);
 
 			for (auto &ip: to_prune) {
 				ip_map.erase(ip);
 			}
 		}
-
-		std::cout << std::endl;
 
 		// Empty the stats.
 		for (auto &el: good_byte_counts_)
@@ -664,19 +681,19 @@ static bool send_val(int fd, void *location, size_t len, InterfaceStats &stats) 
 	auto err = false;
 
 	while (remaining && !err) {
-		auto bytes_read = 0;
-		bytes_read = send(
+		auto bytes_sent = 0;
+		bytes_sent = send(
 			fd,
 			(reinterpret_cast<char *>(location)) + (len - remaining),
 			remaining,
 			0
 		);
 
-		if (bytes_read < 0 || stats.finished()) {
+		if (bytes_sent < 0 || stats.finished()) {
 			err = true;
 			break;
 		} else {
-			remaining -= bytes_read;
+			remaining -= bytes_sent;
 		}
 	}
 
@@ -688,11 +705,19 @@ static void server_runner(InterfaceStats &stats) {
 
 	int server_fd;
 	sockaddr_in address, remote;
+	sockaddr_un u_address;
 	auto opt = 1;
 
-	if (!(server_fd = socket(PF_INET, SOCK_STREAM, 0))) {
-		perror("couldn't create socket");
-		exit(EXIT_FAILURE);
+	if (!USE_UNIX_SOCK){
+		if (!(server_fd = socket(PF_INET, SOCK_STREAM, 0))) {
+			perror("couldn't create socket");
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		if (!(server_fd = socket(PF_LOCAL, SOCK_STREAM, 0))) {
+			perror("couldn't create socket");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	if(setsockopt(
@@ -710,10 +735,23 @@ static void server_runner(InterfaceStats &stats) {
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons(LISTEN_PORT);
 
-	if (bind(server_fd, (sockaddr *)&address, sizeof(address)) < 0) {
-		perror("failed to bind port...");
-		close(server_fd);
-		exit(EXIT_FAILURE);
+	memset(&u_address, 0, sizeof(u_address));
+	u_address.sun_family = AF_UNIX;
+	strncpy(u_address.sun_path, SOCKET_PATH, sizeof(u_address.sun_path)-1);
+
+	if (!USE_UNIX_SOCK) {
+		if (bind(server_fd, (sockaddr *)&address, sizeof(address)) < 0) {
+			perror("failed to bind port...");
+			close(server_fd);
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		unlink(SOCKET_PATH);
+		if (bind(server_fd, (sockaddr *)&u_address, sizeof(u_address)) < 0) {
+			perror("failed to bind port...");
+			close(server_fd);
+			exit(EXIT_FAILURE);
+		}
 	}
 	if (listen(server_fd, 1) < 0) {
 		perror("failed to listen on local address");
@@ -753,6 +791,7 @@ static void server_runner(InterfaceStats &stats) {
 		if (read_val(new_conn, flow_ips.data(), fip_size, stats)) {
 			break;
 		}
+		auto inTime = ch::high_resolution_clock::now();
 
 		// Hacky -- assumes both ends are IEEE-754 compliant floats.
 		// This should give us everything we need though, gcc won't
@@ -776,25 +815,32 @@ static void server_runner(InterfaceStats &stats) {
 			}
 		}
 
-		// How many stat blocks are we about to send?
-		auto num_blocks = htonl((uint32_t) stat_block.flows.size());
-		if (send_val(new_conn, &num_blocks, sizeof(uint32_t), stats)) {
-			break;
-		}
-
 		// And now, use the acquired ip addresses to
 		// ping along the relevant stat blocks!
-		for (auto flow : stat_block.flows) {
-			if (send_val(new_conn, &flow, sizeof(FlowMeasurement), stats)) {
+		for (auto &flow : stat_block.flows) {
+			auto n_flows = (uint32_t) flow.size();
+			auto prep = htonl(n_flows);
+			if (send_val(new_conn, &prep, sizeof(uint32_t), stats)) {
+				goto escape;
+			}
+			if (n_flows < 1) {
+				continue;
+			}
+			if (send_val(new_conn, flow.data(), n_flows * sizeof(FlowMeasurement), stats)) {
 				goto escape;
 			}
 		}
 
 		startTime = stat_block.time;
+		auto outTime = ch::high_resolution_clock::now();
+		if (TIME_PRINT_ERR) {
+			std::cerr << "C-time:" << ch::nanoseconds(outTime - inTime).count()/1000000 << std::endl;
+		}
 	}
 
 	// Donezo.
 escape:
+	shutdown(new_conn, SHUT_RDWR);
 	close(new_conn);
 	close(server_fd);
 	std::this_thread::yield();
@@ -827,7 +873,6 @@ int main(int argc, char const *argv[])
 	auto num_interfaces = argc - 1;
 	auto start_pos = 1;
 	auto server = false;
-	auto stats = InterfaceStats(num_interfaces);
 
 	std::vector<std::thread> workers;
 
@@ -844,6 +889,7 @@ int main(int argc, char const *argv[])
 		return 0;
 	}
 
+	auto stats = InterfaceStats(num_interfaces);
 	auto startTime = ch::high_resolution_clock::now();
 
 	bool err = false;
@@ -891,7 +937,13 @@ int main(int argc, char const *argv[])
 			if (std::cin.eof()) break;
 
 			if (!server) {
+				auto inTime = ch::high_resolution_clock::now();
 				startTime = stats.clearAndPrintStats(startTime);
+			
+				auto outTime = ch::high_resolution_clock::now();
+				if (TIME_PRINT_ERR) {
+					std::cerr << "C-time:" << ch::nanoseconds(outTime - inTime).count()/1000000 << std::endl;
+				}
 			}
 		}
 	}

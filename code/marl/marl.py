@@ -12,6 +12,7 @@ import twink.ofp5.parse as ofpp
 
 from contextlib import closing
 import cPickle as pickle
+import errno
 import itertools
 import math
 import networkx as nx
@@ -19,6 +20,7 @@ import numpy as np
 import os
 import random
 from sarsa import SarsaLearner
+import select
 import signal
 import socket
 import struct
@@ -100,7 +102,9 @@ def marlExperiment(
 		state_direction = "in",
 		actions_target_flows = False,
 
-		bw_mon_socketed = True,
+		bw_mon_socketed = False,
+		unix_sock = True,
+		print_times = False,
 	):
 
 	linkopts_core = linkopts
@@ -327,7 +331,7 @@ def marlExperiment(
 		return int(prob * 0xffffffff)
 
 	def netip(ip, subnet):
-		(lhs,) = struct.unpack("I", socket.inet_aton(ip))
+		(lhs,) = struct.unpack("I", socket.inet_aton(ip)) if isinstance(ip, str) else (ip,)
 		(rhs,) = struct.unpack("I", socket.inet_aton(subnet))
 		return struct.pack("I", lhs & rhs)
 
@@ -527,11 +531,15 @@ def marlExperiment(
 
 	def enactActions(learners, sarsas, flow_action_sets):
 		if actions_target_flows:
+			intime = time.time()
 			for (node, sarsa, maps) in zip(learners, sarsas, flow_action_sets):
 				for ip, state in maps.iteritems():
 					(_, action, _) = state
 					a = action if override_action is None else override_action
 					updateUpstreamRoute(node, ac_prob=a, target_ip=ip)
+			outtime = time.time()
+			if print_times:
+				print "do_acs:", outtime-intime
 		else:
 			for (node, sarsa) in zip(learners, sarsas):
 				(_, action, _) = sarsa.last_act
@@ -912,89 +920,122 @@ def marlExperiment(
 		#  pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, [8-10]
 		#  wnd_iat_mean, wnd_iat_var [11-12]
 		# )
+		bw_sock = None
 		if bw_mon_socketed:
 			# need to mix this with connection management
 			# i.e. open a socket out here, have this function make use of it...
 			# remember to close this at the end...!
-			bw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			try:
-				socket.SO_REUSEPORT
-			except AttributeError:
-				pass
-			else:
-				bw_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+			#bw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			#try:
+			#	socket.SO_REUSEPORT
+			#except AttributeError:
+			#	pass
+			#else:
+			#	bw_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
 
-			bw_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-			bw_sock.create_connection(("127.0.0.1", stats_port))
+			#bw_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			time.sleep(0.5)
+			if unix_sock:
+				bw_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+				bw_sock.connect("bwmon-sock")
+			else:
+				bw_sock = socket.create_connection(("127.0.0.1", stats_port))
+			bw_sock.setblocking(0)
 
 			# "flows" should be an array of u32s
-			def ask_stats(flows, n_ifs):
+			sz_packer = struct.Struct("!I")
+			ip_packer = struct.Struct("=I")
+			time_packer = struct.Struct("=q")
+			bytes_packer = struct.Struct("=Q")
+			fm_packer = struct.Struct("=q6Q6fI4x")
+			def ask_stats(flows, n_ifs, n_agents):
 				# to the socket, send |flows| as u32
 				# as well as each flow ip, as a u32.
-				bw_sock.sendall(struct.pack("!L", len(flows)))
+				intime = time.time()
+				bw_sock.sendall(sz_packer.pack(len(flows)))
 				flow_data = ""
 				for flow in flows:
-					flow_data += struct.pack("L", flow)
+					flow_data += ip_packer.pack(flow)
+				outtime = time.time()
 				bw_sock.sendall(flow_data)
+				if print_times:
+					print "interlude:", outtime - intime
 
 				recvd = ""
-				def read_n(n):
+				def read_n(n, recvd):
 					while len(recvd) < n:
-						recvd += bw_sock.recv(4096)
+						try:
+							t = bw_sock.recv(4096)
+						except socket.error, e:
+							err = e.args[0]
+							if err == errno.EAGAIN or err == errno.EWOULDBLOCK:
+								continue
+							else:
+								print "Life sucks"
+								sys.exit(1)
+						else:
+							recvd += t
+					return recvd
 
 				# read time in ns...
 				len_ns = 8
-				read_n(len_ns)
-				(time_ns,) = struct.unpack("q", recvd[:len_ns])
+				recvd = read_n(len_ns, recvd)
+				(time_ns,) = time_packer.unpack(recvd[:len_ns])
 				recvd = recvd[len_ns:]
 
 				# then, read n_if * (u64 * 2)
-				#  [good per if], [bad per if]
-				list_sz = n_ifs * 8
+				#  [goodx2 per if], [badx2 per if]
+				list_sz = n_ifs * 8 * 2
 				full = list_sz * 2
-				read_n(full)
+				recvd = read_n(full, recvd)
+
+				def mbpsify(bts):
+					return 8000*float(bts)/time_ns
 
 				goods = []
 				bads = []
-				for i in xrange(n_ifs * 2):
+				for i in xrange(n_ifs * 2 * 2):
 					index = i * 8
-					val = struct.unpack("Q", recvd[index: index+8])
-					if i < n_ifs:
-						goods.append(val)
+					(val,) = bytes_packer.unpack(recvd[index: index+8])
+					if i < (n_ifs * 2):
+						goods.append(mbpsify(val))
 					else:
-						bads.append(val)
-				unfused_load_mbps = [val for pair in zip(goods, bads) for val in pair]
+						bads.append(mbpsify(val))
+				unfused_load_mbps = [pair for pair in zip(goods, bads)]
 				recvd = recvd[full:]
 
-				# read a u32 (network order),
-				# then read that many size 88 structs
-				len_u32 = 8
-				read_n(len_u32)
-				(n_flow_entries,) = struct.unpack("!L", recvd[:len_u32])
-				recvd = recvd[len_u32:]
-				# (ip, stats)
 				parsed_flows = []
-				stat_struct_len = 88
-				stat_struct_len_nopad = stat_struct_len - 4
-				for i in xrange(n_flow_entries):
-					read_n(stat_struct_len)
-					datas = struct.unpack(
-						"q6Q6f!L",
-						recvd[:stat_struct_len_nopad]
-					)
-					recvd = recvd[stat_struct_len:]
-					parsed_flows.append(
-						(datas[-1], tuple(
-							datas[0:5] + datas[7:9] + [datas[5]] +
-							datas[9:11] + [datas[6]] + datas[11:13]
-						))
-					)
 
+				for i in xrange(n_agents):
+					# read a u32 (network order),
+					# then read that many size 88 structs
+					len_u32 = 4
+					recvd = read_n(len_u32, recvd)
+					(n_flow_entries,) = sz_packer.unpack(recvd[:len_u32])
+					recvd = recvd[len_u32:]
+					# (ip, stats)
+					l_flows = []
+					stat_struct_len = 88
+					stat_struct_len_nopad = stat_struct_len - 4
+					for i in xrange(n_flow_entries):
+						recvd = read_n(stat_struct_len, recvd)
+						datas = list(fm_packer.unpack(
+							recvd[:stat_struct_len]
+						))
+						recvd = recvd[stat_struct_len:]
+						if datas[-1] != 0:
+							l_flows.append(
+								(datas[-1], tuple(
+									datas[0:5] + datas[7:9] + [datas[5]] +
+									datas[9:11] + [datas[6]] + datas[11:13]
+								))
+							)
+					parsed_flows.append(l_flows)
 				# repack it as the rest of the model expects
-				return (time_ns, unfused_load_mps, parsed_flows)
+				return (time_ns, unfused_load_mbps, parsed_flows)
 		else:
 			# no granularity, get all flow info
-			def ask_stats(_flows, _n_ifs):
+			def ask_stats(_flows, _n_ifs, _n_agents):
 				# Measure good/bad loads!
 				mon_cmd.stdin.write("\n")
 				mon_cmd.stdin.flush()
@@ -1029,7 +1070,7 @@ def marlExperiment(
 							sublayer.append(float(item))
 						if e[0] != "0.0.0.0":
 							ip_bytes = socket.inet_pton(socket.AF_INET, e[0])
-							layer.append((struct.unpack("!L", ip_bytes), sublayer))
+							layer.append((struct.unpack("I", ip_bytes)[0], sublayer))
 						
 					parsed_flows.append(layer)
 
@@ -1178,7 +1219,16 @@ def marlExperiment(
 			postsleep = time.time()
 
 			#print postsleep - presleep
-			(time_ns, unfused_load_mbps, parsed_flows) = ask_stats(flows_to_query)
+			preask = time.time()
+			(time_ns, unfused_load_mbps, parsed_flows) = ask_stats(flows_to_query, len(tracked_interfaces), len(learner_pos))
+			postask = time.time()
+			if print_times:
+				print "total:", postask - preask
+			# REMOVE
+			#print ["{}:{}".format(a,hex(a)) for a in flows_to_query]
+			#for a in parsed_flows:
+			#	for b in a:
+			#		print "{}".format(hex(b[0]))
 
 			def mbpsify(bts):
 					return 8000*float(bts)/time_ns
@@ -1210,6 +1260,7 @@ def marlExperiment(
 			last_traffic_ratio = min(get_data(0)[0]/bw_all[0], 1.0)
 			if not (i % 10): print "\titer {}/{}, good:{}, load:{:.2f} ({:.2f},{:.2f})".format(i, episode_length, last_traffic_ratio, total_mbps[0], *unfused_total_mbps[0:2])
 
+			flows_to_query = []
 			for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
 				team_true_loads = bw_teams[team_no]
 
@@ -1224,6 +1275,7 @@ def marlExperiment(
 					get_total(leader_index), get_data(leader_index)[0], bw_teams[team_no][0],
 					n_teams, l_cap, ratio)
 
+				intime = time.time()
 				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
 					important_indices = [switch_list_indices[name] for name in [
 						intermediates[learner_no/n_learners].name, node.name
@@ -1240,21 +1292,24 @@ def marlExperiment(
 						#  pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, [8-10]
 						#  wnd_iat_mean, wnd_iat_var [11-12]
 						# )
-						flow_space = learner_stats[learner_no]
-						flow_traces = learner_traces[learner_no]
-						flows_seen = parsed_flows[learner_no]
+						l_index = learner_no + (team_no * len(learners))
+						flow_space = learner_stats[l_index]
+						flow_traces = learner_traces[l_index]
+						flows_seen = parsed_flows[l_index]
 
 						# TODO: strip old entries?
 
 						for (ip, props) in flows_seen:
 							s_t = time.time()
+							flows_to_query.append(ip)
 
 							if ip not in flow_space:
 								flow_space[ip] = {
 									"ip": ip,
 									"last_act": 0,
 									"last_rate_in": -1.0,
-									"last_rate_out": -1.0}
+									"last_rate_out": -1.0
+								}
 							l = flow_space[ip]
 
 							l["cx_ratio"] = min(*props[1:3]) / max(*props[1:3])
@@ -1299,7 +1354,7 @@ def marlExperiment(
 
 							action_comps[-1].append((i, e_t - s_t))
 
-							learner_traces[learner_no] = flow_traces
+							learner_traces[l_index] = flow_traces
 					else:
 						# Encode state (as seen by this learner)
 
@@ -1315,6 +1370,9 @@ def marlExperiment(
 						e_t = time.time()
 
 						action_comps[-1].append((i, e_t - s_t))
+				outtime = time.time()
+				if print_times:
+					print "choose_acs:", outtime-intime
 
 			good_traffic_percents[-1].append(last_traffic_ratio)
 			rewards[-1].append(g_reward)
@@ -1341,6 +1399,9 @@ def marlExperiment(
 		#net.interact()
 
 		removeAllSockets()
+		if bw_sock is not None:
+			bw_sock.shutdown(socket.SHUT_RDWR)
+			bw_sock.close()
 
 		if server_proc is not None:
 			server_proc.terminate()
