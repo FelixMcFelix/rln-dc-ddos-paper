@@ -271,10 +271,17 @@ Malicious hosts send many small requests, spoofed to appear as though the origin
 %?? What makes RL a suitable method for network anomaly detection, what features are most relevant?
 %?? Point I was thinking of: feedback-loop-like model allows monitoring \emph{after} an action is taken to (in theory) allow forgiveness of mistakenly punished flows. This does hinge on taking a flow-by-flow look at the state space, but if we can combine knowledge of current state (duh!), the last action taken (i.e. an indicator of our previous assessment [such as high pdrop $\implies$ bad]) then perhaps a flow which falls off identically to a legit flow can be rescued.
 Moving beyond the overt benefits of choosing RL-based defences for coping with non-stationary problems, we believe that there are concrete benefits associated with this problem.
-?? Point I was thinking of: feedback-loop-like model allows monitoring \emph{after} an action is taken to (in theory) allow forgiveness of mistakenly punished flows. This does hinge on taking a flow-by-flow look at the state space, but if we can combine knowledge of current state (duh!), the last action taken (i.e. an indicator of our previous assessment [such as high pdrop $\implies$ bad]) then perhaps a flow which falls off identically to a legit flow can be rescued.
+We have seen that for other domains in particular, misclassification is a serious problem, which can introduce \emph{collateral damage} in the context of DDoS prevention.
+In theory, the feedback-loop-like model allows us to monitor flows \emph{after} an action is taken to allow forgiveness of mistakenly punished flows.
+This does rely upon the ability to take a flow-by-flow view of the state space, but if we can combine knowledge of current state with the last applied action, then perhaps a flow which falls off identically to a legitimate flow can be rescued.
 
+Which features might be best suited to this problem?
+%?? Relevant features: aggregate network state (load at various points [this has been done, of course]), flow-specific measurements (upload/download ratio when bandwidth above threshold \cite{DBLP:conf/ndss/Rossow14}, packet inter-arrival times, etc.)
 ?? Relevant features: aggregate network state (load at various points [this has been done, of course]), flow-specific measurements (upload/download ratio when bandwidth above threshold \cite{DBLP:conf/ndss/Rossow14}, packet inter-arrival times, etc.)
+%?
+%? Need to find a good survey which suggests indicative features.
 ?? Need to find a good survey which suggests indicative features.
+%?? If we assume amplification attacks, we know it won't be `random' source IPs (since it's mostly-legit servers who think that they're doing a good job by replying)
 ?? If we assume amplification attacks, we know it won't be `random' source IPs (since it's mostly-legit servers who think that they're doing a good job by replying)
 
 %\section{A Plan, of Sorts}
@@ -303,7 +310,7 @@ The same observation extends to the possibility of poisoning attacks \cite{DBLP:
 ?? Probably rethink the title of this section.
 
 %?? State the problem and what we want to achieve.
-To best discover how the use of RL techniques in the field of network intrusion prevention may bet be improved, it's prudent that we start by looking for weaknesses in work which exists today.
+To best discover how the use of RL techniques in the field of network intrusion prevention may yet be improved, it's prudent that we start by looking for weaknesses in work which exists today.
 The closest approach which is available within this field is that of \textcite{DBLP:journals/eaai/MalialisK15}, and their contribution in applying RL to the task of intrusion prevention is significant: their work helped to show the viability of live, adaptive, feedback loop-like control of the network to detect and prevent DDoS attacks.
 We begin with a reimplementation and more principled re-examination of their work to further develop the field.
 
@@ -372,8 +379,8 @@ grow'=right
 
 Why use this topology, a fan-out tree, in particular?
 While this is taken verbatim from the work we use as a basis, it is presented within the confines of a framework given by \textcite{DBLP:journals/ton/YauLLY05}.
-This framework is, in turn, an extension of the class of topologies examined in the original pushback paper \cite{DBLP:journals/ccr/MahajanBFIPS02a}.
-In actuality, this topology is far closer to the latter; crucially, it seems to not actually represent or correspond to any realistic deployment at all.
+This framework is, in turn, an extension of the class of topologies examined in the original pushback paper \cite{DBLP:journals/ccr/MahajanBFIPS02a}; this topology is far closer to the latter.
+Crucially, it seems to not actually represent or correspond to any realistic deployment at all.
 In the words of \citeauthor{DBLP:journals/ccr/MahajanBFIPS02a}:
 \begin{displaycquote}{DBLP:journals/ccr/MahajanBFIPS02a}
 	These simulations do not pretend to use realistic topologies or traffic mixes... the simple simulations in this scenario are instead intended... as a first step towards more rigorous evaluation.
@@ -381,10 +388,10 @@ In the words of \citeauthor{DBLP:journals/ccr/MahajanBFIPS02a}:
 %The topology chosen to evaluate our predecessor, indeed, matches theirs.
 %?? So, why does this proliferate, exist? They effectively disavowed it in their own paper. Reading comprehension is hard, I guess.
 Remarkably, it seems to have propagated in a way which was not originally intended.
-It is clear that such a network topology allows for functional testing, but it is hard to argue its relevance to specific classes of victim or to reason about the interactions it might have with dependent applications.
+It is clear that such a network topology allows for functional testing, and indeed is illustrative of one way in which attack traffic might aggregate in the network, but it is hard to argue its relevance to specific classes of victim or to reason about the interactions it might have with dependent applications.
 We aim to address this, to some extent.
 
-Reimplementation of the network model was performed using mininet \cite{mininet}, a Python-based network emulator.
+Reimplementation of this network model was performed using mininet \cite{mininet}, a Python-based network emulator.
 Traffic is played back from hosts via Tcpreplay at a bandwidth assigned uniformly from a `good' or `bad' distribution, each using the same pcap file with source and destination IP addresses rewritten.
 While unrealistic with respect to packet content, it was assumed that this would provide representative load and packet inter-arrival characteristics, since the agents as initially defined are blind to such information.
 
@@ -397,7 +404,7 @@ Specifically, the agent chooses $p \in \left\{ 0.0, 0.1, \ldots, 0.9 \right\}$, 
 In essence, this means that each agent is in control of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a}.
 It's worth noting that there are various ways that this could be done, and that the application of \emph{programmable data planes} to this end are suggested as future work.
 
-The reward functions as specified here were introduced by \textcite{DBLP:journals/eaai/MalialisK15}; in particular, we make use of the global reward as a performance metric and the \emph{coordinated team learning} (CTL) reward for training.
+The reward functions as specified here were introduced by \textcite{DBLP:journals/eaai/MalialisK15}; in particular, we make use of their global reward as a performance metric and their \emph{coordinated team learning} (CTL) reward for training.
 These assume the presence of a classifier, $g(\cdot)$, which estimates the volume of `legitimate traffic' received at any point in the network.
 At time $t$ an agent $v$ (with team leader $l_v$) receives either $R_{t}^{\mathit{Global}}$ or $R_{t}^{\mathit{CTL}}$:
 \begin{subequations}
@@ -423,7 +430,7 @@ A sufficiently well-trained agent needs only to follow the policy it has learned
 ?? Need to tie in the concept of ``meaningful work''?
 
 \section{Performance in an Emulated Environment}\label{sec:performance-in-an-emulated-environment}
-The original introduction of this approach to direct-control reinforcement learning as introduced by \textcite{DBLP:journals/eaai/MalialisK15} fails to consider key cases: disjoint ranges of traffic distribution (i.e., the presence of benign heavy-hitters), the accurate simulation of TCP-like behaviour (and its effects on collateral damage), and assumes a rigid and unrepresentative topology.
+The original introduction of this approach to direct-control reinforcement learning as introduced by \textcite{DBLP:journals/eaai/MalialisK15} fails to consider key cases: the absence of a suitable heuristic classifier $g(\cdot)$, disjoint ranges of traffic distribution (i.e., the presence of benign heavy-hitters), the accurate simulation of TCP-like behaviour (and its effects on collateral damage), and assumes a rigid and unrepresentative topology.
 The latter two are most deserving of a closer investigation, as they have stronger implications for wide-scale deployment.
 
 All experiments described were executed using an Ubuntu 16.04.4 LTS machine with a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
@@ -432,7 +439,7 @@ All code underpinning these findings is available on a public repository\footnot
 ?? TODO: Make repo public...
 
 \subsection{Service Guarantees and Host Density}
-In the default topology, $n=2$ hosts per egress point is not a parameter that can be described as realistic for many web service deployments.
+The default topology chooses $n=2$ hosts per egress point, which isn't a parameter setting that can be described as realistic for many web service deployments.
 In practice, well-established network topologies such as the fat-tree topology fan out \emph{internally} (to provide efficient replication and scaling of resources) while having comparatively few egress points.
 We feel is most worth examining aspects of such a case, where the host/agent ratio is heavily skewed in favour of hosts and actions as defined become less granular.
 
@@ -447,8 +454,8 @@ Host allocations were generated pseudorandomly to ensure fairness between choice
 \begin{figure}
 	\includegraphics[width=\linewidth]{../plots/online-varyN-binary}
 	\caption{
-		MARL pushback control system performance plotted over time, for various settings of $n$ hosts per agent.
-		This plot shows that, from the perspective of benign hosts, service guarantees degrade as inference and applied actions become less granular.
+		MARL pushback control system performance plotted over time for various settings of $n$ hosts per agent.
+		This plot shows that, from the perspective of benign hosts, service guarantees degrade as inference and actions become less granular.
 		This generalises for all behavioural discriminators: even a perfect agent \emph{must} punish benign flows if they are grouped with malicious actors.
 		%		?? Effect on max perf AND learning rate??
 		Crucially, both the maximum achievable performance and learning rate are negatively impacted when granularity is coarse.
@@ -457,7 +464,7 @@ Host allocations were generated pseudorandomly to ensure fairness between choice
 \end{figure}
 
 \Cref{fig:marl-granularity} shows that as more hosts are allocated to each learner, the fraction of traffic believed to be good (as observed at the server) decreases.
-This manifests in two ways: the best-achievable performance decreases, as does the learning rate.
+This manifests in two ways: the best-achievable performance drops, and so too does the learning rate.
 The first consequence arises analytically.
 Given the probability that a host is legitimate, $P_G \in [0,1]$, it follows that a host will be malicious with probability $P_B = 1 - P_G$.
 Defining \emph{imperfect service} to mean any case where all $n$ hosts connecting over a switch do not share the same classification (i.e., a mixture), then the probability that a switch is delivering imperfect service is $P_{M,n} = 1 - (P_G^n + P_B^n)$.
@@ -477,14 +484,11 @@ Defining \emph{imperfect service} to mean any case where all $n$ hosts connectin
 	Restricting $P_G \in (0,1)$ so that both $P_G$ and $P_B$ are non-zero ensures strict inequality: $P_{M,n} < P_{M,n+1}$.
 \end{corr}
 
-Given the UDP-like behaviour of Tcpreplay, being able to replicate the online performance of \citeauthor{DBLP:journals/eaai/MalialisK15} in the $n=2$ case suggests that the numeric simulation their work is entirely based upon does not capture the key interactions between TCP flows and packet drop as a control action.
-From the findings of \cref{sec:tcp-multiplexing-and-fallback-behaviour} and the Mathis equation, their results should be considerably worse in practice.
 %?? Expand according to the summary you posted in the notes document.
 %That the use of UDP-like traffic replicates their experiments, compared against how real tcp behaves in mininet and according to the Mathis equation, shows that they really did not consider the behaviour of benign TCP in this environ (i.e., their results should be considerably worse in practice).
 
 \subsection{TCP Multiplexing and Fallback Behaviour}\label{sec:tcp-multiplexing-and-fallback-behaviour}
 
-?? TODO: Gut this section now...
 %While Tcpreplay was useful in recreating the original work and examining the above condition, flow behaviour under packet loss is closer to that of UDP when using it to replay traffic.
 %To investigate the effects of collateral damage upon benign TCP flows, an iperf3 test was conducted using mininet.
 %Several hosts communicated concurrently to a single server over one switch, with maximum send rates in $\{1,...,5\}$ \si{\mega\bit\per\second} and a constant \SI{40}{\milli\second} latency.
@@ -504,36 +508,36 @@ From the findings of \cref{sec:tcp-multiplexing-and-fallback-behaviour} and the 
 \begin{figure}
 	\includegraphics[width=\linewidth]{../plots/online-varyN-nginx}
 	\caption{
-		A more convincing and/or to-the-point figure for getting people to believe I'm doing god's work.
-		?? TODO: describe 4 real.
+		Comparison of preserved traffic across different traffic models, choosing $n=2$ hosts per egress node.
+		No actions are taken in the ``baseline'' entries.
+		The agents examined here perform above the baseline when traffic sources pay no mind to congestion control, but perform significantly worse for live TCP traffic (nginx).
 		\label{fig:nginx-coffin-nail}
 	}
 \end{figure}
 
 %\Cref{fig:mplex-tcp} shows that this trend is present.
-\Cref{fig:nginx-coffin-nail} shows that this trend is present.
-Accordingly, benign TCP flows are severely harmed by \emph{any} packet drop, so collateral damage to these hosts is more significant.
-Good-faith TCP congestion avoidance causes these flows to attempt to back off very quickly.
-%?? Talk about the same major points you made in the presentation here (i.e. TCP interactions) w/ pushback. Or in the evaluation...
-UDP, however, behaves as expected---malicious hosts are expected to exhibit the same behaviour, given that congestion is their primary goal.
-
-?? Quic will probably behave much like TCP.
-
-The performance characteristics of TCP under packet drop are well-known and well-understood through the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97}:
+Given the UDP-like behaviour of Tcpreplay, being able to replicate the online performance of \citeauthor{DBLP:journals/eaai/MalialisK15} in the $n=2$ case suggests that the numeric simulation their work is entirely based upon does not capture the key interactions between TCP flows and packet drop as a control action.
+From the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97}, through which the performance characteristics of TCP under packet drop are well-known and well-understood, their results should be considerably worse in practice:
 \begin{equation}
 \operatorname{BW} = \frac{\operatorname{MSS}}{\operatorname{RTT}} \frac{C}{\sqrt{p}},
 \end{equation}
 for the \emph{maximum segment size} (MSS), \emph{round trip time} (RTT), a choice of constant $C \approx{} \sqrt{3/2}$ dependent on system assumptions, and the probability $p \in (0, 1]$ that a packet is lost.
-%The lower bound on $p$ is deliberately open, as packet drop acts as a control signal for the TCP send window size and is an expected part of normal operation.
-%TCP flows in Mininet are found to obey this law, as expected.
-This reveals that the original work \emph{does not capture this behaviour}, or else the initial experiment (UDP-like traffic when $n=2$) wouldn't have achieved similar results to those which were reported.
-
-\Cref{sec:a-new-normal} is where the new normal model arrives. Wow!
+Accordingly, benign TCP flows are severely harmed by \emph{any} packet drop, so collateral damage to these hosts is more significant.
+Good-faith TCP congestion avoidance causes these flows to attempt to back off very quickly.
+\Cref{fig:nginx-coffin-nail} shows that this trend is present.
+%?? Talk about the same major points you made in the presentation here (i.e. TCP interactions) w/ pushback. Or in the evaluation...
+The TCP traffic as it appears here is generated according to \Cref{sec:a-new-normal}.
+UDP, however, behaves as expected---malicious hosts are expected to exhibit the same behaviour, given that congestion is their primary goal.
+As far as future network protocols are concerned, QUIC \cite{DBLP:conf/sigcomm/LangleyRWVKZYKS17}, a congestion-aware stream transmission protocol, will behave much like TCP.
 
 \subsection{Computational Cost}
-?? Consider talking about the execution times of the old MARL approach here? They're real nice (as expected), so we have lots of room to play around with while (hopefully) remaining under the 1ms target time given by \textcite{DBLP:conf/sigcomm/ChenL0L18}.
+%?? Consider talking about the execution times of the old MARL approach here? They're real nice (as expected), so we have lots of room to play around with while (hopefully) remaining under the 1ms target time given by \textcite{DBLP:conf/sigcomm/ChenL0L18}.
 
-We're in \SIrange{80}{100}{\micro\second}
+Measurements during each of these experiments indicated that the cost of computing any action is typically within \SIrange{80}{100}{\micro\second}.
+This is reassuring when measured alongside the insights from other work.
+\textcite{DBLP:conf/sigcomm/ChenL0L18} observed that, ideally, actions must be computed and taken within \SI{1}{\milli\second} to have a meaningful affect on short flows.
+%Most flows are short, and flow-size follows a heavy-tailed distribution.
+That our starting point falls significantly below this threshold allows us to safely consider more costly actions or larger state spaces, which would typically increase the computational cost.
 
 %\subsection{Synthesis}
 %%It'd be really good if I could figure out a rough proof for the service property...
@@ -546,58 +550,55 @@ We're in \SIrange{80}{100}{\micro\second}
 
 \section{A New Normal}\label{sec:a-new-normal}
 
-In establishing...
-
-?? How will I structure this?
-?? Motivation -> Model -> Results?
-?? OR Use the results of the last section to springboard into here?
+%In establishing...
+%
+%?? How will I structure this?
+%?? Motivation -> Model -> Results?
+%?? OR Use the results of the last section to springboard into here?
 
 ?? Remember, the motivation is clear. We don't care so much that it is "representative" wrt a specific deployment location or network type. The whole purpose of this is that we aim to test specific behaviour which traces cannot replicate (i.e., correlated back-and-forth, dynamics introduced to congestion-aware protocols, ...)
 ?? If we need to, we can codition the distribution of requests according to statistics mined form an existing trace if reviewer number 2 needs that extra push to be convinced.
 
 ?? Full Openflow controller setup (in mininet). All internal routers are primed with knowledge of the shortest path to any internal host, while new inbound flows register the ``way back'' for each hop used to maintain consistency over traffic conditions.
 If such information is lost, it suffices to forward an outbound packet on a random (outbound) port, as we assume that any external IP is reachable through any of the test network's egress ports (i.e., that it is not connected to any stub autonomous systems).
-The controller is also responsible for responding to ARP traffic, as a gateway might
+The controller is also responsible for responding to ARP traffic, as a gateway might do.
 The necessity of this arises due to the realities of relying upon Linux's IP stack, and would not need to be considered for purely trace-based evaluation.
 ?? Legitimate traffic: TCP traffic (HTTP clients downloading web pages, dependent resources and files) with a mixture of lifetimes for each request.
 ?? Malicious traffic: UDP flood traffic (hping3, MTU-size packets, ). Why not min-size packets? Because the traffic generator gets in a horrible rut if I do so...
 
-\Cref{fig:nginx-coffin-nail} shows the effects of using 
-
-?? Actually describe what I have here, now. I can do this.
+?? Actually describe what I have here, now.
 
 ?? ANGLE: set up an environment to test \emph{specific} behaviours to examine \emph{specific} problems in past work. I make no claims that it is perfect or representative for all traffic, just for this (likely common) behaviour which I expect to plague almost all legit TCP flows.
 
 ?? Existing sims used for testing such applications reliant on traces, or not sophisticated enough to capture interactive, back-and-forth (correlated) behaviours---possibly discarded as second-hand effects by past work when these are so crucial given user traffic patterns (and the nature of the control signal we choose to enact).
 
+?? Two modes: long-flow (i.e., groundhog day loop of GCC8 download) and nice request-chain mode for ``representativeness''(??)
+
 \section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
 
-?? Mention Colin/Qianru's concerns about Quic, IPv6. At this point, src/dst IP is the only ``traditional'' characteristics. Even then, IPv6 can have a different IP for each application ON A HOST. Port number meaningless...
+?? Mention Colin/Qianru's concerns about Quic, IPv6. At this point, src/dst IP are the only ``traditional'' characteristics that can be relied upon. Even then, IPv6 can have a different IP for each application ON A HOST. Port number meaningless...
 
 ?? What do we want?
 
-\begin{IEEEdescription}[\IEEEsetlabelwidth{Global state}]
-	\item[Global state] space space space
-	\item[Local state]
-\end{IEEEdescription}
-
 \textbf{Global state}---what came before (load statistics from various network locations)
 
-\textbf{Local state}---per-flow data.
+\textbf{Local state}---per-flow data. Specifically, right now I'm using:
 
-?? Last action taken: encodes the notion of current belief of flow maliciousness (default at 0). Potentially allows forgiveness: a mistakenly malicious flow 's falloff after punishment could be used for such purpose (if we're lucky...)
+?? \emph{IP}
 
-?? Correspondence ratio: ratio (in bytes) between upstream/downstream traffic for a src/dst pair. (Cite the work that suggested this)
+?? \emph{Last action taken}: encodes the notion of current belief of flow maliciousness (default at 0). Potentially allows forgiveness: a mistakenly malicious flow 's falloff after punishment could be used for such purpose (if we're lucky...)
 
-?? Source IP, port, protocol (*zzz*)
+?? \emph{Flow duration, size}
 
-?? Flow duration, size
+?? \emph{Correspondence ratio}: ratio (in bytes) between upstream/downstream traffic for a src/dst pair. (Cite the work that suggested this)
 
-?? Change in send/recv rates since last action/check?
+?? \emph{Change in send/recv rates} since last action/check.
 
-?? More things... (look into other works, actually research this...)
+?? \emph{Mean inter-arrival time}.
 
-\paragraph{Done with that...}
+\subsection{What's done with these?}
+
+?? Tile coded together, action taken per-flow every timestep.
 
 ?? TODO: everything
 
@@ -669,6 +670,7 @@ System state which is dependent on many signals drawn from across a wide network
 My thanks go to Mircea Iordache, Qianru Zhou, and Richard Cziva for their comments and technical assistance.
 Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
 
+\renewcommand*{\bibfont}{\small}
 \printbibliography
 
 \end{document}
