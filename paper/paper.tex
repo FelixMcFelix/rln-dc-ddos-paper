@@ -318,7 +318,7 @@ We begin with a reimplementation and more principled re-examination of their wor
 
 %?? Why are we comparing against/building on/reimplementing M\&K? What was their main contribution? Answer: they helped to show the viability of live, adaptive control of the network to detect/prevent DDoS attacks...
 
-\subsection{Topology}
+\subsection{Topology}\label{sec:topology}
 
 The network itself is tree-structured, where one server $s$ connects through a dedicated switch to $k$ team leader switches, each connected to $l$ intermediate switches, which in turn each connect to $m$ egress switches.
 Agents are co-located with these egress switches, who control the proportion of upstream packets from $n$ external hosts to discard according to load statistics observed along their path to the server.
@@ -556,23 +556,41 @@ That our starting point falls significantly below this threshold allows us to sa
 %?? Motivation -> Model -> Results?
 %?? OR Use the results of the last section to springboard into here?
 
-?? Remember, the motivation is clear. We don't care so much that it is "representative" wrt a specific deployment location or network type. The whole purpose of this is that we aim to test specific behaviour which traces cannot replicate (i.e., correlated back-and-forth, dynamics introduced to congestion-aware protocols, ...)
-?? If we need to, we can codition the distribution of requests according to statistics mined form an existing trace if reviewer number 2 needs that extra push to be convinced.
+From what we have seen, it is difficult (or impossible) for trace-based or numerical simulations to correctly capture certain dynamics without an extraordinary amount of care or consideration.
+%As it turns out, 
+Our goal is to briefly describe an environment which tests \emph{specific} behaviours to examine the \emph{specific} problems which have arisen during our testing of past approaches.
+In particular, we are interested in capturing interactive, correlated back-and-forth exchanges associated with live HTTP traffic; mainly because of the particular interactions between the application-level dynamics, congestion awareness at the transport level and the nature of control signal used.
+We make no claims that it is perfect or representative for all traffic, only that it captures some of the behaviour which we expect will plague most legitimate TCP flows; if need be, we expect the frequency or distribution of requests could be conditioned to match observations of real-world access patterns.
 
-?? Full Openflow controller setup (in mininet). All internal routers are primed with knowledge of the shortest path to any internal host, while new inbound flows register the ``way back'' for each hop used to maintain consistency over traffic conditions.
-If such information is lost, it suffices to forward an outbound packet on a random (outbound) port, as we assume that any external IP is reachable through any of the test network's egress ports (i.e., that it is not connected to any stub autonomous systems).
-The controller is also responsible for responding to ARP traffic, as a gateway might do.
-The necessity of this arises due to the realities of relying upon Linux's IP stack, and would not need to be considered for purely trace-based evaluation.
-?? Legitimate traffic: TCP traffic (HTTP clients downloading web pages, dependent resources and files) with a mixture of lifetimes for each request.
-?? Malicious traffic: UDP flood traffic (hping3, MTU-size packets, ). Why not min-size packets? Because the traffic generator gets in a horrible rut if I do so...
+%?? ANGLE: set up an environment to test \emph{specific} behaviours to examine \emph{specific} problems in past work. I make no claims that it is perfect or representative for all traffic, just for this (likely common) behaviour which I expect to plague almost all legit TCP flows.
 
-?? Actually describe what I have here, now.
+%?? Existing sims used for testing such applications reliant on traces, or not sophisticated enough to capture interactive, back-and-forth (correlated) behaviours---possibly discarded as second-hand effects by past work when these are so crucial given user traffic patterns (and the nature of the control signal we choose to enact).
 
-?? ANGLE: set up an environment to test \emph{specific} behaviours to examine \emph{specific} problems in past work. I make no claims that it is perfect or representative for all traffic, just for this (likely common) behaviour which I expect to plague almost all legit TCP flows.
+%?? Remember, the motivation is clear. We don't care so much that it is "representative" wrt a specific deployment location or network type. The whole purpose of this is that we aim to test specific behaviour which traces cannot replicate (i.e., correlated back-and-forth, dynamics introduced to congestion-aware protocols, ...)
+%?? If we need to, we can condition the distribution of requests according to statistics mined from an existing trace if reviewer number 2 needs that extra push to be convinced.
 
-?? Existing sims used for testing such applications reliant on traces, or not sophisticated enough to capture interactive, back-and-forth (correlated) behaviours---possibly discarded as second-hand effects by past work when these are so crucial given user traffic patterns (and the nature of the control signal we choose to enact).
+\subsection{Network Design}
+We make use of a fully software-defined network, built using Openflow-aware switches in mininet alongside a controller application based on \emph{Ryu} \cite{ryu}.
+All internal routers are primed with knowledge of the shortest path to each internal host, while new inbound flows register the ``way back'' for each hop used to maintain consistency over traffic conditions.
+If such information is lost, perhaps expiring due to inactivity, it suffices to forward an outbound packet on a random (outbound) port, as we assume that any external IP is reachable through any of the test network's egress ports (i.e., that it is not connected to any stub autonomous systems).
+The controller is also responsible for computing how switches respond to ARP requests: the necessity of this arises due to the reliance upon Linux's networking stack for live applications, and wouldn't need to be considered for purely trace-based evaluation.
+We make further use of the topology presented earlier (\cref{sec:topology}), noting that our architecture allows us to trivially extend and modify this if required.
 
-?? Two modes: long-flow (i.e., groundhog day loop of GCC8 download) and nice request-chain mode for ``representativeness''(??)
+\subsection{Traffic Model}
+%?? Legitimate traffic: TCP traffic (HTTP clients downloading web pages, dependent resources and files) with a mixture of lifetimes for each request.
+To model legitimate traffic the server node runs an nginx v1.10.3 HTTP daemon, serving statically generated web pages alongside various large files and binaries.
+Benign hosts run a simple libcurl-based application written in Rust, repeatedly requesting resources from the server.
+This provides two modes of operation:
+\begin{itemize}
+	\item \emph{long flow} testing has each host constantly request a large binary, such as a tarball of GCC8;
+	\item \emph{request-chain} testing has each host request a random file known to exist within the website, followed by any dependent resources (stylesheets, images, etc.). This presents a more balanced distribution of flow duration and size.
+\end{itemize}
+Each host's download rate is limited to match whatever maximum bandwidth was assigned to it.
+Accordingly, reward functions aim to maximise the downstream throughput.
+
+%?? Malicious traffic: UDP flood traffic (hping3, MTU-size packets, ). Why not min-size packets? Because the traffic generator gets in a horrible rut if I do so...
+Malicious traffic is generated by use of the \emph{hping3} program, generating UDP-flood traffic targeting random ports.
+Each malicious packet is MTU-sized, loosely mapping to the large frame sizes expected in an amplification attack and to ensure that simulation remains tractable.
 
 \section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
 
@@ -604,6 +622,8 @@ The necessity of this arises due to the realities of relying upon Linux's IP sta
 
 ?? What concessions will we have to make in order to make per-flow processing more viable? Intelligent sampling/reanalysis of flows when needed (i.e. an external heuristic guiding method)?
 
+?? Explicitly mention \emph{why} we don't make use of neural networks, and instead favour more classical function approximation. Latency concerns, energy usage, graphics/TPU/whatever hardware availability or lack thereof across switches/routers/etc.
+
 ?? NOTE: think about how I might need to change/alter the tile-coding when we add extra discriminative features... (i.e., are there better ways to handle covariance between properties of system/flow state, properly capture generalisation?)
 
 ?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other!
@@ -620,7 +640,7 @@ The necessity of this arises due to the realities of relying upon Linux's IP sta
 %?? Abuses of RL 
 Earnest, well-considered application of RL towards the challenge of intrusion detection/prevention has seen comparatively little examination.
 Past work exhibits treatment of the paradigm as a traditional classifier for anomaly detection \cite{shamshirband2014anomaly} and DDoS prevention \cite{DBLP:conf/mates/ServinK08}.
-Given that arguably the main strength of RL techniques is their ability to control ongoing interaction and to adapt by observing the concrete effects of actions taken, such works fail to see how best to apply the rich literature on the subject.
+Given that one of the main strengths of RL techniques is their ability to control ongoing interaction and to adapt by observing the concrete effects of actions taken, such works fail to see how best to apply the rich literature on the subject.
 
 For categorising how RL fits into solving problems, we label works as direct- or indirect-control RL.
 A \emph{direct-control} RL problem is one where the RL agent(s) are learning optimal control over a set of actions to act as the \emph{primary} defence or decision-maker---requiring measurements, reward functions and action sets tailored for this purpose.
@@ -631,7 +651,7 @@ An \emph{indirect-control} RL problem, where the role played by the agents is to
 A past example includes learning when best to \emph{communicate} and share knowledge between \emph{hidden Markov model} anomaly detectors \cite{DBLP:conf/paisi/XuSH07}.
 The position of this work is weakened by its reliance on the discredited `DARPA99' dataset \cite{DARPA-IDD, DBLP:conf/cisda/TavallaeeBLG09, DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
 Outside of anomaly/intrusion detection, there has been growing interest in the use of reinforcement learning in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for resource-constrained process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
-?? Also adaptively choosing video bitrates based on network conditions \cite{DBLP:conf/sigcomm/MaoNA17}.
+Work by \textcite{DBLP:conf/sigcomm/MaoNA17} employs client-side observations of network state and video player performance to optimise adaptive bitrate selection for multimedia streaming by RL methods.
 
 ?? Completely reword, yikes.
 \citeauthor{DBLP:conf/sigcomm/ChenL0L18}'s \emph{AuTO} \cite{DBLP:conf/sigcomm/ChenL0L18} uses deep RL (the \emph{deterministic policy gradients} algorithm \cite{DBLP:conf/icml/SilverLHDWR14}).
@@ -667,8 +687,8 @@ System state which is dependent on many signals drawn from across a wide network
 ?? More future work --- share knowledge between agents. ``Knowledge bases'' for this purpose? (see: Qianru).
 
 \section*{Acknowledgements}
-My thanks go to Mircea Iordache, Qianru Zhou, and Richard Cziva for their comments and technical assistance.
-Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
+Our thanks go to Mircea Iordache, Qianru Zhou, and Richard Cziva for their comments and technical assistance.
+%Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
 
 \renewcommand*{\bibfont}{\small}
 \printbibliography
