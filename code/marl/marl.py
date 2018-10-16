@@ -105,6 +105,10 @@ def marlExperiment(
 		bw_mon_socketed = False,
 		unix_sock = True,
 		print_times = False,
+		record_times = False,
+
+		contributors = None,
+		restrict = None,
 	):
 
 	linkopts_core = linkopts
@@ -201,10 +205,17 @@ def marlExperiment(
 			0.0, 0.0, 0.0, 0.0, 0.0,
 			0.0, -50.0, -50.0
 		]
+
 		sarsaParams["extended_maxes"] = [
 			4294967296.0, 0.9, 2000.0, float(10 * (1024 ** 2)), 1.0,
 			10000.0, 50.0, 50.0
 		]
+
+		if restrict is not None:
+			for prop_name in ["extended_mins", "extended_maxes"]:
+				old = sarsaParams[prop_name]
+				sarsaParams[prop_name] = [old[i] for i in restrict]
+
 		sarsaParams["vec_size"] += len(sarsaParams["extended_maxes"])
 
 	# helpers
@@ -1325,16 +1336,16 @@ def marlExperiment(
 							l["delta_in"] = observed_rate_in - l["last_rate_in"]
 							l["delta_out"] = observed_rate_out - l["last_rate_out"]
 
-							temp = flow_to_state_vec(l)
+							total_vec = state_vec + flow_to_state_vec(l)
 
-							#state = sarsa.to_state(np.array(state_vec + flow_to_state_vec(l)))
-							state = sarsa.to_state(np.array(state_vec + temp))
-							#print state, "and the lengths are: final ({}) initial ({}) new ({}) sum ({})".format(len(state), len(state_vec), len(temp), len(state_vec + temp))
+							# TODO: work with contributors etc in here...
+							tx_vec = total_vec if restrict is None else [total_vec[i] for i in restrict]
+							state = sarsa.to_state(np.array(tx_vec))
 
 							# if there was an earlier decision made on this flow, then update the past state estimates associated.
 							# Compute and store the intended update for each flow.
 							if ip in flow_traces:
-								l_action = sarsa.update(state, reward, flow_traces[ip])
+								(l_action, ac_vals) = sarsa.update(state, reward, flow_traces[ip])
 							else:
 								l_action = sarsa.bootstrap(state)
 
@@ -1352,7 +1363,8 @@ def marlExperiment(
 
 							#print "computed action: it took {}s".format(e_t - s_t)
 
-							action_comps[-1].append((i, e_t - s_t))
+							if record_times:
+								action_comps[-1].append((i, e_t - s_t))
 
 							learner_traces[l_index] = flow_traces
 					else:
@@ -1369,7 +1381,9 @@ def marlExperiment(
 						# End time.
 						e_t = time.time()
 
-						action_comps[-1].append((i, e_t - s_t))
+						if record_times:
+							action_comps[-1].append((i, e_t - s_t))
+
 				outtime = time.time()
 				if print_times:
 					print "choose_acs:", outtime-intime
