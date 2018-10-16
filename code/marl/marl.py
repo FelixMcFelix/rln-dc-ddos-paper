@@ -212,11 +212,15 @@ def marlExperiment(
 		]
 
 		if restrict is not None:
+			sarsaParams["vec_size"] = len(restrict)
 			for prop_name in ["extended_mins", "extended_maxes"]:
 				old = sarsaParams[prop_name]
-				sarsaParams[prop_name] = [old[i] for i in restrict]
+				# TODO: work to allow selection of 0--4
+				sarsaParams[prop_name] = [old[i-4] for i in restrict]
+		else:
+			sarsaParams["vec_size"] += len(sarsaParams["extended_maxes"])
 
-		sarsaParams["vec_size"] += len(sarsaParams["extended_maxes"])
+	print sarsaParams
 
 	# helpers
 
@@ -547,15 +551,15 @@ def marlExperiment(
 				for ip, state in maps.iteritems():
 					(_, action, _) = state
 					a = action if override_action is None else override_action
-					updateUpstreamRoute(node, ac_prob=a, target_ip=ip)
+					updateUpstreamRoute(node, ac_prob=sarsa.actions[a], target_ip=ip)
 			outtime = time.time()
 			if print_times:
 				print "do_acs:", outtime-intime
 		else:
 			for (node, sarsa) in zip(learners, sarsas):
-				(_, action, _) = sarsa.last_act
+				(_, action) = sarsa.last_act
 				a = action if override_action is None else override_action
-				updateUpstreamRoute(node, ac_prob=a)
+				updateUpstreamRoute(node, ac_prob=sarsa.actions[a])
 
 	def moralise(value, good, max_val=255, no_goods=[0, 255]):
 		target_mod = 0 if good else 1
@@ -1340,6 +1344,7 @@ def marlExperiment(
 
 							# TODO: work with contributors etc in here...
 							tx_vec = total_vec if restrict is None else [total_vec[i] for i in restrict]
+							print total_vec, tx_vec
 							state = sarsa.to_state(np.array(tx_vec))
 
 							# if there was an earlier decision made on this flow, then update the past state estimates associated.

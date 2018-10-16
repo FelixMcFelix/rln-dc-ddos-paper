@@ -4,9 +4,6 @@ from writer import writeResults, makeResultsAverage
 
 hosts_p = 2
 
-# rng state = (0, seed)
-#             (1, state)
-
 def run(restrict, state, rewards, good_traffic_percents, total_loads):
 	results = marlExperiment(
 		n_teams = 2,#5,
@@ -15,8 +12,8 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads):
 		n_learners = 3,
 		host_range = [hosts_p, hosts_p],
 
-		explore_episodes = 0.3,
-		episodes = 1,#50,#500, Since mininet keeps running out of files even e/ cleanup
+		explore_episodes = 0.8,
+		episodes = 1,
 		episode_length = 10000,
 		separate_episodes = True,
 
@@ -40,8 +37,6 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads):
 		total_loads = total_loads,
 	)
 
-	
-
 	return results
 
 # Run one set to old mode, run 8 on restrict [4+i for i in xrange(8)]
@@ -51,10 +46,10 @@ results_dir = "../../results/"
 file_dir = results_dir + "ftprep.pickle"
 n_features = 8
 n_episodes = 10
-restrict_sets = [None] + [4 + i for i in xrange(n_features)]
+restrict_sets = [None] + [[4 + i] for i in xrange(n_features)]
 out_names = ["g"] + ["f{}".format(i) for i in xrange(n_features)]
 
-result_sets = [(None, None, None) for i in xrange(1 + n_features)]
+result_sets = [([], [], []) for i in xrange(1 + n_features)]
 things_to_pickle = []
 
 randstate = None
@@ -84,8 +79,8 @@ with open(file_dir, "wb") as outfile:
 
 # Now, write out the results!
 for ((rs, gs, ls), out_name) in zip(result_sets, out_names):
-	csv_dir = results_dir + "ft-{}.csv".format(name_str)
-	avg_csv_dir = results_dir + "ft-{}-avg.csv".format(name_str)
+	csv_dir = results_dir + "ft-{}.csv".format(out_name)
+	avg_csv_dir = results_dir + "ft-{}-avg.csv".format(out_name)
 
 	results = (rs, gs, ls, None, None, None)
 

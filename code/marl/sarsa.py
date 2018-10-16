@@ -70,7 +70,7 @@ class SarsaLearner:
 		action = self.actions[a_index]
 
 		# action, indiv. values for the action that was chosen, summed values for each action
-		return (action, np.array([av[a_index] for av in all_tile_action_vals]))
+		return (a_index, np.array([av[a_index] for av in all_tile_action_vals]), action_vals)
 
 	def select_action_from_vals(self, vals):
 		# Epsilon-greedy action selection (linear-decreasing).
@@ -86,11 +86,11 @@ class SarsaLearner:
 	# Need to convert state with self.tc(...) first
 	def bootstrap(self, state):
 		# Select an action:
-		(action, values) = self._select_action(state)
+		(action, _, ac_values) = self.select_action(state)
 
-		self.last_act = (state, action, values)
+		self.last_act = (state, action)
 		
-		return action
+		return (action, ac_values)
 
 	# Ditto. run self.tc(...) on state observation
 	def update(self, state, reward, subs_last_act=None):
@@ -101,6 +101,7 @@ class SarsaLearner:
 		# Otherwise, we're moving from an old start to the new target...
 		all_tile_action_vals = self._get_state_values(last_state)
 		last_values = np.array([av[last_action] for av in all_tile_action_vals])
+		print last_action, last_values 
 
 		# First, what is the value of the action would we choose in the new state w/ old model
 		(new_action, new_values, ac_values) = self.select_action(state)
@@ -108,7 +109,7 @@ class SarsaLearner:
 		updated_vals = last_values + (self.discount*new_values - last_values + reward) * self.learn_rate
 
 		# Update value accordingly
-		self._update_state_values(last_state, self.actions.index(last_action), updated_vals)
+		self._update_state_values(last_state, last_action, updated_vals)
 
 		# Reduce epsilon somehow
 		self._curr_epsilon = max(0, (1 - self._step_count/float(self.epsilon_falloff)) * self.epsilon)
