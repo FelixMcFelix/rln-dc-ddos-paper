@@ -101,7 +101,6 @@ class SarsaLearner:
 		# Otherwise, we're moving from an old start to the new target...
 		all_tile_action_vals = self._get_state_values(last_state)
 		last_values = np.array([av[last_action] for av in all_tile_action_vals])
-		print last_action, last_values 
 
 		# First, what is the value of the action would we choose in the new state w/ old model
 		(new_action, new_values, ac_values) = self.select_action(state)

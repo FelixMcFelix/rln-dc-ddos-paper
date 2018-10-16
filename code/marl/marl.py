@@ -220,7 +220,6 @@ def marlExperiment(
 		else:
 			sarsaParams["vec_size"] += len(sarsaParams["extended_maxes"])
 
-	print sarsaParams
 
 	# helpers
 
