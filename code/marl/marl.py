@@ -548,7 +548,7 @@ def marlExperiment(
 			intime = time.time()
 			for (node, sarsa, maps) in zip(learners, sarsas, flow_action_sets):
 				for ip, state in maps.iteritems():
-					(_, action, _) = state
+					(_, action) = state
 					a = action if override_action is None else override_action
 					updateUpstreamRoute(node, ac_prob=sarsa.actions[a], target_ip=ip)
 			outtime = time.time()
@@ -1343,7 +1343,6 @@ def marlExperiment(
 
 							# TODO: work with contributors etc in here...
 							tx_vec = total_vec if restrict is None else [total_vec[i] for i in restrict]
-							print total_vec, tx_vec
 							state = sarsa.to_state(np.array(tx_vec))
 
 							# if there was an earlier decision made on this flow, then update the past state estimates associated.
