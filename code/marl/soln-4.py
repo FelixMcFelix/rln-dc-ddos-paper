@@ -27,7 +27,6 @@ results = marlExperiment(
 	use_controller = True,
 	actions_target_flows = True,
 
-	estimate_const_limit = True,
 )
 
 writeResults("../../results/soln-4.csv", results)

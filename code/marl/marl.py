@@ -105,6 +105,10 @@ def marlExperiment(
 		bw_mon_socketed = False,
 		unix_sock = True,
 		print_times = False,
+		record_times = False,
+
+		contributors = [],
+		restrict = None,
 	):
 
 	linkopts_core = linkopts
@@ -201,11 +205,21 @@ def marlExperiment(
 			0.0, 0.0, 0.0, 0.0, 0.0,
 			0.0, -50.0, -50.0
 		]
+
 		sarsaParams["extended_maxes"] = [
 			4294967296.0, 0.9, 2000.0, float(10 * (1024 ** 2)), 1.0,
 			10000.0, 50.0, 50.0
 		]
-		sarsaParams["vec_size"] += len(sarsaParams["extended_maxes"])
+
+		if restrict is not None:
+			sarsaParams["vec_size"] = len(restrict)
+			for prop_name in ["extended_mins", "extended_maxes"]:
+				old = sarsaParams[prop_name]
+				# TODO: work to allow selection of 0--4
+				sarsaParams[prop_name] = [old[i-4] for i in restrict]
+		else:
+			sarsaParams["vec_size"] += len(sarsaParams["extended_maxes"])
+
 
 	# helpers
 
@@ -534,17 +548,17 @@ def marlExperiment(
 			intime = time.time()
 			for (node, sarsa, maps) in zip(learners, sarsas, flow_action_sets):
 				for ip, state in maps.iteritems():
-					(_, action, _) = state
+					(_, action) = state
 					a = action if override_action is None else override_action
-					updateUpstreamRoute(node, ac_prob=a, target_ip=ip)
+					updateUpstreamRoute(node, ac_prob=sarsa.actions[a], target_ip=ip)
 			outtime = time.time()
 			if print_times:
 				print "do_acs:", outtime-intime
 		else:
 			for (node, sarsa) in zip(learners, sarsas):
-				(_, action, _) = sarsa.last_act
+				(_, action) = sarsa.last_act
 				a = action if override_action is None else override_action
-				updateUpstreamRoute(node, ac_prob=a)
+				updateUpstreamRoute(node, ac_prob=sarsa.actions[a])
 
 	def moralise(value, good, max_val=255, no_goods=[0, 255]):
 		target_mod = 0 if good else 1
@@ -1324,24 +1338,51 @@ def marlExperiment(
 								l["last_rate_out"] = observed_rate_out
 							l["delta_in"] = observed_rate_in - l["last_rate_in"]
 							l["delta_out"] = observed_rate_out - l["last_rate_out"]
+							total_vec = state_vec + flow_to_state_vec(l)
 
-							temp = flow_to_state_vec(l)
+							# Each needs its own view of the state...
+							# (and specifies its restriction thereof)
+							# Combine these to get a vector of likelihoods,
+							# get the highest-epsilon to calculate the action.
+							# Then update each model with the TRUE action chosen.
+							subactors = [(sarsa, restrict)] + [(s_tree[team_no][learner_no], r) for (s_tree, r) in contributors]
+							last_sarsa = sarsa
+							ac_vals = np.zeros(len(sarsa.actions))
+							substates = []
+							need_decay = True
 
-							#state = sarsa.to_state(np.array(state_vec + flow_to_state_vec(l)))
-							state = sarsa.to_state(np.array(state_vec + temp))
-							#print state, "and the lengths are: final ({}) initial ({}) new ({}) sum ({})".format(len(state), len(state_vec), len(temp), len(state_vec + temp))
+							for s_ac_num, (s, r) in enumerate(subactors):
+								tx_vec = total_vec if r is None else [total_vec[i] for i in r]
+								state = s.to_state(np.array(tx_vec))
+								substates.append(state)
 
-							# if there was an earlier decision made on this flow, then update the past state estimates associated.
-							# Compute and store the intended update for each flow.
-							if ip in flow_traces:
-								l_action = sarsa.update(state, reward, flow_traces[ip])
-							else:
-								l_action = sarsa.bootstrap(state)
+								# if there was an earlier decision made on this flow, then update the past state estimates associated.
+								# Compute and store the intended update for each flow.
+								if ip in flow_traces:
+									dat = flow_traces[ip]
+									(_, new_vals) = s.update(
+										state,
+										reward,
+										(dat[0][s_ac_num], dat[1]),
+										decay=False,
+									)
+								else:
+									(_, new_vals) = s.bootstrap(state)
+									need_decay = False
 
-							flow_traces[ip] = sarsa.last_act
+								ac_vals += new_vals
+
+								last_sarsa = s
+
+							l_action = last_sarsa.select_action_from_vals(ac_vals)
+							flow_traces[ip] = (substates, l_action)
+
+							if need_decay:
+								for (s, _) in subactors:
+									s.decay()
 
 							# TODO: maybe only update this whole thing if we're choosing to examine this flow.
-							l["last_act"] = l_action 
+							l["last_act"] = l_action
 							l["last_rate_in"] = observed_rate_in
 							l["last_rate_out"] = observed_rate_out
 
@@ -1352,7 +1393,8 @@ def marlExperiment(
 
 							#print "computed action: it took {}s".format(e_t - s_t)
 
-							action_comps[-1].append((i, e_t - s_t))
+							if record_times:
+								action_comps[-1].append((i, e_t - s_t))
 
 							learner_traces[l_index] = flow_traces
 					else:
@@ -1369,7 +1411,9 @@ def marlExperiment(
 						# End time.
 						e_t = time.time()
 
-						action_comps[-1].append((i, e_t - s_t))
+						if record_times:
+							action_comps[-1].append((i, e_t - s_t))
+
 				outtime = time.time()
 				if print_times:
 					print "choose_acs:", outtime-intime
