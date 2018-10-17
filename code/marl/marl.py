@@ -107,7 +107,7 @@ def marlExperiment(
 		print_times = False,
 		record_times = False,
 
-		contributors = None,
+		contributors = [],
 		restrict = None,
 	):
 
@@ -1352,7 +1352,7 @@ def marlExperiment(
 							need_decay = True
 
 							for s_ac_num, (s, r) in enumerate(subactors):
-								tx_vec = total_vec if restrict is None else [total_vec[i] for i in restrict]
+								tx_vec = total_vec if r is None else [total_vec[i] for i in r]
 								state = s.to_state(np.array(tx_vec))
 								substates.append(state)
 

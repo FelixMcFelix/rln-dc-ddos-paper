@@ -50,39 +50,41 @@ restrict_sets = [None] + [[4 + i] for i in xrange(n_features)]
 out_names = ["g"] + ["f{}".format(i) for i in xrange(n_features)]
 
 result_sets = [([], [], []) for i in xrange(1 + n_features)]
-things_to_pickle = []
 
-randstate = None
-for i in xrange(n_episodes):
-	state = (i, randstate)
-	agents = []
-	for j, restriction in enumerate(restrict_sets):
-		(rewards, good_traffic_percents, total_loads) = result_sets[j]
-		(rs, gs, ls, store_sarsas, rng_state, _) = run(
-			restriction,
-			state[1],
-			rewards, good_traffic_percents, total_loads
-		)
+if __name__ == "__main__":
+	things_to_pickle = []
 
-		result_sets[j] = (rs, gs, ls)
-		randstate = rng_state
+	randstate = None
+	for i in xrange(n_episodes):
+		state = (i, randstate)
+		agents = []
+		for j, restriction in enumerate(restrict_sets):
+			(rewards, good_traffic_percents, total_loads) = result_sets[j]
+			(rs, gs, ls, store_sarsas, rng_state, _) = run(
+				restriction,
+				state[1],
+				rewards, good_traffic_percents, total_loads
+			)
 
-		# list of: each set of agents, and the filtered
-		agents.append((store_sarsas, restriction))
+			result_sets[j] = (rs, gs, ls)
+			randstate = rng_state
 
-	# list of: rng states and the set of agents generated from each.
-	things_to_pickle.append((state, agents))
+			# list of: each set of agents, and the filtered
+			agents.append((store_sarsas, restriction))
 
-# Now, save out the sarsas.
-with open(file_dir, "wb") as outfile:
-	cPickle.dump(things_to_pickle, outfile)
+		# list of: rng states and the set of agents generated from each.
+		things_to_pickle.append((state, agents))
 
-# Now, write out the results!
-for ((rs, gs, ls), out_name) in zip(result_sets, out_names):
-	csv_dir = results_dir + "ft-{}.csv".format(out_name)
-	avg_csv_dir = results_dir + "ft-{}-avg.csv".format(out_name)
+	# Now, save out the sarsas.
+	with open(file_dir, "wb") as outfile:
+		cPickle.dump(things_to_pickle, outfile)
 
-	results = (rs, gs, ls, None, None, None)
+	# Now, write out the results!
+	for ((rs, gs, ls), out_name) in zip(result_sets, out_names):
+		csv_dir = results_dir + "ft-{}.csv".format(out_name)
+		avg_csv_dir = results_dir + "ft-{}-avg.csv".format(out_name)
 
-	writeResults(csv_dir, results)
-	makeResultsAverage(csv_dir, avg_csv_dir)
+		results = (rs, gs, ls, None, None, None)
+
+		writeResults(csv_dir, results)
+		makeResultsAverage(csv_dir, avg_csv_dir)
