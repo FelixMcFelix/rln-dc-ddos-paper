@@ -1338,7 +1338,6 @@ def marlExperiment(
 								l["last_rate_out"] = observed_rate_out
 							l["delta_in"] = observed_rate_in - l["last_rate_in"]
 							l["delta_out"] = observed_rate_out - l["last_rate_out"]
-
 							total_vec = state_vec + flow_to_state_vec(l)
 
 							# TODO: work with contributors etc in here...
@@ -1350,12 +1349,12 @@ def marlExperiment(
 							if ip in flow_traces:
 								(l_action, ac_vals) = sarsa.update(state, reward, flow_traces[ip])
 							else:
-								l_action = sarsa.bootstrap(state)
+								(l_action, ac_vals) = sarsa.bootstrap(state)
 
 							flow_traces[ip] = sarsa.last_act
 
 							# TODO: maybe only update this whole thing if we're choosing to examine this flow.
-							l["last_act"] = l_action 
+							l["last_act"] = l_action
 							l["last_rate_in"] = observed_rate_in
 							l["last_rate_out"] = observed_rate_out
 
