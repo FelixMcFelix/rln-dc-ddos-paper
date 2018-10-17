@@ -1341,6 +1341,11 @@ def marlExperiment(
 							total_vec = state_vec + flow_to_state_vec(l)
 
 							# TODO: work with contributors etc in here...
+							# Each needs its own view of the state...
+							# (and specifies its restriction thereof)
+							# Combine these to get a vector of likelihoods,
+							# get the highest-epsilon to calculate the action.
+							# Then update each model with the TRUE action chosen.
 							tx_vec = total_vec if restrict is None else [total_vec[i] for i in restrict]
 							state = sarsa.to_state(np.array(tx_vec))
 
