@@ -1340,23 +1340,46 @@ def marlExperiment(
 							l["delta_out"] = observed_rate_out - l["last_rate_out"]
 							total_vec = state_vec + flow_to_state_vec(l)
 
-							# TODO: work with contributors etc in here...
 							# Each needs its own view of the state...
 							# (and specifies its restriction thereof)
 							# Combine these to get a vector of likelihoods,
 							# get the highest-epsilon to calculate the action.
 							# Then update each model with the TRUE action chosen.
-							tx_vec = total_vec if restrict is None else [total_vec[i] for i in restrict]
-							state = sarsa.to_state(np.array(tx_vec))
+							subactors = [(sarsa, restrict)] + [(s_tree[team_no][learner_no], r) for (s_tree, r) in contributors]
+							last_sarsa = sarsa
+							ac_vals = np.zeros(len(sarsa.actions))
+							substates = []
+							need_decay = True
 
-							# if there was an earlier decision made on this flow, then update the past state estimates associated.
-							# Compute and store the intended update for each flow.
-							if ip in flow_traces:
-								(l_action, ac_vals) = sarsa.update(state, reward, flow_traces[ip])
-							else:
-								(l_action, ac_vals) = sarsa.bootstrap(state)
+							for s_ac_num, (s, r) in enumerate(subactors):
+								tx_vec = total_vec if restrict is None else [total_vec[i] for i in restrict]
+								state = s.to_state(np.array(tx_vec))
+								substates.append(state)
 
-							flow_traces[ip] = sarsa.last_act
+								# if there was an earlier decision made on this flow, then update the past state estimates associated.
+								# Compute and store the intended update for each flow.
+								if ip in flow_traces:
+									dat = flow_traces[ip]
+									(_, new_vals) = s.update(
+										state,
+										reward,
+										(dat[0][s_ac_num], dat[1]),
+										decay=False,
+									)
+								else:
+									(_, new_vals) = s.bootstrap(state)
+									need_decay = False
+
+								ac_vals += new_vals
+
+								last_sarsa = s
+
+							l_action = last_sarsa.select_action_from_vals(ac_vals)
+							flow_traces[ip] = (substates, l_action)
+
+							if need_decay:
+								for (s, _) in subactors:
+									s.decay()
 
 							# TODO: maybe only update this whole thing if we're choosing to examine this flow.
 							l["last_act"] = l_action
