@@ -93,7 +93,7 @@ class SarsaLearner:
 		return (action, ac_values)
 
 	# Ditto. run self.tc(...) on state observation
-	def update(self, state, reward, subs_last_act=None):
+	def update(self, state, reward, subs_last_act=None, decay=True):
 		(last_state, last_action) = (self.last_act if subs_last_act is None else subs_last_act)
 
 		# because of updates in parallel, we need to grab the current values.
@@ -111,13 +111,17 @@ class SarsaLearner:
 		self._update_state_values(last_state, last_action, updated_vals)
 
 		# Reduce epsilon somehow
-		self._curr_epsilon = max(0, (1 - self._step_count/float(self.epsilon_falloff)) * self.epsilon)
-		self._step_count += 1
+		if decay:
+			self.decay()
 
 		self.last_act = (state, new_action)
 
 		# Return the "chosen" action, and the values it was computed from.
 		return (new_action, ac_values)
+
+	def decay(self):
+		self._curr_epsilon = max(0, (1 - self._step_count/float(self.epsilon_falloff)) * self.epsilon)
+		self._step_count += 1
 
 	def to_state(self, *args):
 		out = self.tc(*args)
