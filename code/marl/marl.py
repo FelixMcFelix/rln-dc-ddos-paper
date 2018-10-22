@@ -1360,21 +1360,24 @@ def marlExperiment(
 								# Compute and store the intended update for each flow.
 								if ip in flow_traces:
 									dat = flow_traces[ip]
-									(_, new_vals) = s.update(
+									(would_choose, new_vals) = s.update(
 										state,
 										reward,
 										(dat[0][s_ac_num], dat[1]),
 										decay=False,
 									)
 								else:
-									(_, new_vals) = s.bootstrap(state)
+									(would_choose, new_vals) = s.bootstrap(state)
 									need_decay = False
+
+								#print "part: {}. Wanted to pick: {}".format(new_vals, would_choose)
 
 								ac_vals += new_vals
 
 								last_sarsa = s
 
 							l_action = last_sarsa.select_action_from_vals(ac_vals)
+							#print "full: {}. Chosen: {}".format(ac_vals, l_action)
 							flow_traces[ip] = (substates, l_action)
 
 							if need_decay:
