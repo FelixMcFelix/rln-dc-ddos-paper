@@ -86,7 +86,8 @@ uniquelist=false]{biblatex}
 	linkcolor=black,
 	urlcolor=black,
 	pdftitle={\mytitle{}},
-	pdfauthor={Kyle A. Simpson, Dimitrios P. Pezaros}
+%	pdfauthor={Kyle A. Simpson, Dimitrios P. Pezaros}
+	pdfauthor={Anonymous Giraffe and Badger}
 }
 \newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
 
@@ -151,10 +152,14 @@ uniquelist=false]{biblatex}
 
 \title{\mytitle{}}
 \author{
-	Kyle A.\ Simpson\thanks{This work was supported by the Engineering and Physical Sciences Research Council [grant number EP/M508056/1].},
-	Dimitrios P.\ Pezaros\\
-	University of Glasgow, Glasgow, Scotland,\\
-	\email{k.simpson.1@research.gla.ac.uk}
+%	Kyle A.\ Simpson\thanks{This work was supported by the Engineering and Physical Sciences Research Council [grant number EP/M508056/1].},
+%	Dimitrios P.\ Pezaros\\
+%	University of Glasgow, Glasgow, Scotland,\\
+%	\email{k.simpson.1@research.gla.ac.uk}
+Anonymous Giraffe\thanks{This work was supported by a nameless, shapeless funder [grant number 7].},
+Anonymous Badger\\
+Unnamed Department, Nowhere\\
+\email{giraffe.a@unnamed.zoo}
 }
 
 % Remove date, leave no spacing.
@@ -284,14 +289,14 @@ We have seen that for other domains in particular, misclassification is a seriou
 In theory, the feedback-loop-like model allows us to monitor flows \emph{after} an action is taken to allow forgiveness of mistakenly punished flows.
 This does rely upon the ability to take a flow-by-flow view of the state space, but if we can combine knowledge of current state with the last applied action, then perhaps a flow which falls off identically to a legitimate flow can be rescued.
 
-Which features might be best suited to this problem?
+%Which features might be best suited to this problem?
 %?? Relevant features: aggregate network state (load at various points [this has been done, of course]), flow-specific measurements (upload/download ratio when bandwidth above threshold \cite{DBLP:conf/ndss/Rossow14}, packet inter-arrival times, etc.)
-?? Relevant features: aggregate network state (load at various points [this has been done, of course]), flow-specific measurements (upload/download ratio when bandwidth above threshold \cite{DBLP:conf/ndss/Rossow14}, packet inter-arrival times, etc.)
-%?
-%? Need to find a good survey which suggests indicative features.
-?? Need to find a good survey which suggests indicative features.
+Other studies suggest that there are particularly useful features which make the task of online DDoS flow identification feasible.
+Aggregate network load observed at various locations suggests the overall health of a network \cite{DBLP:journals/eaai/MalialisK15}, and the ratio of correspondence between pair flows can suggest asymmetry and in many cases illegitimacy \cite{DBLP:conf/ndss/Rossow14}.
+Generic volume-based statistics (counts, counts per duration, average packet sizes) have seen effectiveness in such as $k$-nearest neighbours classifiers \cite{DBLP:conf/dsn/LeeKSPY17}.
+Most importantly, there is evidence showing behavioural changes in response to bandwidth expansion \cite{DBLP:conf/ndss/KangGS16}, suggesting similar artefacts might arise after throttling, packet drop, or other interference.
 %?? If we assume amplification attacks, we know it won't be `random' source IPs (since it's mostly-legit servers who think that they're doing a good job by replying)
-?? If we assume amplification attacks, we know it won't be `random' source IPs (since it's mostly-legit servers who think that they're doing a good job by replying)
+%?? If we assume amplification attacks, we know it won't be `random' source IPs (since it's mostly-legit servers who think that they're doing a good job by replying)
 
 %\section{A Plan, of Sorts}
 %
@@ -308,10 +313,12 @@ Which features might be best suited to this problem?
 
 %?? The fine folks at most security conferences will want to see one. I suppose it serves its purpose by delineating what an attacker can/cannot do.
 
-?? Oultine attacker's goals, particularly wrt SPIFFY.
-?? They want to impact fair-share bandwidth allocation to flows (minimise), they have no worry about being unmasked (there are many available reflectors, which don't need to be bought etc...) [cite the rossow papers about amplification hell].
+%?? Oultine attacker's goals, particularly wrt SPIFFY.
+%?? They want to impact fair-share bandwidth allocation to flows (minimise), they have no worry about being unmasked (there are many available reflectors, which don't need to be bought etc...) [cite the rossow papers about amplification hell].
+An attacker's goal is to minimise the fair-share bandwidth allocation that a server can give to any host which connects to it, we they are expected to act rationally in its pursuit.
 We assume that attacks are bandwidth-based DDoS attacks with the structure of an \emph{amplification attack}, and that traffic aggregates at the target (unlike in a \emph{transit-link attack}).
 The addresses of any machines taking part in an attack are not revealed to the target, save for the fairly stable set of unwitting reflector nodes.
+The discovery of any reflector by some defence system does have a cost to the attacker---there is a particularly large (finite) supply of viable reflector nodes \cite{DBLP:conf/ndss/Rossow14}, but the constraints that each has a large upstream bandwidth and support for high-amplification-factor protocols narrow this pool.
 
 Finally, we do not assume that an attacker has white-box access to the parameters underlying an agent's policy, or that they will attempt to intelligently modify flow/system state to indirectly control an agent \cite{DBLP:conf/eurosp/PapernotMJFCS16, DBLP:conf/eurosp/PapernotMSW18, DBLP:journals/corr/HuangPGDA17, DBLP:conf/sp/Carlini017}.
 While they may be able to perform some degree of reverse engineering by observing the health of their own legitimate canary flows, ``stealing'' the policy through observation \cite{DBLP:conf/uss/TramerZJRR16}, investigating whether perturbations would persist in a medium as volatile as network traffic statistics falls outside of the scope of this work.
@@ -443,7 +450,8 @@ The original introduction of this approach to direct-control reinforcement learn
 The latter two are most deserving of a closer investigation, as they have stronger implications for wide-scale deployment.
 
 All experiments described were executed using an Ubuntu 16.04.4 LTS machine with a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
-All code underpinning these findings is available on a public repository\footnote{\url{https://github.com/FelixMcFelix/rln-dc-ddos-paper}}.
+All code underpinning these findings is available on a public repository\footnote{\url{https://aweb.site/a-repo.}}.
+%All code underpinning these findings is available on a public repository\footnote{\url{https://github.com/FelixMcFelix/rln-dc-ddos-paper}}.
 
 %?? TODO: Make repo public...
 
