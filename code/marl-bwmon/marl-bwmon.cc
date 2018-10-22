@@ -38,6 +38,7 @@ const int LISTEN_PORT = 9932;
 const bool TIME_PRINT_ERR = false;
 const bool USE_UNIX_SOCK = true;
 const char *SOCKET_PATH = "bwmon-sock";
+const int FLOW_PRUNE_AGE = 2;
 
 // Store and update some stats about float64s.
 struct Stat {
@@ -157,7 +158,7 @@ struct FlowStats
 	}
 
 	bool clearAndPrintStats(char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
-		auto prune_age = ch::seconds(10);
+		auto prune_age = ch::seconds(FLOW_PRUNE_AGE);
 
 		// prune here if last packet rx'd was of a certain age,
 		// AND there was no info gleaned in this window.
@@ -196,7 +197,7 @@ struct FlowStats
 	}
 
 	std::optional<std::pair<bool, FlowMeasurement>> clearAndRetrieveStats(uint32_t ip, char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
-		auto prune_age = ch::seconds(10);
+		auto prune_age = ch::seconds(FLOW_PRUNE_AGE);
 
 		// prune here if last packet rx'd was of a certain age,
 		// AND there was no info gleaned in this window.
@@ -452,6 +453,8 @@ public:
 			}
 
 			std::cout << "]";
+
+			//std::cerr << "C: " << i << std::endl;
 		}
 
 		std::cout << std::endl;

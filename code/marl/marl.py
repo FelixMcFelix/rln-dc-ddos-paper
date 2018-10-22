@@ -349,23 +349,37 @@ def marlExperiment(
 		(rhs,) = struct.unpack("I", socket.inet_aton(subnet))
 		return struct.pack("I", lhs & rhs)
 
-	def internal_choose_group(group, ip="10.0.0.1", subnet="255.255.255.0", target_ip=None):
+	def internal_choose_group(group, ip="10.0.0.1", subnet="255.255.255.0", target_ip=None, force_old=None):
 		importance = 1 if target_ip is None else 0
 		priority = 1 if target_ip is None else 2
 
 		source_matcher = [] if target_ip is None else [ofpm.build(None, ofp.OFPXMT_OFB_IPV4_SRC, True, 0, netip(target_ip, "255.255.255.255"), socket.inet_aton("255.255.255.255"))]
 
-		return ofpb.ofp_flow_mod(
-			None, 0, 0, 0, ofp.OFPFC_ADD,
-			0, 0, priority, None, None, None, 0, importance,
-			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
-				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
-				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
-			] + source_matcher),
-			ofpb.ofp_instruction_actions(ofp.OFPIT_APPLY_ACTIONS, None, [
-				ofpb.ofp_action_group(None, 8, group)
-			])
-		)
+		if force_old is not None:
+			return ofpb.ofp_flow_mod(
+				None, 0, 0, 0, ofp.OFPFC_ADD,
+				0, 0, priority, None, None, None, 0, importance,
+				ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+					ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+					ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
+				] + source_matcher),
+				ofpb.ofp_instruction_actions(ofp.OFPIT_APPLY_ACTIONS, None, [
+					ofpb._pack("HHI", 29, 8, force_old),
+					ofpb.ofp_action_output(None, 16, 1, 65535)
+				])
+			)
+		else:
+			return ofpb.ofp_flow_mod(
+				None, 0, 0, 0, ofp.OFPFC_ADD,
+				0, 0, priority, None, None, None, 0, importance,
+				ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+					ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+					ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
+				] + source_matcher),
+				ofpb.ofp_instruction_actions(ofp.OFPIT_APPLY_ACTIONS, None, [
+					ofpb.ofp_action_group(None, 8, group)
+				])
+			)
 
 	flow_pdrop_msg = [""]
 	flow_upstream_msg = [""]
@@ -495,7 +509,7 @@ def marlExperiment(
 		name = switch.name
 		p_drop_num = pdrop(prob)
 		p_drop = "" if ac_prob == 0.0 else "probdrop:{},".format(p_drop_num)
-
+		#print prob, p_drop_num
 		# really lazy -- big one-directional route. But that's all we need for now.
 		if not switch.listenPort:
 			listenAddr = "unix:/tmp/{}.listen".format(switch.name)
@@ -518,7 +532,9 @@ def marlExperiment(
 				msg = copy_msg[:-20] + ofpb._pack("I", p_drop_num) + copy_msg[-16:]
 		else:
 			cmd_list = []
-			msg = internal_choose_group(int(ac_prob * 10), target_ip=target_ip)
+			# remove if groups fixed
+			os = p_drop_num # = None
+			msg = internal_choose_group(int(ac_prob * 10), target_ip=target_ip, force_old=os)
 
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
@@ -546,11 +562,13 @@ def marlExperiment(
 	def enactActions(learners, sarsas, flow_action_sets):
 		if actions_target_flows:
 			intime = time.time()
-			for (node, sarsa, maps) in zip(learners, sarsas, flow_action_sets):
+			for i, (node, sarsa, maps) in enumerate(zip(learners, sarsas, flow_action_sets)):
 				for ip, state in maps.iteritems():
+					#print "{}: {}".format(i, ip)
 					(_, action) = state
 					a = action if override_action is None else override_action
-					updateUpstreamRoute(node, ac_prob=sarsa.actions[a], target_ip=ip)
+					tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
+					updateUpstreamRoute(node, ac_prob=tx_ac, target_ip=ip)
 			outtime = time.time()
 			if print_times:
 				print "do_acs:", outtime-intime
@@ -558,7 +576,8 @@ def marlExperiment(
 			for (node, sarsa) in zip(learners, sarsas):
 				(_, action) = sarsa.last_act
 				a = action if override_action is None else override_action
-				updateUpstreamRoute(node, ac_prob=sarsa.actions[a])
+				tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
+				updateUpstreamRoute(node, ac_prob=tx_ac)
 
 	def moralise(value, good, max_val=255, no_goods=[0, 255]):
 		target_mod = 0 if good else 1
@@ -584,7 +603,6 @@ def marlExperiment(
 		for i in xrange(host_count):
 			good = random.random() < P_good
 			bw = (random.uniform(*(good_range if good else evil_range)))
-			print "drew: good={}, bw={}".format(good, bw)
 
 			# Make up a wonderful IP.
 			# Last byte => goodness. Even = good.
@@ -598,6 +616,7 @@ def marlExperiment(
 			ip_bytes[-1] = moralise(ip_bytes[-1], good)
 
 			ip = "{}.{}.{}.{}".format(*ip_bytes)
+			print "drew: good={}, bw={}, ip={}".format(good, bw, ip)
 
 			new_host = newNamedHost(ip="{}.{}.{}.{}/24".format(*ip_bytes))
 			link = trackedLink(extern, new_host, {"bw": bw} if (old_style or force_host_tc) else {})
@@ -1059,11 +1078,12 @@ def marlExperiment(
 				flow_stat_break = flow_stat_str.split("]")
 				split_stats = [s.strip().split("[")[-1] for s in flow_stat_break if len(s) > 0]
 				# now split into flow-keys. (ip, ...)(ip, ...)
-				almost_subs = [s.split(")") for s in split_stats if len(s) > 0]
+				almost_subs = [s.split(")") if len(s) > 0 else "" for s in split_stats]
 				subs = []
 				for set_str in almost_subs:
-					if len(set_str) == 0:
-						continue
+					#if len(set_str) == 0:
+						#continue
+					#	subs.append([])
 					subs.append([a.split("(")[-1].split(",") for a in set_str])
 
 				# (ip, props)
@@ -1071,8 +1091,8 @@ def marlExperiment(
 				parsed_flows = []
 
 				for l in subs:
-					if len(l) == 0:
-						continue
+					#if len(l) == 0:
+					#	continue
 
 					layer = []
 					for e in l:
@@ -1085,6 +1105,8 @@ def marlExperiment(
 						if e[0] != "0.0.0.0":
 							ip_bytes = socket.inet_pton(socket.AF_INET, e[0])
 							layer.append((struct.unpack("I", ip_bytes)[0], sublayer))
+							#if e[3] > 0:
+							#	print "culprit: {}, {}".format(e[0], e[3])
 						
 					parsed_flows.append(layer)
 
@@ -1098,6 +1120,8 @@ def marlExperiment(
 						el.strip().split(" ")
 					) for el in data[1:]
 				]
+
+				#print unfused_load_mbps
 
 				return (time_ns, unfused_load_mbps, parsed_flows)
 
@@ -1217,8 +1241,9 @@ def marlExperiment(
 			if interrupted[0]:
 				break
 			# Make the last actions a reality!
-			for (_, _, learners, _, _, sarsas) in teams:
-				enactActions(learners, sarsas, learner_traces)
+			for team_no, (_, _, learners, _, _, sarsas) in enumerate(teams):
+				block_size = len(learners)
+				enactActions(learners, sarsas, learner_traces[team_no * block_size:])
 
 			if i == 10:
 				#net.interact()
@@ -1310,6 +1335,8 @@ def marlExperiment(
 						flow_space = learner_stats[l_index]
 						flow_traces = learner_traces[l_index]
 						flows_seen = parsed_flows[l_index]
+
+						#print len(flow_space), flows_seen
 
 						# TODO: strip old entries?
 

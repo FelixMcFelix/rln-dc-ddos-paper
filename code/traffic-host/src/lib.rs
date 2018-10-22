@@ -40,6 +40,7 @@ use std::{
 	path::{Path, PathBuf},
 	sync::mpsc::{self, Receiver, TryRecvError},
 	thread,
+	time::Duration,
 };
 use url::Url;
 
@@ -181,6 +182,11 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 					for i in 0..visited.len() {
 						visited[i] = false;
 					}
+
+                    if options.randomise {
+    					// Wait the flow prune time.
+    					thread::sleep(Duration::new(2, 100000000));
+                    }
 					
 					enqueue(
 						available_targets.get(draw.sample(&mut rng_local))
