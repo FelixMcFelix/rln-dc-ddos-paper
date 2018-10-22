@@ -4,7 +4,7 @@ from writer import writeResults, makeResultsAverage
 
 ft = __import__("feature-test-prep")
 
-def run(restrict, state, rewards, good_traffic_percents, total_loads, contributors=None, store_sarsas=[]):
+def run(restrict, state, rewards, good_traffic_percents, total_loads, contributors=None, store_sarsas=[], ep_len=10000):
 	results = marlExperiment(
 		n_teams = 2,
 
@@ -14,7 +14,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, contributo
 
 		explore_episodes = 0.8,
 		episodes = 1,
-		episode_length = 10000,
+		episode_length = ep_len,
 		separate_episodes = True,
 
 		alpha = 0.05,
@@ -48,8 +48,8 @@ combo_result_sets = [([], [], []) for i in xrange(ft.n_features)]
 fresh_result_sets = [([], [], []) for i in xrange(ft.n_features)]
 
 configs = [
-	(combo_result_sets, False, "combine"),
-	(fresh_result_sets, True, "fresh")
+	(combo_result_sets, False, "combine", 3000),
+	#(fresh_result_sets, True, "fresh", 10000)
 ]
 
 if __name__ == "__main__":
@@ -57,12 +57,11 @@ if __name__ == "__main__":
 		data = cPickle.load(of)
 
 	for (randstate, contributors) in data:
-		g_contrib = contributors[0]
-		g_contrib[1] = [a for a in xrange(4)]
+		g_contrib = (contributors[0][0], [a for a in xrange(4)])
 
 		feature_contribs = contributors[1:]
 
-		for (target_results, start_fresh, _) in configs:
+		for (target_results, start_fresh, _, ep_len) in configs:
 			for j, (sarsa_tree, restriction) in enumerate(feature_contribs):
 				(rewards, good_traffic_percents, total_loads) = target_results[j]
 				(rs, gs, ls, store_sarsas, rng_state, _) = run(
@@ -71,12 +70,13 @@ if __name__ == "__main__":
 					rewards, good_traffic_percents, total_loads,
 					contributors=[g_contrib],
 					store_sarsas=[] if start_fresh else sarsa_tree,
+					ep_len=ep_len
 				)
 
 				target_results[j] = (rs, gs, ls)
 
 	# Now, write out the results!
-	for (target_results, start_fresh, config_name) in configs:
+	for (target_results, start_fresh, config_name, ep_len) in configs:
 		for i, (rs, gs, ls) in enumerate(target_results):
 			csv_dir = ft.results_dir + "ft-{}-f{}.csv".format(config_name, i)
 			avg_csv_dir = ft.results_dir + "ft-{}-f{}-avg.csv".format(config_name, i)
