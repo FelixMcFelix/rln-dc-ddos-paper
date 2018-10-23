@@ -587,8 +587,8 @@ def marlExperiment(
 			if print_times:
 				print "do_acs:", outtime-intime
 		else:
-			for (node, sarsa) in zip(learners, sarsas):
-				(_, action) = sarsa.last_act
+			for (node, sarsa, state) in zip(learners, sarsas, flow_action_sets):
+				(_, action) = state
 				a = action if override_action is None else override_action
 				tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 				updateUpstreamRoute(node, ac_prob=tx_ac)
@@ -605,7 +605,7 @@ def marlExperiment(
 			value += 2
 			value %= god_mod
 
-		return value		
+		return value
 
 	def addHosts(extern, hosts_per_learner, hosts_upper):
 		host_count = (hosts_per_learner if hosts_per_learner == hosts_upper
@@ -1277,11 +1277,6 @@ def marlExperiment(
 			postask = time.time()
 			if print_times:
 				print "total:", postask - preask
-			# REMOVE
-			#print ["{}:{}".format(a,hex(a)) for a in flows_to_query]
-			#for a in parsed_flows:
-			#	for b in a:
-			#		print "{}".format(hex(b[0]))
 
 			def mbpsify(bts):
 					return 8000*float(bts)/time_ns
@@ -1313,6 +1308,8 @@ def marlExperiment(
 			last_traffic_ratio = min(get_data(0)[0]/bw_all[0], 1.0)
 			if not (i % 10): print "\titer {}/{}, good:{}, load:{:.2f} ({:.2f},{:.2f})".format(i, episode_length, last_traffic_ratio, total_mbps[0], *unfused_total_mbps[0:2])
 
+			first_sarsa = None
+
 			flows_to_query = []
 			for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
 				team_true_loads = bw_teams[team_no]
@@ -1330,12 +1327,19 @@ def marlExperiment(
 
 				intime = time.time()
 				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
+					if first_sarsa is None:
+						first_sarsa = sarsa
+
+					target_sarsa = first_sarsa if single_learner else sarsa
+
 					important_indices = [switch_list_indices[name] for name in [
 						intermediates[learner_no/n_learners].name, node.name
 					]]
 
 					#state_vec = np.array([total_mbps[index] for index in [0, leader_index]+important_indices])
 					state_vec = [total_mbps[index] for index in [0, leader_index]+important_indices]
+
+					l_index = learner_no + (team_no * len(learners))
 					# if on hard mode, do some other stuff instead.
 					if actions_target_flows:
 						# props: (
@@ -1345,7 +1349,6 @@ def marlExperiment(
 						#  pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, [8-10]
 						#  wnd_iat_mean, wnd_iat_var [11-12]
 						# )
-						l_index = learner_no + (team_no * len(learners))
 						flow_space = learner_stats[l_index]
 						flow_traces = learner_traces[l_index]
 						flows_seen = parsed_flows[l_index]
@@ -1386,7 +1389,12 @@ def marlExperiment(
 							# Combine these to get a vector of likelihoods,
 							# get the highest-epsilon to calculate the action.
 							# Then update each model with the TRUE action chosen.
-							subactors = [(sarsa, restrict)] + [(s_tree[team_no][learner_no], r) for (s_tree, r) in contributors]
+
+							# single_learner support: just take firstmost...
+							s_tree_t = 0 if single_learner else team_no
+							s_tree_l = 0 if single_learner else learner_no
+							subactors = [(target_sarsa, restrict)] + [(s_tree[s_tree_t][s_tree_l], r) for (s_tree, r) in contributors]
+
 							last_sarsa = sarsa
 							ac_vals = np.zeros(len(sarsa.actions))
 							substates = []
@@ -1445,15 +1453,19 @@ def marlExperiment(
 
 							learner_traces[l_index] = flow_traces
 					else:
-						# Encode state (as seen by this learner)
+						prev_state = learner_traces[l_index]
+						if prev_state == {}:
+							prev_state = sarsa.last_act
 
 						# Start time of action computation
 						s_t = time.time()
 
+						# Encode state (as seen by this learner)
 						state = sarsa.to_state(np.array(state_vec))
 
 						# Learn!
-						sarsa.update(state, reward)
+						target_sarsa.update(state, reward, prev_state)
+						learner_traces[l_index] = target_sarsa.last_act
 
 						# End time.
 						e_t = time.time()
