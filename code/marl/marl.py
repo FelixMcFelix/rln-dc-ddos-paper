@@ -23,6 +23,7 @@ from sarsa import SarsaLearner
 import select
 import signal
 import socket
+from spf import *
 import struct
 from subprocess import PIPE, Popen
 import sys
@@ -109,6 +110,9 @@ def marlExperiment(
 
 		contributors = [],
 		restrict = None,
+
+		single_learner = False,
+		spiffy_mode = False,
 	):
 
 	linkopts_core = linkopts
@@ -183,10 +187,18 @@ def marlExperiment(
 			num_teams, max_load*ratio)
 	# gen
 
+	# change the state machine we get to roll with...
+	if spiffy_mode:
+		AcTrans = SpfMachine
+		aset = range(3)
+	else:
+		AcTrans = MarlMachine
+		aset = pdrop_magnitudes
+
 	sarsaParams = {
 		"max_bw": max_bw,
 		"vec_size": 4,
-		"actions": pdrop_magnitudes,
+		"actions": aset,
 		"epsilon": epsilon,
 		"learn_rate": alpha,
 		"discount": discount,
@@ -194,7 +206,8 @@ def marlExperiment(
 		# "tile_c": 16,
 		# "tilings_c": 3,
 		# "default_q": 0,
-		"epsilon_falloff": explore_episodes * episode_length
+		"epsilon_falloff": explore_episodes * episode_length,
+		"AcTrans": AcTrans,
 	}
 
 	if actions_target_flows:
@@ -565,9 +578,10 @@ def marlExperiment(
 			for i, (node, sarsa, maps) in enumerate(zip(learners, sarsas, flow_action_sets)):
 				for ip, state in maps.iteritems():
 					#print "{}: {}".format(i, ip)
-					(_, action) = state
+					(_, action, machine) = state
 					a = action if override_action is None else override_action
-					tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
+					# tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
+					tx_ac = machine.action() if isinstance(a, (int, long)) else a
 					updateUpstreamRoute(node, ac_prob=tx_ac, target_ip=ip)
 			outtime = time.time()
 			if print_times:
@@ -1387,6 +1401,7 @@ def marlExperiment(
 								# Compute and store the intended update for each flow.
 								if ip in flow_traces:
 									dat = flow_traces[ip]
+									machine = dat[2]
 									(would_choose, new_vals) = s.update(
 										state,
 										reward,
@@ -1396,6 +1411,7 @@ def marlExperiment(
 								else:
 									(would_choose, new_vals) = s.bootstrap(state)
 									need_decay = False
+									machine = AcTrans()
 
 								#print "part: {}. Wanted to pick: {}".format(new_vals, would_choose)
 
@@ -1404,15 +1420,16 @@ def marlExperiment(
 								last_sarsa = s
 
 							l_action = last_sarsa.select_action_from_vals(ac_vals)
+							machine.move(l_action)
 							#print "full: {}. Chosen: {}".format(ac_vals, l_action)
-							flow_traces[ip] = (substates, l_action)
+							flow_traces[ip] = (substates, l_action, machine)
 
 							if need_decay:
 								for (s, _) in subactors:
 									s.decay()
 
 							# TODO: maybe only update this whole thing if we're choosing to examine this flow.
-							l["last_act"] = l_action
+							l["last_act"] = machine.action()#l_action
 							l["last_rate_in"] = observed_rate_in
 							l["last_rate_out"] = observed_rate_out
 

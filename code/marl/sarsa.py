@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import tilecoding.representation as r
+from spf import *
 import sys
 
 class SarsaLearner:
@@ -15,7 +16,8 @@ class SarsaLearner:
 				tile_c=6, tilings_c=8, default_q=0.0,
 				epsilon_falloff=1000,
 				break_equal=False,
-				extended_mins=[], extended_maxes=[]):
+				extended_mins=[], extended_maxes=[],
+				AcTrans=MarlMachine):
 		state_range = [
 			[0 for i in xrange(vec_size)] + extended_mins,
 			[max_bw for i in xrange(vec_size)]+ extended_maxes,
