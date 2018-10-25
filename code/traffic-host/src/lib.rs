@@ -70,9 +70,13 @@ pub fn run(options: Config<'static>) {
 
 	// Here: listen for EOL (and then kill inner thread).
 	// Inner thread does request loop.
+    let await = options.requests.is_none();
+
 	let handle = thread::spawn(move || request_loop(rx, options));
-	stdin.read_line(&mut buffer);
-	tx.send(CliCommand::End);
+    if await {
+    	stdin.read_line(&mut buffer);
+	    tx.send(CliCommand::End);
+    }
 
 	handle.join();
 }

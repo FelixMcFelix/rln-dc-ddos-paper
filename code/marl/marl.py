@@ -113,6 +113,10 @@ def marlExperiment(
 
 		single_learner = False,
 		spiffy_mode = False,
+
+		randomise = False,
+		randomise_count = None,
+		randomise_new_ip = False,
 	):
 
 	linkopts_core = linkopts
@@ -196,6 +200,20 @@ def marlExperiment(
 		AcTrans = MarlMachine
 		aset = pdrop_magnitudes
 		default_machine_state = 0
+
+	def th_cmd(bw):
+		return [
+			"../traffic-host/target/release/traffic-host",
+			str(bw),
+		] + (
+			["-s", "10.0.0.1/gcc-8.2.0.tar.gz"] if not randomise else \
+			[
+				"-r",
+				"-l", "../traffic-host/htdoc-deps.ron",
+			]
+		) + (
+			[] if randomise_count is None else ["-c", str(randomise_count)]
+		)
 
 	sarsaParams = {
 		"max_bw": max_bw,
@@ -612,6 +630,18 @@ def marlExperiment(
 
 		return value
 
+	def genIP(good):
+		# The spectre of classful routing still haunts us all.
+		lims = [0xdf,0xff,0xff,0xff]
+		ip_bytes = [random.randint(0,lim) for lim in lims]
+		# 10.*.*.* is a/our PRIVATE space.
+		while ip_bytes[0] == 10 or ip_bytes[0] == 0:
+			ip_bytes[0] = random.randint(1, lims[0])
+		ip_bytes[-1] = moralise(ip_bytes[-1], good)
+
+		ip = "{}.{}.{}.{}".format(*ip_bytes)
+		return (ip, ip_bytes)
+
 	def addHosts(extern, hosts_per_learner, hosts_upper):
 		host_count = (hosts_per_learner if hosts_per_learner == hosts_upper
 			else random.randint(hosts_per_learner, hosts_upper)
@@ -626,15 +656,7 @@ def marlExperiment(
 			# Make up a wonderful IP.
 			# Last byte => goodness. Even = good.
 
-			# The spectre of classful routing still haunts us all.
-			lims = [0xdf,0xff,0xff,0xff]
-			ip_bytes = [random.randint(0,lim) for lim in lims]
-			# 10.*.*.* is a/our PRIVATE space.
-			while ip_bytes[0] == 10 or ip_bytes[0] == 0:
-				ip_bytes[0] = random.randint(1, lims[0])
-			ip_bytes[-1] = moralise(ip_bytes[-1], good)
-
-			ip = "{}.{}.{}.{}".format(*ip_bytes)
+			(ip, ip_bytes) = genIP(good)
 			print "drew: good={}, bw={}, ip={}".format(good, bw, ip)
 
 			new_host = newNamedHost(ip="{}.{}.{}.{}/24".format(*ip_bytes))
@@ -1179,12 +1201,7 @@ def marlExperiment(
 					) + [(good_file if good else bad_file)]
 				elif model == "nginx":
 					if submodel == "http" or (submodel is None and good):
-						cmd = [
-							"../traffic-host/target/release/traffic-host",
-							str(bw),
-							# temp/testing
-							"-s", "10.0.0.1/gcc-8.2.0.tar.gz"
-						]
+						cmd = th_cmd(bw)
 					elif submodel == "udp-flood" or (submodel is None and not good):
 						#rate_const = 3.0 if not good else 4.0
 						udp_h_size = 28.0
@@ -1212,7 +1229,7 @@ def marlExperiment(
 
 				if len(cmd) > 0:
 					host_procs.append(host.popen(
-						cmd, stdin=sys.stdout, stderr=sys.stderr
+						cmd, stdin=PIPE, stderr=sys.stdout,
 					))
 
 		# Let the pcaps come to life.
@@ -1264,10 +1281,41 @@ def marlExperiment(
 				block_size = len(learners)
 				enactActions(learners, sarsas, learner_traces[team_no * block_size:])
 
-			if i == 10:
+			if i == 100:
 				#net.interact()
 				#quit()
 				pass
+
+			if randomise:
+				counter = 0
+				for (_, _, _, _, hosts, _) in teams:
+					for (host, good, bw, link, ip) in hosts:
+						finished = host_procs[counter].poll() is not None
+						#print "{} finished? {}".format(counter, finished)
+						if good and finished:
+							my_if = host.intf()
+							if randomise_new_ip:
+								# this is BROKEN
+								link = my_if.link
+								# get partner
+								# unhook IF from both sides
+								# create new between them with new IP (shazam!)
+								# set hosts' default routes to new IF
+								#parent = (link.intf1 if my_if == link.intf2 else link.intf2).node
+								newIP = genIP(good)
+								#link.delete()
+								a= my_if.setIP(newIP[0], 24)
+								b= my_if.updateIP()
+								if counter==0:
+									print a, b
+								#print my_if.updateIP(), newIP
+
+							# restart traffic-host
+							#print "restarting for my friend.. {}".format(counter)
+							host_procs[counter] = host.popen(
+								th_cmd(bw), stdin=sys.stdout, stderr=sys.stderr
+							)
+						counter += 1
 
 			presleep = time.time()
 
@@ -1357,6 +1405,8 @@ def marlExperiment(
 						flow_space = learner_stats[l_index]
 						flow_traces = learner_traces[l_index]
 						flows_seen = parsed_flows[l_index]
+						#if l_index == 0:
+						#	print "learner {} seen {} flows to date".format(l_index, len(flow_space))
 
 						#print len(flow_space), flows_seen
 
