@@ -8,5 +8,5 @@ marker: $(targets)
 	latexmk -lualatex -pdf $< > /dev/null 2>&1
 
 %.tex: %.gnuplot $(source_data)
-	gnuplot $<
+	gnuplot -e "load 'config/preamble.cfg'" $<
 
