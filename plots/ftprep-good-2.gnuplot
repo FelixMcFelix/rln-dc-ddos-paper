@@ -1,5 +1,5 @@
 set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}'
-set output "ftprep-good.tex"
+set output "ftprep-good-2.tex"
 
 load "parula.pal"
 
@@ -25,8 +25,7 @@ set yrange [0.0:1.0]
 set key inside bottom right
 
 plot '../results/baseline-2-avg.csv' u 1:3 w lines smooth sbezier title "baseline", \
-     '../results/ft-g-avg.csv' u 1:3 w lines smooth sbezier title "G", \
-     '../results/ft-f0-avg.csv' u 1:3 w lines smooth sbezier title "f0" ls 4, \
-     '../results/ft-f1-avg.csv' u 1:3 w lines smooth sbezier title "f1" ls 5, \
-     '../results/ft-f2-avg.csv' u 1:3 w lines smooth sbezier title "f2" ls 6, \
-     '../results/ft-f3-avg.csv' u 1:3 w lines smooth sbezier title "f3" ls 7
+     '../results/ft-f4-avg.csv' u 1:3 w lines smooth sbezier title "f4" ls 3, \
+     '../results/ft-f5-avg.csv' u 1:3 w lines smooth sbezier title "f5" ls 5, \
+     '../results/ft-f6-avg.csv' u 1:3 w lines smooth sbezier title "f6" ls 6, \
+     '../results/ft-f7-avg.csv' u 1:3 w lines smooth sbezier title "f7" ls 7
