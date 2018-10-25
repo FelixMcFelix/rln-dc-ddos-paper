@@ -24,9 +24,9 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 set key inside bottom right
 
-plot '../results/baseline-2-avg.csv' u 1:3 w lines smooth sbezier title "baseline", \
-     '../results/ft-g-avg.csv' u 1:3 w lines smooth sbezier title "G", \
-     '../results/ft-f0-avg.csv' u 1:3 w lines smooth sbezier title "f0" ls 4, \
-     '../results/ft-f1-avg.csv' u 1:3 w lines smooth sbezier title "f1" ls 5, \
-     '../results/ft-f2-avg.csv' u 1:3 w lines smooth sbezier title "f2" ls 6, \
-     '../results/ft-f3-avg.csv' u 1:3 w lines smooth sbezier title "f3" ls 7
+plot '../results/baseline-2-avg.csv' u 1:3 w lines smooth sbezier title "Baseline", \
+     '../results/ft-g-avg.csv' u 1:3 w lines smooth sbezier title "4 $\\cdot{}$ Load", \
+     '../results/ft-f0-avg.csv' u 1:3 w lines smooth sbezier title "IP" ls 4, \
+     '../results/ft-f1-avg.csv' u 1:3 w lines smooth sbezier title "Last Action" ls 5, \
+     '../results/ft-f2-avg.csv' u 1:3 w lines smooth sbezier title "Duration" ls 6, \
+     '../results/ft-f3-avg.csv' u 1:3 w lines smooth sbezier title "Flow Size" ls 7
