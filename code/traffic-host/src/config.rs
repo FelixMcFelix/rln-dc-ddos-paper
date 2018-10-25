@@ -1,4 +1,7 @@
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    time::Duration,
+};
 
 #[derive(Debug)]
 pub struct Config<'a> {
@@ -19,5 +22,11 @@ pub struct Config<'a> {
 
     /// Base url for the domain to make requests from.
     pub url: Cow<'a, str>,
+
+    /// Amount of requests to make (from a root object) before termination.
+    pub requests: Option<u64>,
+
+    /// Time to wait between requests (in ms)
+    pub wait_ms: Duration,
 }
 

@@ -2,7 +2,10 @@ extern crate clap;
 extern crate traffic_host;
 
 use clap::{App, Arg, ArgMatches};
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    time::Duration,
+};
 
 static BYTES_IN_MEGABYTE: f64 = 1_048_576.0;
 static BITS_IN_BYTE: f64 = 8.0;
@@ -32,6 +35,20 @@ fn main() {
 				.help("Server to send requests to.")
 				.takes_value(true)
 				.default_value("http://10.0.0.1"))
+			.arg(Arg::with_name("wait")
+				.short("w")
+				.long("wait")
+				.value_name("TIME_MS")
+				.help("Amount of milliseconds to wait between requests.")
+				.takes_value(true)
+				.default_value("0"))
+			.arg(Arg::with_name("count")
+				.short("c")
+				.long("count")
+				.value_name("COUNT")
+				.help("Amount of requests to make in total. 0 => Infinite.")
+				.takes_value(true)
+				.default_value("0"))
 			.arg(Arg::with_name("http-dir")
 				.short("d")
 				.long("http-dir")
@@ -83,6 +100,24 @@ fn main() {
 			.to_string()
 	);
 
+	let requests = matches.value_of_lossy("count")
+		.expect("Count always guaranteed to exist.")
+		.parse::<u64>()
+		.expect("Count MUST be an integer value.");
+
+	let wait_ms = Duration::from_millis(
+        matches.value_of_lossy("wait")
+    		.expect("Wait-time always guaranteed to exist.")
+		    .parse::<u64>()
+    		.expect("Wait-time MUST be an integer value.")
+        );
+
+	let requests = if requests == 0 {
+		None
+	} else {
+		Some(requests)
+	};
+
 	let randomise = matches.is_present("random");
 
 	if matches.is_present("bless") {
@@ -94,7 +129,9 @@ fn main() {
 			max_down: 0,
 			max_up: 0,
 			randomise,
+            requests,
 			url,
+            wait_ms,
 		};
 
 		traffic_host::bless(config);
@@ -108,7 +145,9 @@ fn main() {
 			max_down,
 			max_up,
 			randomise,
+            requests,
 			url,
+            wait_ms,
 		};
 
 		traffic_host::run(config);

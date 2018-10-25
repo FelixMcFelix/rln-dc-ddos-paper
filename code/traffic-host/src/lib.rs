@@ -138,12 +138,18 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 		}
 	}
 
+    let tracker = options.requests.clone();
+
 	enqueue(
 		available_targets.get(draw.sample(&mut rng_local))
 			.expect("Guaranteed by bounds"),
 		&mut work_queue,
 		&mut visited,
 		&dep_list.name_map);
+    
+    let mut tracker = tracker.map(|x| x.checked_sub(1).unwrap_or(0));
+
+    let empty_dur = Duration::default();
 
 	loop {
 		match rx.try_recv() {
@@ -179,13 +185,20 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 
 				// add random element, wipe the visited list.
 				if work_queue.is_empty() {
+                    if tracker == Some(0) {
+                        break;
+                    }
+
 					for i in 0..visited.len() {
 						visited[i] = false;
 					}
 
-                    if options.randomise {
+                    if options.wait_ms > empty_dur {
     					// Wait the flow prune time.
-    					thread::sleep(Duration::new(2, 100000000));
+    					thread::sleep(
+                            //Duration::new(2, 100000000)
+                            options.wait_ms
+                        );
                     }
 					
 					enqueue(
@@ -194,6 +207,8 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 						&mut work_queue,
 						&mut visited,
 						&dep_list.name_map);
+
+                    tracker = tracker.map(|x| x.checked_sub(1).unwrap_or(0));
 				}
 			}
 			Ok(CliCommand::End) | Err(_) => {break;},

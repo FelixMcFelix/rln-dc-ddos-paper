@@ -191,9 +191,11 @@ def marlExperiment(
 	if spiffy_mode:
 		AcTrans = SpfMachine
 		aset = range(3)
+		default_machine_state = 1
 	else:
 		AcTrans = MarlMachine
 		aset = pdrop_magnitudes
+		default_machine_state = 0
 
 	sarsaParams = {
 		"max_bw": max_bw,
@@ -588,7 +590,10 @@ def marlExperiment(
 				print "do_acs:", outtime-intime
 		else:
 			for (node, sarsa, state) in zip(learners, sarsas, flow_action_sets):
-				(_, action) = state
+				if len(state) == 0:
+					action = default_machine_state
+				else:
+					(_, action) = state
 				a = action if override_action is None else override_action
 				tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 				updateUpstreamRoute(node, ac_prob=tx_ac)
