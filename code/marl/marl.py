@@ -823,7 +823,7 @@ def marlExperiment(
 			ctl_proc = Popen(
 				[
 					"ryu-manager", "controller.py",
-					"--verbose"
+					#"--verbose"
 				],
 				stdin=PIPE,
 				stderr=sys.stderr
