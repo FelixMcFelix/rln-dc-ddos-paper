@@ -120,6 +120,7 @@ def marlExperiment(
 
 		split_codings = False,
 		extra_codings = [],
+		feature_max = 12,
 	):
 
 	linkopts_core = linkopts
@@ -236,16 +237,25 @@ def marlExperiment(
 	if actions_target_flows:
 		# order of the features:
 		#  ip, last_act, len, size, cx_ratio,
-		#  mean_iat, delta_in, delta_out
+		#  mean_iat, delta_in, delta_out,
+		#  pkt_in_count, pkt_out_count,
+		#  pkt_in_wnd_count, pkt_out_wnd_count,
+		#  mean_bpp_in, mean_bpp_out,
 		sarsaParams["extended_mins"] = [
 			0.0, 0.0, 0.0, 0.0, 0.0,
-			0.0, -50.0, -50.0
-		]
+			0.0, -50.0, -50.0,
+			0.0, 0.0,
+			0.0, 0.0,
+			0.0, 0.0,
+		][0:feature_max-4]
 
 		sarsaParams["extended_maxes"] = [
 			4294967296.0, 1.0, 2000.0, float(10 * (1024 ** 2)), 1.0,
-			10000.0, 50.0, 50.0
-		]
+			10000.0, 50.0, 50.0,
+			7000.0, 7000.0,
+			2000.0, 2000.0,
+			1560.0, 1560.0,
+		][0:feature_max-4]
 
 		if restrict is not None:
 			sarsaParams["vec_size"] = len(restrict)
@@ -277,6 +287,12 @@ def marlExperiment(
 			flow_set["mean_iat"],
 			flow_set["delta_in"],
 			flow_set["delta_out"],
+			flow_set["pkt_in_count"],
+			flow_set["pkt_out_count"],
+			flow_set["pkt_in_wnd_count"],
+			flow_set["pkt_out_wnd_count"],
+			flow_set["mean_bpp_in"],
+			flow_set["mean_bpp_out"],
 		]
 
 	initd_host_count = [1]
@@ -1493,7 +1509,9 @@ def marlExperiment(
 									"ip": ip,
 									"last_act": 0,
 									"last_rate_in": -1.0,
-									"last_rate_out": -1.0
+									"last_rate_out": -1.0,
+									"pkt_in_count": 0,
+									"pkt_out_count": 0,
 								}
 							l = flow_space[ip]
 
@@ -1501,6 +1519,15 @@ def marlExperiment(
 							l["length"] = props[0]
 							l["size"] = props[1] + props[2]
 							l["mean_iat"] = props[11]
+							l["pkt_in_count"] += props[7]
+							l["pkt_out_count"] += props[10]
+							l["pkt_in_wnd_count"] = props[7]
+							l["pkt_out_wnd_count"] = props[10]
+							l["mean_bpp_in"] = props[5]
+							l["mean_bpp_out"] = props[8]
+							l["bytes_in"] = props[3]
+							l["bytes_out"] = props[4]
+
 							observed_rate_in = mbpsify(props[3])
 							observed_rate_out = mbpsify(props[4])
 
@@ -1510,6 +1537,8 @@ def marlExperiment(
 							l["delta_in"] = observed_rate_in - l["last_rate_in"]
 							l["delta_out"] = observed_rate_out - l["last_rate_out"]
 							total_vec = state_vec + flow_to_state_vec(l)
+
+							total_vec = total_vec[:feature_max]
 
 							# Each needs its own view of the state...
 							# (and specifies its restriction thereof)
