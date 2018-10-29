@@ -42,6 +42,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, contributo
 		reward_direction = "out",
 		randomise = True,
 		randomise_count = 3,
+		randomise_new_ip = True,
 	)
 
 	return results
