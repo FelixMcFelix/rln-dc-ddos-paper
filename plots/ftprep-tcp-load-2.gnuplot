@@ -21,7 +21,7 @@ set datafile separator ","
 set xlabel "Iteration ($t \\cdot{} \\SI{50}{\\milli\\second}$)"
 set ylabel "Total load (\\si{\\mega\\bit\\per\\second})"
 
-plot '../results/baseline-2-avg-ng.csv' u 1:4 w lines smooth sbezier title "baseline", \
+plot '../results/baseline-2-uncap-avg-ng.csv' u 1:4 w lines smooth sbezier title "baseline", \
      '../results/ft-tcp-f4-avg.csv' u 1:4 w lines smooth sbezier title "f4", \
      '../results/ft-tcp-f5-avg.csv' u 1:4 w lines smooth sbezier title "f5", \
      '../results/ft-tcp-f6-avg.csv' u 1:4 w lines smooth sbezier title "f6", \
