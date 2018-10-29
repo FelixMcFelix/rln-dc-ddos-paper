@@ -243,7 +243,7 @@ def marlExperiment(
 		]
 
 		sarsaParams["extended_maxes"] = [
-			4294967296.0, 0.9, 2000.0, float(10 * (1024 ** 2)), 1.0,
+			4294967296.0, 1.0, 2000.0, float(10 * (1024 ** 2)), 1.0,
 			10000.0, 50.0, 50.0
 		]
 
@@ -269,7 +269,7 @@ def marlExperiment(
 	def flow_to_state_vec(flow_set):
 		return [
 			float(flow_set["ip"]),
-			float(flow_set["last_act"]) / 10.0,
+			float(flow_set["last_act"]),
 			# conert from ns to ms
 			flow_set["length"] / 1000000,
 			flow_set["size"],
