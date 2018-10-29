@@ -17,13 +17,17 @@ class SarsaLearner:
 				epsilon_falloff=1000,
 				break_equal=False,
 				extended_mins=[], extended_maxes=[],
+				tc_indices = None,
 				AcTrans=MarlMachine):
 		state_range = [
 			[0 for i in xrange(vec_size)] + extended_mins,
 			[max_bw for i in xrange(vec_size)]+ extended_maxes,
 		]
+
+		tc_indices = tc_indices if tc_indices is not None else [np.arange(vec_size)]
+
 		self.tc = r.TileCoding(
-			input_indices = [np.arange(vec_size)],
+			input_indices = tc_indices, 
 			ntiles = [tile_c],
 			ntilings = [tilings_c],
 			hashing = None,

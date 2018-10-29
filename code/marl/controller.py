@@ -29,7 +29,7 @@ class SmartishRouter(app_manager.RyuApp):
 		self.netmask = "255.255.255.0"
 		# may want to use the actual outbound mac, later
 		self.pretend_mac = "00:00:00:01:00:00"
-
+		self.outsiders = {}
 
 		# probably open a conn to mininet here, and wait to receive params...
 		with closing(
@@ -235,6 +235,7 @@ class SmartishRouter(app_manager.RyuApp):
 		pkt = packet.Packet(msg.data)
 		arp_pkt = pkt.get_protocol(arp.arp)
 		ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
+		ether_pkt = pkt.get_protocol(ethernet.ethernet)
 
 		if arp_pkt is not None:
 			#print "it's ARP"
@@ -273,12 +274,71 @@ class SmartishRouter(app_manager.RyuApp):
 						ipv4_dst=(arp_pkt.src_ip, "255.255.255.255"),
 					),
 					actions=actions,
+					table_id=1,
 				)
 				#print "route home installed for external"
 
+				self.outsiders[arp_pkt.src_mac] = arp_pkt.src_ip
+
 			return
 		elif dpid not in self.entry_map:
-			#print "non-arp upcall from external"
+			self.logger.debug("non-arp upcall from external")
+
+			if ether_pkt.src not in self.outsiders:
+				return
+
+			true_ip = self.outsiders[ether_pkt.src]
+			self.logger.debug("Found it in outsiders")
+			self.logger.debug("src:{}, dst:{}".format(ipv4_pkt.src, ipv4_pkt.dst))
+			self.logger.debug("true_src:{}".format(true_ip))
+
+			# Do the logic for IP rewrite installation here...
+			# 1. Cancel the CONTROLLER rule in table 0.
+			# Replace SRC, then send on output 1...
+			actions = [
+				ofp_parser.OFPActionSetField(
+					ipv4_src=ipv4_pkt.src,
+				),
+				ofp_parser.OFPActionOutput(1)
+			]
+			self.add_flow(dp, 1,
+				ofp_parser.OFPMatch(
+					eth_type=ipv4_eth,
+					ipv4_src=(true_ip, "255.255.255.255")
+				),
+				actions=actions,
+			)
+
+			# 2. Update the MAC-rewrite to also rewrite dstIP if new IP seen.
+			actions = [
+				ofp_parser.OFPActionSetField(
+					eth_dst=ether_pkt.src,
+				),
+				ofp_parser.OFPActionSetField(
+					eth_src=self.pretend_mac,
+				),
+				ofp_parser.OFPActionSetField(
+					ipv4_dst=true_ip,
+				),
+				ofp_parser.OFPActionOutput(in_port)
+			]
+
+			self.add_flow(dp, 1,
+				ofp_parser.OFPMatch(
+					eth_type=ipv4_eth,
+					ipv4_dst=(ipv4_pkt.src, "255.255.255.255"),
+				),
+				actions=actions,
+				table_id=1,
+			)
+			# 3. Hand back to switch.
+			actions = [ofp_parser.OFPActionOutput(ofp.OFPP_TABLE)]
+			out = ofp_parser.OFPPacketOut(
+				datapath=dp, buffer_id=msg.buffer_id, in_port=in_port,
+				actions=actions, data=msg.data)
+			#print out, dp, msg.buffer_id, in_port, actions, msg.data.encode("hex_codec"), port, adj
+			dp.send_msg(out)
+			self.logger.debug("haned back")
 			return
 
 		#print "it's ipv4"

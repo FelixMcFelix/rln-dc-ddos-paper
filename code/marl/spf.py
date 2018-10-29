@@ -22,7 +22,7 @@ class MarlMachine:
 	def action(self):
 		return self._values[self._curr_state]
 
-class SpfMachine:
+class SpfMachine(MarlMachine):
 	"""
 		basically a state machine seeing whether
 		encoding known info about how flows behave

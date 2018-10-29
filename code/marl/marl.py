@@ -117,6 +117,9 @@ def marlExperiment(
 		randomise = False,
 		randomise_count = None,
 		randomise_new_ip = False,
+
+		split_codings = False,
+		extra_codings = [],
 	):
 
 	linkopts_core = linkopts
@@ -253,6 +256,13 @@ def marlExperiment(
 		else:
 			sarsaParams["vec_size"] += len(sarsaParams["extended_maxes"])
 
+		if not split_codings:
+			sarsaParams["tc_indices"] = [np.arange(sarsaParams["vec_size"])]
+		else:
+			sarsaParams["tc_indices"] = [np.arange(4)] + [np.array(i) for i in xrange(4, sarsaParams["vec_size"])]
+
+		sarsaParams["tc_indices"] += extra_codings
+
 
 	# helpers
 
@@ -350,7 +360,7 @@ def marlExperiment(
 			killsock(sock)
 		switch_sockets[0] = {}
 
-	def updateOneRoute(switch, cmd_list, msg):
+	def updateOneRoute(switch, cmd_list, msg, needs_check=False):
 		if force_cmd_routes or not switch.listenPort:
 			switch.cmd(*cmd_list)
 		else:
@@ -365,9 +375,10 @@ def marlExperiment(
 				try:
 					s.sendall(msg)
 					sent = True
-					#print ofpp.parse(s.recv(4096)) 
 				except:
 					s = openSwitchSocket(switch)
+			if needs_check:
+				print ofpp.parse(s.recv(4096)) 
 
 	def executeRouteQueue():
 		for el in route_commands[0]:
@@ -414,12 +425,36 @@ def marlExperiment(
 				])
 			)
 
+	def ip_masker_message(new_ip, old_ip, subnet="255.255.255.255"):
+		importance = 0
+		priority = 1
+
+		txd_old = netip(old_ip, subnet)
+		txd_new = netip(new_ip, subnet)
+		txd_sub = socket.inet_aton(subnet)
+
+		# rewrite dst, rewrite src
+		return ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, priority, None, None, None, 0, importance,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_SRC, True, 0, txd_old, txd_sub)
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_APPLY_ACTIONS, None, [
+				ofpb.ofp_action_set_field(None, 8, ofpm.build(None, ofp.OFPXMT_OFB_IPV4_SRC, False, 0, txd_new)),
+				ofpb.ofp_action_output(None, 16, ofp.OFPP_CONTROLLER, 65535)
+			])
+		)
+
 	flow_pdrop_msg = [""]
 	flow_upstream_msg = [""]
+	flow_upstream_t1_msg = [""]
 	flow_gselect_msg = [""]
 	flow_outbound_msg = [""]
 	flow_outbound_flood = [""]
 	flow_arp_upcall = [""]
+	flow_miss_next_table = [""]
 	flow_group_msgs = [[]]
 
 	def compute_msg(ip="10.0.0.1", subnet="255.255.255.0",
@@ -450,6 +485,15 @@ def marlExperiment(
 			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
 				ofpb.ofp_action_output(None, 16, ofp.OFPP_CONTROLLER, 65535)
 			])
+		)
+
+		flow_miss_next_table[0] = ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 0, None, None, None, 0, 1,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				#ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0806, None),
+			]),
+			ofpb.ofp_instruction_goto_table(None, None, 1)
 		)
 
 		groups = []
@@ -503,6 +547,18 @@ def marlExperiment(
 			])
 		)
 
+		flow_upstream_t1_msg[0] = ofpb.ofp_flow_mod(
+			None, 0, 0, 1, ofp.OFPFC_ADD,
+			0, 0, 0, None, None, None, 0, 1,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(ip, subnet), socket.inet_aton(subnet))
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				ofpb.ofp_action_output(None, 16, out_port, 65535)
+			])
+		)
+
 	compute_msg()
 
 	def prepLearner(switch, out_port=1, ac_prob=0.0):
@@ -527,7 +583,7 @@ def marlExperiment(
 
 		# send group+bucket instantiations,
 		# also the base rules (internal dst -> G0, external -> outwards port=2)
-		for msg in flow_arp_upcall + flow_upstream_msg + flow_outbound_flood:
+		for msg in flow_arp_upcall + flow_upstream_t1_msg + flow_outbound_flood + flow_miss_next_table:
 			if alive:
 				updateOneRoute(switch, cmd_list, msg)
 			else:
@@ -571,6 +627,12 @@ def marlExperiment(
 
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
+		else:
+			route_commands[0].append((switch, cmd_list, msg))
+
+	def switch_cmd(switch, cmd_list, msg, needs_check=False):
+		if alive:
+			updateOneRoute(switch, cmd_list, msg, needs_check)
 		else:
 			route_commands[0].append((switch, cmd_list, msg))
 
@@ -1301,14 +1363,11 @@ def marlExperiment(
 								# unhook IF from both sides
 								# create new between them with new IP (shazam!)
 								# set hosts' default routes to new IF
-								#parent = (link.intf1 if my_if == link.intf2 else link.intf2).node
+								parent = (link.intf1 if my_if == link.intf2 else link.intf2).node
 								newIP = genIP(good)
-								#link.delete()
-								a= my_if.setIP(newIP[0], 24)
-								b= my_if.updateIP()
-								if counter==0:
-									print a, b
-								#print my_if.updateIP(), newIP
+								switch_cmd(parent, [], ip_masker_message(newIP[0], ip), False)
+								#print "{} doing a rewrite: {}->{}".format(parent.listenPort, ip, newIP[0])
+								# TODO: think about chanign bw/goodness?
 
 							# restart traffic-host
 							#print "restarting for my friend.. {}".format(counter)
@@ -1406,11 +1465,14 @@ def marlExperiment(
 						flow_traces = learner_traces[l_index]
 						flows_seen = parsed_flows[l_index]
 						#if l_index == 0:
-						#	print "learner {} seen {} flows to date".format(l_index, len(flow_space))
+						#print "learner {} seen {} flows to date".format(l_index, len(flow_space))
 
 						#print len(flow_space), flows_seen
 
 						# TODO: strip old entries?
+
+						#if l_index == 0:
+						#	print "learner {}: {} flows total".format(l_index, len(flow_traces))
 
 						for (ip, props) in flows_seen:
 							s_t = time.time()
