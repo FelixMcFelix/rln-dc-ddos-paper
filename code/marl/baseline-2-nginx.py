@@ -35,6 +35,9 @@ results = marlExperiment(
 	override_action = 0.0,
 	manual_early_limit = 26.0,
 	reward_direction = "out",
+
+	randomise = True,
+	randomise_count = 3,
 )
 
 writeResults("../../results/baseline-2-ng.csv", results)
