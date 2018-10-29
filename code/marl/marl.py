@@ -209,7 +209,7 @@ def marlExperiment(
 			"../traffic-host/target/release/traffic-host",
 			str(bw),
 		] + (
-			["-s", "10.0.0.1/gcc-8.2.0.tar.gz"] if not randomise else \
+			["-s", "http://10.0.0.1/gcc-8.2.0.tar.gz"] if not randomise else \
 			[
 				"-r",
 				"-l", "../traffic-host/htdoc-deps.ron",
@@ -567,9 +567,17 @@ def marlExperiment(
 
 		cmd_list = []
 
+		# Need to find what the default degree of punishment for a flow is...
+		default_machine = AcTrans()
+		ac = default_machine.action()
+		p_drop_num = pdrop(1-ac)
+
+		#local_gselect_msg = flow_gselect_msg
+		local_gselect_msg = [internal_choose_group(0, force_old=p_drop_num)]
+
 		# send group+bucket instantiations,
 		# also the base rules (internal dst -> G0, external -> outwards port=2)
-		for msg in flow_group_msgs[0] + flow_gselect_msg + flow_outbound_msg:
+		for msg in flow_group_msgs[0] + local_gselect_msg + flow_outbound_msg:
 			if alive:
 				updateOneRoute(switch, cmd_list, msg)
 			else:
@@ -1409,9 +1417,9 @@ def marlExperiment(
 
 			def get_total(n):
 				reward_src = total_mbps[n]
-				if reward_direction == "in":
+				if state_direction == "in":
 					reward_src = unfused_total_mbps[2*n]
-				elif reward_direction == "out":
+				elif state_direction == "out":
 					reward_src = unfused_total_mbps[2*n + 1]
 				return reward_src
 
@@ -1436,6 +1444,8 @@ def marlExperiment(
 				g_reward = safe_reward_func(std_marl, get_total(0), get_data(0)[0], bw_all[0],
 					get_total(leader_index), get_data(leader_index)[0], bw_teams[team_no][0],
 					n_teams, l_cap, ratio)
+
+				#print g_reward, get_total(0), get_data(0)[0], bw_all[0], n_teams, l_cap, ratio
 
 				intime = time.time()
 				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):

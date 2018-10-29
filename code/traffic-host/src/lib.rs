@@ -88,7 +88,7 @@ enum CliCommand {
 fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 	let mut easy = Easy::new();
 	let url_path = Url::parse(&options.url)
-			.expect("Not given a valid url!")
+			.expect(&format!("Not given a valid url! Saw: {:?}", &options.url))
 			.path()[1..]
 			.to_string();
 
