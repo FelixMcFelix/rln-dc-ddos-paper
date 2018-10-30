@@ -23,7 +23,7 @@ set ylabel "Reward"
 
 set yrange [-1.0:1.0]
 
-plot '../results/baseline-2-uncap-avg-ng.csv' u 1:2 w lines smooth sbezier title "baseline", \
+plot '../results/baseline-2-avg-ng.csv' u 1:2 w lines smooth sbezier title "baseline", \
      '../results/ft-tcp-g-avg.csv' u 1:2 w lines smooth sbezier title "G", \
      '../results/ft-tcp-f0-avg.csv' u 1:2 w lines smooth sbezier title "f0", \
      '../results/ft-tcp-f1-avg.csv' u 1:2 w lines smooth sbezier title "f1", \

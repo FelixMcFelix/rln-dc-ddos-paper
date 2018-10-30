@@ -121,6 +121,8 @@ def marlExperiment(
 		split_codings = False,
 		extra_codings = [],
 		feature_max = 12,
+
+		trs_maxtime = None,
 	):
 
 	linkopts_core = linkopts
@@ -293,6 +295,47 @@ def marlExperiment(
 			flow_set["pkt_out_wnd_count"],
 			flow_set["mean_bpp_in"],
 			flow_set["mean_bpp_out"],
+		]
+
+	def combine_flow_vecs(fv1, fv2):
+		# Some of these we want to flat-out overwrite
+		# some of these we want to meaningfully combine.
+		# i.e. combining pkt_in_wnds might lead to crazy skew
+		# if we don't combine it with timing info.
+		in_count = float(fv1[10] + fv2[10])
+		out_count = float(fv1[11] + fv2[11])
+		fv1_in_weight = float(fv1[10])
+		fv2_in_weight = float(fv2[10])
+		fv1_out_weight = float(fv1[11])
+		fv2_out_weight = float(fv2[11])
+
+		return [
+			# take CURRENT global state
+			fv2[0],
+			fv2[1],
+			fv2[2],
+			fv2[3],
+			# ip and last_action should NOT change.
+			fv2[4],
+			fv2[5],
+			# length, size take max
+			max(fv1[6], fv2[6]),
+			max(fv1[7], fv2[7]),
+			# take newest cx
+			fv2[8],
+			#rescale IATs (in)
+			(fv1_in_weight * fv1[9] + fv2_in_weight * fv2[9]) / in_count,
+			# sum deltas
+			fv1[10] + fv2[10],
+			fv1[11] + fv2[11],
+			# take newest on all counts - don't fuse window pkt counts
+			fv2[12],
+			fv2[13],
+			fv2[14],
+			fv2[15],
+			# rescale mean bpps
+			(fv1_in_weight * fv1[16] + fv2_in_weight * fv2[16]) / in_count,
+			(fv1_out_weight * fv1[17] + fv2_out_weight * fv2[17]) / out_count,
 		]
 
 	initd_host_count = [1]
@@ -1356,6 +1399,8 @@ def marlExperiment(
 
 		learner_stats = [{} for _ in learner_pos]
 		learner_traces = [{} for _ in learner_pos]
+		learner_queues = [{"curr": ([], set(), set()), "future": set(), "pos": 0} for _ in learner_pos]
+		learner_fvecs = [{} for _ in learner_pos]
 		flows_to_query = []
 
 		for i in xrange(episode_length):
@@ -1377,11 +1422,9 @@ def marlExperiment(
 				for (_, _, _, _, hosts, _) in teams:
 					for (host, good, bw, link, ip) in hosts:
 						finished = host_procs[counter].poll() is not None
-						#print "{} finished? {}".format(counter, finished)
 						if good and finished:
 							my_if = host.intf()
 							if randomise_new_ip:
-								# this is BROKEN
 								link = my_if.link
 								# get partner
 								# unhook IF from both sides
@@ -1390,11 +1433,9 @@ def marlExperiment(
 								parent = (link.intf1 if my_if == link.intf2 else link.intf2).node
 								newIP = genIP(good)
 								switch_cmd(parent, [], ip_masker_message(newIP[0], ip), False)
-								#print "{} doing a rewrite: {}->{}".format(parent.listenPort, ip, newIP[0])
-								# TODO: think about chanign bw/goodness?
+								# TODO: think about changing bw/goodness?
 
 							# restart traffic-host
-							#print "restarting for my friend.. {}".format(counter)
 							host_procs[counter] = host.popen(
 								th_cmd(bw), stdin=sys.stdout, stderr=sys.stderr
 							)
@@ -1474,7 +1515,6 @@ def marlExperiment(
 						intermediates[learner_no/n_learners].name, node.name
 					]]
 
-					#state_vec = np.array([total_mbps[index] for index in [0, leader_index]+important_indices])
 					state_vec = [total_mbps[index] for index in [0, leader_index]+important_indices]
 
 					l_index = learner_no + (team_no * len(learners))
@@ -1490,24 +1530,27 @@ def marlExperiment(
 						flow_space = learner_stats[l_index]
 						flow_traces = learner_traces[l_index]
 						flows_seen = parsed_flows[l_index]
-						#if l_index == 0:
-						#print "learner {} seen {} flows to date".format(l_index, len(flow_space))
+						queue_holder = learner_queues[l_index]
+						fvec_holder = learner_fvecs[l_index]
 
-						#print len(flow_space), flows_seen
+						deadline = (time.time() + trs_maxtime) if trs_maxtime is not None else None
+						def can_act():
+							return deadline is None or time.time() <= deadline
+
+						# learner_queues = [{"curr": ([], set(), set()), "future": set(), "pos": 0} for _ in learner_pos]
+
+						(local_work, local_work_set, local_visited_set) = queue_holder["curr"]
+						local_pos = queue_holder["pos"]
 
 						# TODO: strip old entries?
-
-						#if l_index == 0:
-						#	print "learner {}: {} flows total".format(l_index, len(flow_traces))
-
+						# PROCESS ALL NEW DATA.
 						for (ip, props) in flows_seen:
-							s_t = time.time()
 							flows_to_query.append(ip)
 
 							if ip not in flow_space:
 								flow_space[ip] = {
 									"ip": ip,
-									"last_act": 0,
+									"last_act": 0.0 if not spiffy_mode else 0.05,
 									"last_rate_in": -1.0,
 									"last_rate_out": -1.0,
 									"pkt_in_count": 0,
@@ -1537,14 +1580,44 @@ def marlExperiment(
 							l["delta_in"] = observed_rate_in - l["last_rate_in"]
 							l["delta_out"] = observed_rate_out - l["last_rate_out"]
 							total_vec = state_vec + flow_to_state_vec(l)
+							flow_space[ip] = l
 
-							total_vec = total_vec[:feature_max]
+							fvec = combine_flow_vecs(fvec_holder[ip], total_vec) if ip in fvec_holder else total_vec
+							fvec_holder[ip] = fvec
+							# maybe push this seen IP into the future set
+							# When? If it's not in the current work set,
+							# or it has been visited and is in the current set.
+							if ip not in local_work_set or ip in local_visited_set:
+								queue_holder["future"].add(ip)
+
+						if local_pos >= len(local_work):
+							local_pos = 0
+							local_work_set = queue_holder["future"]
+							local_visited_set = set()
+							queue_holder["future"] = set()
+							# take a shuffle! Ideally without perturbing RNG
+							# used for IP generation...
+							# I'd fix that, but the amount of new IPs
+							# we need is stochastic anyhow.
+							local_work = list(local_work_set)
+							random.shuffle(local_work)
+
+						flows_procd = 0
+						# ACT ON A SUBSET OF CURRENT
+						while can_act() and pos < len(local_work):
+							ip = local_work[pos]
+							local_visited_set.add(ip)
+
+							s_t = time.time()
+							l = flow_space[ip]
 
 							# Each needs its own view of the state...
 							# (and specifies its restriction thereof)
 							# Combine these to get a vector of likelihoods,
 							# get the highest-epsilon to calculate the action.
 							# Then update each model with the TRUE action chosen.
+							fvec = fvec_holder[ip]
+							total_vec = fvec[:feature_max]
 
 							# single_learner support: just take firstmost...
 							s_tree_t = 0 if single_learner else team_no
@@ -1577,20 +1650,20 @@ def marlExperiment(
 									need_decay = False
 									machine = AcTrans()
 
-								#print "part: {}. Wanted to pick: {}".format(new_vals, would_choose)
-
 								ac_vals += new_vals
 
 								last_sarsa = s
 
 							l_action = last_sarsa.select_action_from_vals(ac_vals)
 							machine.move(l_action)
-							#print "full: {}. Chosen: {}".format(ac_vals, l_action)
 							flow_traces[ip] = (substates, l_action, machine)
 
 							if need_decay:
 								for (s, _) in subactors:
 									s.decay()
+
+							observed_rate_in = l["last_rate_in"] + l["delta_in"]
+							observed_rate_out = l["last_rate_out"] + l["delta_out"]
 
 							# TODO: maybe only update this whole thing if we're choosing to examine this flow.
 							l["last_act"] = machine.action()#l_action
@@ -1602,12 +1675,18 @@ def marlExperiment(
 							# End time.
 							e_t = time.time()
 
-							#print "computed action: it took {}s".format(e_t - s_t)
-
 							if record_times:
 								action_comps[-1].append((i, e_t - s_t))
 
 							learner_traces[l_index] = flow_traces
+							pos += 1
+							flows_procd += 1
+							del fvec_holder[ip]
+
+						print "Managed: {} flows in under {}".format(flows_procd, )
+
+						queue_holder["curr"] = (local_work, local_work_set, local_visited_set)
+						queue_holder["pos"] = local_pos
 					else:
 						prev_state = learner_traces[l_index]
 						if prev_state == {}:

@@ -24,7 +24,7 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 set key inside bottom right
 
-plot '../results/baseline-2-uncap-avg-ng.csv' u 1:3 w lines smooth sbezier title "Baseline", \
+plot '../results/baseline-2-avg-ng.csv' u 1:3 w lines smooth sbezier title "Baseline", \
      '../results/ft-tcp-f4-avg.csv' u 1:3 w lines smooth sbezier title "Correspondence Ratio" ls 2, \
      '../results/ft-tcp-f5-avg.csv' u 1:3 w lines smooth sbezier title "Mean IAT" ls 4, \
      '../results/ft-tcp-f6-avg.csv' u 1:3 w lines smooth sbezier title "$\\Delta{}$ In Rate" ls 6, \
