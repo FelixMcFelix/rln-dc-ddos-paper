@@ -9,4 +9,5 @@ purgeprocs hping3
 purgeprocs traffic-host
 purgeprocs tcpreplay-edit
 purgeprocs marl-bwmon
+purgeprocs ryu-manager
 

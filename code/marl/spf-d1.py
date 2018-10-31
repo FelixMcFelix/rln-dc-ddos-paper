@@ -32,9 +32,9 @@ results = marlExperiment(
 	rf = "ctl",
 	use_controller = True,
 
-	reward_direction = "out",
+	#reward_direction = "out",
 	actions_target_flows = True,
-	estimate_const_limit = True,
+	#estimate_const_limit = True,
 
 	spiffy_mode = True,
 	randomise = True,
