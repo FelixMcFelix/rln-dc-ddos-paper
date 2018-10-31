@@ -2,7 +2,7 @@ import logging
 from marl import *
 from writer import writeResults, makeResultsAverage
 
-host_p = 4 
+host_p = 2 
 
 results = marlExperiment(
 	n_teams = 2,#5,
@@ -12,7 +12,7 @@ results = marlExperiment(
 	host_range = [host_p, host_p],
 
 	# test to handle bi-directional
-	evil_range = [4, 7],
+	#evil_range = [4, 7],
 
 	explore_episodes = 0.8,
 	episodes = 10,#50,#500, Since mininet keeps running out of files even e/ cleanup
@@ -37,13 +37,14 @@ results = marlExperiment(
 	#estimate_const_limit = True,
 
 	spiffy_mode = True,
-	randomise = True,
-	randomise_count = 1,
-	randomise_new_ip = True,
+	#randomise = True,
+	#randomise_count = 1,
+	#randomise_new_ip = True,
 
 	split_codings = True,
 	trs_maxtime = 0.001,
 	feature_max = 18,
+	single_learner = True,
 )
 
 writeResults("../../results/spf-d0.csv", results)

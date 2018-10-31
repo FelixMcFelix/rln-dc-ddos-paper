@@ -27,7 +27,7 @@ class SpfMachine(MarlMachine):
 		basically a state machine seeing whether
 		encoding known info about how flows behave
 		with an RL agent aids performance.
-		Basically a defcon monitor - up, stay, down. [0, 1, 2]
+		Basically a defcon monitor - stay, up, down. [0, 1, 2]
 	"""
 	def __init__(self,
 			values=[0.0, 0.05, 0.25, 0.50, 1.0],
@@ -36,7 +36,9 @@ class SpfMachine(MarlMachine):
 		MarlMachine.__init__(self, values, init_state, range(3))
 
 	def move(self, action):
-		if action == 0 and self._curr_state > 0:
+		#print "in:{} took:{}".format(self._curr_state, action)
+		if action == 1 and self._curr_state > 0:
 			self._curr_state -= 1
 		elif action == 2 and self._curr_state < self._max_state:
 			self._curr_state += 1
+		#print "now:{}".format(self._curr_state)

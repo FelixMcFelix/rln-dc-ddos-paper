@@ -2,7 +2,7 @@ import logging
 from marl import *
 from writer import writeResults, makeResultsAverage
 
-host_p = 4 
+host_p = 2 
 
 results = marlExperiment(
 	n_teams = 2,#5,
@@ -37,13 +37,14 @@ results = marlExperiment(
 	#estimate_const_limit = True,
 
 	spiffy_mode = True,
-	randomise = True,
-	randomise_count = 1,
-	randomise_new_ip = True,
+	#randomise = True,
+	#randomise_count = 1,
+	#randomise_new_ip = True,
 
 	split_codings = True,
 	trs_maxtime = 0.001,
 	feature_max = 18,
+	single_learner = True,
 )
 
 writeResults("../../results/spf-d3.csv", results)

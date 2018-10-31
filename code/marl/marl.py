@@ -63,7 +63,7 @@ def marlExperiment(
 		alpha = 0.05,
 		epsilon = 0.3,
 		discount = 0,
-		break_equal = False,
+		break_equal = None,
 
 		model = "tcpreplay",
 		submodel = None,
@@ -112,6 +112,8 @@ def marlExperiment(
 		restrict = None,
 
 		single_learner = False,
+		single_learner_ep_scale = True,
+
 		spiffy_mode = False,
 
 		randomise = False,
@@ -123,6 +125,7 @@ def marlExperiment(
 		feature_max = 12,
 
 		trs_maxtime = None,
+		reward_band = 1.0,
 	):
 
 	linkopts_core = linkopts
@@ -194,7 +197,7 @@ def marlExperiment(
 			num_teams, max_load, ratio):
 		return f(total_svr_load, min(legit_svr_load,true_legit_svr_load), true_legit_svr_load,
 			total_leader_load, min(legit_leader_load,true_legit_leader_load), true_legit_leader_load,
-			num_teams, max_load*ratio)
+			num_teams, reward_band*max_load*ratio)
 	# gen
 
 	# change the state machine we get to roll with...
@@ -206,6 +209,9 @@ def marlExperiment(
 		AcTrans = MarlMachine
 		aset = pdrop_magnitudes
 		default_machine_state = 0
+
+	if single_learner and single_learner_ep_scale:
+		explore_episodes *= float(n_teams * n_inters * n_learners) 
 
 	def th_cmd(bw):
 		return [
@@ -220,6 +226,7 @@ def marlExperiment(
 		) + (
 			[] if randomise_count is None else ["-c", str(randomise_count)]
 		)
+	break_equal = (spiffy_mode) if break_equal is None else break_equal
 
 	sarsaParams = {
 		"max_bw": max_bw,
