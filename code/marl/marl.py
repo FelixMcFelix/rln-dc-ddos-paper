@@ -324,7 +324,7 @@ def marlExperiment(
 			# take newest cx
 			fv2[8],
 			#rescale IATs (in)
-			(fv1_in_weight * fv1[9] + fv2_in_weight * fv2[9]) / in_count,
+			fv2[9] if in_count == 0.0 else (fv1_in_weight * fv1[9] + fv2_in_weight * fv2[9]) / in_count,
 			# sum deltas
 			fv1[10] + fv2[10],
 			fv1[11] + fv2[11],
@@ -334,8 +334,8 @@ def marlExperiment(
 			fv2[14],
 			fv2[15],
 			# rescale mean bpps
-			(fv1_in_weight * fv1[16] + fv2_in_weight * fv2[16]) / in_count,
-			(fv1_out_weight * fv1[17] + fv2_out_weight * fv2[17]) / out_count,
+			fv2[16] if in_count == 0.0 else (fv1_in_weight * fv1[16] + fv2_in_weight * fv2[16]) / in_count,
+			fv2[17] if out_count == 0.0 else (fv1_out_weight * fv1[17] + fv2_out_weight * fv2[17]) / out_count,
 		]
 
 	initd_host_count = [1]
@@ -1533,9 +1533,9 @@ def marlExperiment(
 						queue_holder = learner_queues[l_index]
 						fvec_holder = learner_fvecs[l_index]
 
-						deadline = (time.time() + trs_maxtime) if trs_maxtime is not None else None
+						total_spent = 0.0
 						def can_act():
-							return deadline is None or time.time() <= deadline
+							return trs_maxtime is None or total_spent <= trs_maxtime
 
 						# learner_queues = [{"curr": ([], set(), set()), "future": set(), "pos": 0} for _ in learner_pos]
 
@@ -1601,11 +1601,14 @@ def marlExperiment(
 							# we need is stochastic anyhow.
 							local_work = list(local_work_set)
 							random.shuffle(local_work)
+						else:
+							#print "existing work: task size {}, pos {}".format(len(local_work_set), local_pos)
+							pass
 
 						flows_procd = 0
 						# ACT ON A SUBSET OF CURRENT
-						while can_act() and pos < len(local_work):
-							ip = local_work[pos]
+						while can_act() and local_pos < len(local_work):
+							ip = local_work[local_pos]
 							local_visited_set.add(ip)
 
 							s_t = time.time()
@@ -1674,16 +1677,17 @@ def marlExperiment(
 							# print l
 							# End time.
 							e_t = time.time()
+							total_spent += e_t - s_t
 
 							if record_times:
 								action_comps[-1].append((i, e_t - s_t))
 
 							learner_traces[l_index] = flow_traces
-							pos += 1
+							local_pos += 1
 							flows_procd += 1
 							del fvec_holder[ip]
 
-						print "Managed: {} flows in under {}".format(flows_procd, )
+						#print "Managed: {}/{}-{} flows in under {}".format(flows_procd, local_pos-flows_procd, len(local_work_set), trs_maxtime)
 
 						queue_holder["curr"] = (local_work, local_work_set, local_visited_set)
 						queue_holder["pos"] = local_pos
