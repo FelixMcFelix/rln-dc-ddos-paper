@@ -24,8 +24,8 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 set key inside bottom right
 
-plot '../results/baseline-2-avg.csv' u 1:3 w lines smooth sbezier title "Baseline", \
-     '../results/ft-f4-avg.csv' u 1:3 w lines smooth sbezier title "Correspondence Ratio" ls 2, \
-     '../results/ft-f5-avg.csv' u 1:3 w lines smooth sbezier title "Mean IAT" ls 4, \
-     '../results/ft-f6-avg.csv' u 1:3 w lines smooth sbezier title "$\\Delta{}$ In Rate" ls 6, \
-     '../results/ft-f7-avg.csv' u 1:3 w lines smooth sbezier title "$\\Delta{}$ Out Rate" ls 8
+plot '../results/baseline-2-avg.csv' u 1:3 w lines smooth sbezier title "Baseline" dt 1, \
+     '../results/ft-f4-avg.csv' u 1:3 w lines smooth sbezier title "Correspondence Ratio" ls 2 dt (18,2,2,2), \
+     '../results/ft-f5-avg.csv' u 1:3 w lines smooth sbezier title "Mean IAT" ls 4 dt (6,2,2,2), \
+     '../results/ft-f6-avg.csv' u 1:3 w lines smooth sbezier title "$\\Delta{}$ In Rate" ls 6 dt (18,2), \
+     '../results/ft-f7-avg.csv' u 1:3 w lines smooth sbezier title "$\\Delta{}$ Out Rate" ls 8 dt (2,2)

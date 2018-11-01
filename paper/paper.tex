@@ -16,6 +16,16 @@
 \usepackage[binary-units, per-mode=symbol]{siunitx}
 \sisetup{detect-all, range-phrase=--, range-units=single}
 
+\makeatletter
+\let\MYcaption\@makecaption
+\makeatother
+
+\usepackage[font=footnotesize]{subcaption}
+
+\makeatletter
+\let\@makecaption\MYcaption
+\makeatother
+
 \usepackage[basic]{complexity}
 \usepackage[super,negative]{nth}
 
@@ -159,7 +169,7 @@ uniquelist=false]{biblatex}
 Anonymous Giraffe\thanks{This work was supported by a nameless, shapeless funder [grant number 7].},
 Anonymous Badger\\
 Unnamed Department, Nowhere\\
-\email{giraffe.a@unnamed.zoo}
+\email{giraffe.a@unnamed.com}
 }
 
 % Remove date, leave no spacing.
@@ -220,7 +230,7 @@ In service of this goal, this paper contributes:
 	\item A DDoS mitigation system based on direct-control reinforcement learning designed for deployment in real-world software-defined networks (\cref{sec:environment-and-rl-algorithm,sec:rethinking-the-state-space}).
 	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}---a deconstruction and empirical study on their formulation, flaws, and risk factors concerning many traffic distributions (\cref{sec:performance-in-an-emulated-environment}).
 	\item A reactive simulation of web-server traffic, designed to test system characteristics which packet trace playback fails to capture (\cref{sec:a-new-normal}).
-	\item A flow-level granularity approach to RL-driven DDoS prevention, improving upon past aggregate-based approaches (\cref{sec:rethinking-the-state-space}), alongside an empirical evaluation (\cref{sec:the-results-of-doing-so}).
+	\item A source-level granularity approach to RL-driven DDoS prevention, improving upon past aggregate-based approaches (\cref{sec:rethinking-the-state-space}), alongside an empirical evaluation (\cref{sec:the-results-of-doing-so}).
 \end{itemize}
 
 \section{Background and Threat Model}
@@ -315,14 +325,16 @@ Most importantly, there is evidence showing behavioural changes in response to b
 
 %?? Oultine attacker's goals, particularly wrt SPIFFY.
 %?? They want to impact fair-share bandwidth allocation to flows (minimise), they have no worry about being unmasked (there are many available reflectors, which don't need to be bought etc...) [cite the rossow papers about amplification hell].
-An attacker's goal is to minimise the fair-share bandwidth allocation that a server can give to any host which connects to it, we they are expected to act rationally in its pursuit.
-We assume that attacks are bandwidth-based DDoS attacks with the structure of an \emph{amplification attack}, and that traffic aggregates at the target (unlike in a \emph{transit-link attack}).
+An attacker's goal is to minimise the fair-share bandwidth allocation that a server can give to any host which connects to it, and they are expected to act rationally in its pursuit.
+Threat actors are external and act intentionally, aren't expected to be classified as an \emph{advanced persistent threat}, and likely range from hacktivists to moderately funded adversaries.
+We assume that attacks will be bandwidth-based DDoS attacks with the structure of an \emph{amplification attack}, and that traffic aggregates at the target (unlike in a \emph{transit-link attack}).
 The addresses of any machines taking part in an attack are not revealed to the target, save for the fairly stable set of unwitting reflector nodes.
-The discovery of any reflector by some defence system does have a cost to the attacker---there is a particularly large (finite) supply of viable reflector nodes \cite{DBLP:conf/ndss/Rossow14}, but the constraints that each has a large upstream bandwidth and support for high-amplification-factor protocols narrow this pool.
+The discovery of any reflector by some defence system does have a cost to the attacker---there is a particularly large (yet finite) supply of viable reflector nodes \cite{DBLP:conf/ndss/Rossow14}, but the constraints that each has a large upstream bandwidth and support for high-amplification-factor protocols narrow this pool.
 
-Finally, we do not assume that an attacker has white-box access to the parameters underlying an agent's policy, or that they will attempt to intelligently modify flow/system state to indirectly control an agent \cite{DBLP:conf/eurosp/PapernotMJFCS16, DBLP:conf/eurosp/PapernotMSW18, DBLP:journals/corr/HuangPGDA17, DBLP:conf/sp/Carlini017}.
+We do not assume that an attacker has white-box access to the parameters underlying an agent's policy, or that they will attempt to intelligently modify flow/system state to indirectly control an agent \cite{DBLP:conf/eurosp/PapernotMJFCS16, DBLP:conf/eurosp/PapernotMSW18, DBLP:journals/corr/HuangPGDA17, DBLP:conf/sp/Carlini017}.
 While they may be able to perform some degree of reverse engineering by observing the health of their own legitimate canary flows, ``stealing'' the policy through observation \cite{DBLP:conf/uss/TramerZJRR16}, investigating whether perturbations would persist in a medium as volatile as network traffic statistics falls outside of the scope of this work.
 The same observation extends to the possibility of poisoning attacks \cite{DBLP:journals/jmlr/KloftL10, DBLP:conf/acsac/ShenTS16}; to the best of our knowledge, no studies have been undertaken surrounding the mis-training of RL agents.
+These are APT-level capabilities, whose exploration presents a rich source of future work.
 
 \section{Analysing Existing Work}\label{sec:environment-and-rl-algorithm}
 %?? State the problem and what we want to achieve.
@@ -346,34 +358,37 @@ All links have unbounded capacity, save for the server-switch connection which i
 \begin{figure}
 \centering
 \resizebox{\linewidth}{!}{
-\begin{tikzpicture}[
+				\begin{tikzpicture}[
 texts/.style = {text=black},
 labeltexts/.style = {text=uofgsandstone},
 treeline/.style = {draw=uofgburgundy},
 treenode/.style = {texts, circle, centered, fill=white, treeline},
+load/.style = {fill=uofgcobalt},
+loadhide/.style = {fill=uofgcobalt!40!white},
 external/.style = {fill=uofgrust},
+externalhide/.style = {fill=uofgrust!40!white},
 hideline/.style = {draw=uofgsandstone!40!white},
 hidenode/.style = {treenode, hideline},
 grow'=right
 ]
 \node[treenode, label={[texts]above:Server}] (root) {}
-	child [treeline] { node [treenode, label={[texts]above:Core}] (sswitch) {}
-		child [treeline] { node [treenode, label={[texts]above:Leader}] (teaml) {} 
-			child [treeline] { node [treenode, label={[texts]above:Intermediate}] (inter) {}
-				child [treeline] { node [treenode, label={[texts]above:Agent/Egress}] (agent) {}
-					child [treeline] { node [treenode, external] (extern) {}
-						child [treeline] { node [treenode, external, label={[texts]above:Host}] (host) {} }
-						child [hideline] { node [hidenode] (endhost) {} }
-					}
+child [treeline] { node [treenode, load, label={[texts]above:Core}] (sswitch) {}
+	child [treeline] { node [treenode, load, label={[texts]above:Leader}] (teaml) {} 
+		child [treeline] { node [treenode, load, label={[texts]above:Intermediate}] (inter) {}
+			child [treeline] { node [treenode, load, label={[texts]above:Agent/Egress}] (agent) {}
+				child [treeline] { node [treenode, external] (extern) {}
+					child [treeline] { node [treenode, external, label={[texts]above:Host}] (host) {} }
+					child [hideline] { node [hidenode, externalhide] (endhost) {} }
 				}
-				child [hideline] { node [hidenode] (endagent) {} }
 			}
-			child [hideline] { node [hidenode] (endinter) {} }
+			child [hideline] { node [hidenode, loadhide] (endagent) {} }
 		}
-		child [hideline] { node [hidenode] (endteaml) {} }
-		edge from parent
-		node[below, labeltexts] {$U_s$}
-	};
+		child [hideline] { node [hidenode, loadhide] (endinter) {} }
+	}
+	child [hideline] { node [hidenode, loadhide] (endteaml) {} }
+	edge from parent
+	node[below, labeltexts] {$U_s$}
+};
 
 %\draw[-] (teaml) -- (endteaml);
 \node [labeltexts] (kdots) at ($(teaml)!0.5!(endteaml)$) {$\rvdots$};
@@ -388,7 +403,8 @@ grow'=right
 }
 \caption{
 	Network topology diagram, showing how the server and its core switch's $k$ teams are structured, with $l$ intermediate routers per team, connected to $m$ agents which each moderate $n$ hosts beyond a single external switch.
-	Empty nodes are considered to be internal.
+%	Empty nodes are considered to be internal.
+	Red nodes are considered to be external, and the load of each blue node features in the state vector.
 	\label{fig:marl-topol}
 }
 \end{figure}
@@ -440,17 +456,19 @@ Each agent has its own internal parameter vector $\wvec{}$, and agents do not sh
 
 %?? M\&K Seem not to have a grasp on the importance of up/down traffic splits. Hmm......... (i.e., both could be relevant?) Man, who knows.
 
-?? wrt reward function relying on heuristic elements or perfect knowledge:
-A sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training by a simulated environment to transfer to reality.
-?? BUT, if we don't have reward functions which are available at runtime, then we've lost out on what is arguably one of the main benefits that RL can give us!
-?? Need to tie in the concept of ``meaningful work''?
+%?? wrt reward function relying on heuristic elements or perfect knowledge:
+While it can be observed that reliance upon heuristic elements or perfect knowledge as in the above reward functions hampers their real-world applicability, a sufficiently well-trained agent needs only to follow the policy it has learned in a greedy manner, allowing pre-training by a simulated environment to transfer to reality.
+%?? BUT, if we don't have reward functions which are available at runtime, then we've lost out on what is arguably one of the main benefits that RL can give us!
+%?? Need to tie in the concept of ``meaningful work''?
+The lack of a truly online reward function is sorely felt, however.
+This causes the loss of some of RL's main benefits, such as online learning with regards to an evolving problem context.
 
 \section{Performance in an Emulated Environment}\label{sec:performance-in-an-emulated-environment}
 The original introduction of this approach to direct-control reinforcement learning as introduced by \textcite{DBLP:journals/eaai/MalialisK15} fails to consider key cases: the absence of a suitable heuristic classifier $g(\cdot)$, disjoint ranges of traffic distribution (i.e., the presence of benign heavy-hitters), the accurate simulation of TCP-like behaviour (and its effects on collateral damage), and assumes a rigid and unrepresentative topology.
 The latter two are most deserving of a closer investigation, as they have stronger implications for wide-scale deployment.
 
-All experiments described were executed using an Ubuntu 16.04.4 LTS machine with a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
-All code underpinning these findings is available on a public repository\footnote{\url{https://aweb.site/a-repo.}}.
+All experiments described were executed on Ubuntu 16.04.5 LTS (GNU/Linux 4.4.3-040403-generic x86\_64), using a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
+All code underpinning these findings is available on a public repository\footnote{Link removed for double-blind reviewing.}.
 %All code underpinning these findings is available on a public repository\footnote{\url{https://github.com/FelixMcFelix/rln-dc-ddos-paper}}.
 
 %?? TODO: Make repo public...
@@ -603,18 +621,102 @@ Benign hosts run a simple libcurl-based application written in Rust, repeatedly 
 This provides two modes of operation:
 \begin{itemize}
 	\item \emph{long flow} testing has each host constantly request a large binary file, such as a tarball of GCC8;
-	\item \emph{request-chain} testing has each host request a random file known to exist within the website, followed by any dependent resources (stylesheets, images, etc.). This presents a more balanced distribution of flow duration and size.
+	\item \emph{request-chain} testing has each host request several random files known to exist within the website, followed by any dependent resources for each (stylesheets, images, etc.). On completion, a host changes its IP to minimise downtime of inbound data while separating statistics per-flow. This presents a more balanced distribution of flow duration and size.
 \end{itemize}
 Each host's download rate is limited to match whatever maximum bandwidth was assigned to it.
-Accordingly, reward functions aim to maximise the downstream throughput.
 
 %?? Malicious traffic: UDP flood traffic (hping3, MTU-size packets, ). Why not min-size packets? Because the traffic generator gets in a horrible rut if I do so...
 Malicious traffic is generated by use of the \emph{hping3} program, generating UDP-flood traffic targeting random ports.
 Each malicious packet is MTU-sized, loosely mapping to the large frame sizes expected in an amplification attack and to ensure that simulation remains tractable.
+When using TCP-like traffic, we must increase each attacker's upload range to \SIrange{4}{7}{\mega\bit\per\second} to meaningfully impact benign flows.
 
-\section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
+\section{Acting On Individual Sources}
+
+?? High-level overview...
+
+\subsection{Models}
+
+?? Talk about the modifications to standard: multiple actions per-timestep, updating many traces from one reward...
+
+?? Timed Random Sequential flow visitation.
+
+?? Accordingly, reward functions aim to maximise the downstream throughput. Reward function direction for overload + protected loads.
+
+?? Talk about SPF -- Influenced by SPIFFY \cite{DBLP:conf/ndss/KangGS16}. Why? To demonstrate the design of a model which includes some aspects of real-world knowledge, and to see whether making an agent less ``free-form'' might allow us to trade power for learning speed (smaller action space etc.).
+
+\subsection{Rethinking the State Space}\label{sec:rethinking-the-state-space}
+
+\begin{figure*}
+	\centering
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-good}
+	\end{subfigure}
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-good-2}
+	\end{subfigure}
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-good-3}
+	\end{subfigure}
+	\caption{
+		Features: how good are they really? These are for UDP. As you can see, Most things are pretty average (except for \emph{Mean IAT}, which dominates).
+	\label{fig:udp-feature-plots}
+}
+\end{figure*}
+
+%\begin{figure*}
+%	\centering
+%	\begin{subfigure}{0.32\linewidth}
+%		\includegraphics[width=\linewidth]{../plots/ftprep-cap-good}
+%	\end{subfigure}
+%	\begin{subfigure}{0.32\linewidth}
+%		\includegraphics[width=\linewidth]{../plots/ftprep-cap-good-2}
+%	\end{subfigure}
+%	\begin{subfigure}{0.32\linewidth}
+%		\includegraphics[width=\linewidth]{../plots/ftprep-cap-good-2}
+%	\end{subfigure}
+%	\caption{
+%		Features: how good are they really? These are for UDP. As you can see, Most things are pretty average (except for \emph{Mean IAT}, which dominates).
+%		\label{fig:udp-cap-feature-plots}
+%	}
+%\end{figure*}
+
+\begin{figure*}
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-good}
+	\end{subfigure}
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-good-2}
+	\end{subfigure}
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-good-3}
+	\end{subfigure}
+	
+	\caption{
+		Features: how good are they really (part 2)? These are for TCP. These are less conclusive...
+		\label{fig:tcp-feature-plots}
+	}
+\end{figure*}
+
+\begin{figure*}
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-cap-good}
+	\end{subfigure}
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-cap-good-2}
+	\end{subfigure}
+	\begin{subfigure}{0.32\linewidth}
+		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-cap-good-2}
+	\end{subfigure}
+	
+	\caption{
+		Features: how good are they really (part 3)? These are for TCP, but capped. These are less conclusive...
+		\label{fig:tcp-cap-feature-plots}
+	}
+\end{figure*}
 
 ?? Mention Colin/Qianru's concerns about Quic, IPv6. At this point, src/dst IP are the only ``traditional'' characteristics that can be relied upon. Even then, IPv6 can have a different IP for each application ON A HOST. Port number meaningless...
+
+?? NEED TO SAY SOMEWHERE: Baselines use TC for establishing interleaving/buffers filling etc., when MARL+ or SPF are in play then disabling TC (thus allowing illegal states, with \num{-1} reward marking them as such---``negative reinforcement'') may accelerate learning. We have a choice---but the results show that for TCP we WANT TC enabled...
 
 ?? What do we want?
 
@@ -622,19 +724,44 @@ Each malicious packet is MTU-sized, loosely mapping to the large frame sizes exp
 
 \textbf{Global state}---what came before (load statistics from various network locations)
 
-\textbf{Local state}---per-flow data. Specifically, right now I'm using:
+\textbf{Local state}---per-source data. Specifically, right now I'm using:
 
 ?? \emph{IP}
 
-?? \emph{Last action taken}: encodes the notion of current belief of flow maliciousness (default at 0). Potentially allows forgiveness: a mistakenly malicious flow 's falloff after punishment could be used for such purpose (if we're lucky...)
+?? \emph{Last action taken}: encodes the notion of current belief of flow maliciousness (default at 0). Potentially allows forgiveness: a mistakenly malicious flow's falloff after punishment could be used for such purpose (if we're lucky...)
 
 ?? \emph{Flow duration, size}
 
-?? \emph{Correspondence ratio}: ratio (in bytes) between upstream/downstream traffic for a src/dst pair. (Cite the work that suggested this)
+?? \emph{Correspondence ratio}: ratio (in bytes) between upstream/downstream traffic for a src/dst pair. (Cite the work that suggested this) $C_X = \min(\mathit{in}, \mathit{out})/\max(\mathit{in}, \mathit{out})$
 
 ?? \emph{Change in send/recv rates} since last action/check.
 
 ?? \emph{Mean inter-arrival time}.
+
+?? \Cref{fig:udp-feature-plots} shows the effectiveness of each for UDP (resp.\ \cref{fig:udp-feature-plots} for TCP).
+
+\begin{table}
+	\centering
+	\caption{Tile coding windows for each feature.}
+	
+	\begin{tabular}{@{}ll@{}}
+		\toprule
+		New Feature (unit) & Range \\
+		\midrule
+		Load (\si{\mega\bit\per\second}) & $[0, U_s]$ \\
+		IP & $[0, 2^{32}-1]$ \\
+		Last Action (\si{\percent}) & $[0, 1]$ \\
+		Duration (\si{\milli\second}) & $[0, \num{2000}]$ \\
+		Size (\si{\mebi\byte}) & $[0,10]$ \\
+		Correspondence Ratio & $[0,1]$ \\
+		Mean IAT (\si{\milli\second}) & $[0, \num{10000}]$ \\
+		$\Delta$In/Out Rate (\si{\mega\bit\per\second}) & $[-50, 50]$ \\
+		Packets In/Out & $[0, 7000]$ \\
+		Packets In/Out Window & $[0, 2000]$ \\
+		Mean In/Out Packet Size (\si{\byte}) & $[0, 1560]$ \\
+		\bottomrule
+	\end{tabular}
+\end{table}
 
 \subsection{What's done with these?}
 
@@ -652,9 +779,13 @@ Each malicious packet is MTU-sized, loosely mapping to the large frame sizes exp
 
 ?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other! Alternatively, monitor the health of canary flows which cross the team boundary (i.e. only one in-out link).
 
+?? Have some more things worth testing now. FSA with transitions based on the theory underlying SPIFFY. 5 states (start in low pdrop) from \SIrange{0}{100}{\percent} drop, actions move up, down or hold on the level of drop. Why like this? Chosen deployment environments might not be able to reroute to get the requisite bandwidth epansion factor, so punish everyone to begin with.
+
 \section{The Results of Doing So}\label{sec:the-results-of-doing-so}
 
 ?? They'd probably look real nice...
+
+?? "We chose to take a separate tile-coding over each feature, ignoring combinatorial effects for now. Combining them all as one tile-coding led to poor performance due to an inability to generalise value across similar states."
 
 \section{Related Work}
 
@@ -671,7 +802,7 @@ Many of their features aren't overly relevant, as their focus is not active defe
 %Attackers must either be detected or reduce the throughput of each bot, increasing the cost of launching an attack.
 Unlike our approach (and due to the class of attacks it is designed to defend against), SPIFFY is intended to be deployed within ISP networks, although some of our feature choices are backed by similar observations.
 
-\emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} is a more generalised SDN framework for intrusion detection, but has shown the use of a \emph{k nearest-neighbours} classifier to detect individual attack flows.
+\emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} is a more generalised SDN framework for intrusion detection, but has shown the use of a \emph{k-nearest neighbours} classifier to detect individual attack flows.
 Although heavyweight (and proven to be effective compared with \textcite{DBLP:conf/lcn/BragaMP10}), their comparison against SPIFFY lacks the quantitative evidence required to understand how the system compares.
 
 \Textcite{DBLP:conf/sp/SmithS18} present techniques based on AS-level routing to tackle both transit-link and flooding-based attacks.
@@ -706,6 +837,14 @@ The second agent makes bespoke decisions about routing, prioritisation etc.\ for
 
 %These works emphasise the necessity of ingenuity in effectively handling how states and actions are represented.
 
+\section{Discussion}
+
+Talk about flaws here, what could go wrong...
+
+\subsection{Future Work}
+
+Airlift half of the ``conclusion'' and paste it in here, so that it can be a lot neater.
+
 \section{Conclusion}
 
 It all ends here...
@@ -732,7 +871,8 @@ System state which is dependent on many signals drawn from across a wide network
 ?? Can probably fold a lot of this out into discussion or something.
 
 \section*{Acknowledgements}
-Our thanks go to Simon Rogers, Mircea Iordache, Qianru Zhou, and Richard Cziva for their advice, comments and technical assistance.
+%Our thanks go to Simon Rogers, Mircea Iordache, Qianru Zhou, Charles Rutherford, Marco Cook and Richard Cziva for their advice, comments and technical assistance.
+Our thanks go to Anonymous, Anonymous, Anonymous, Anonymous, Anonymous and Anonymous for their advice, comments and technical assistance.
 %Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
 
 \renewcommand*{\bibfont}{\small}

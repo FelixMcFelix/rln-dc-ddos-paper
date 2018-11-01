@@ -24,10 +24,11 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 set key inside bottom right
 
-plot '../results/baseline-2-avg.csv' u 1:3 w lines smooth sbezier title "Baseline", \
-     '../results/ft-f8-avg.csv' u 1:3 w lines smooth sbezier title "Packets In" ls 2, \
-     '../results/ft-f9-avg.csv' u 1:3 w lines smooth sbezier title "Packets Out" ls 3, \
-     '../results/ft-f10-avg.csv' u 1:3 w lines smooth sbezier title "Packets In Window" ls 4, \
-     '../results/ft-f11-avg.csv' u 1:3 w lines smooth sbezier title "Packets Out Window" ls 5, \
-     '../results/ft-f12-avg.csv' u 1:3 w lines smooth sbezier title "Mean In Pkt Size" ls 6, \
-     '../results/ft-f13-avg.csv' u 1:3 w lines smooth sbezier title "Mean Out Pkt Size" ls 7, \
+plot '../results/baseline-2-avg.csv' u 1:3 w lines smooth sbezier title "Baseline" dt 1, \
+     '../results/ft-f8-avg.csv' u 1:3 w lines smooth sbezier title "Packets In" ls 2 dt (18,2,2,2), \
+     '../results/ft-f9-avg.csv' u 1:3 w lines smooth sbezier title "Packets Out" ls 3 dt (6,2,2,2), \
+     '../results/ft-f10-avg.csv' u 1:3 w lines smooth sbezier title "Packets In Window" ls 4 dt (18,2), \
+     '../results/ft-f11-avg.csv' u 1:3 w lines smooth sbezier title "Packets Out Window" ls 5 dt (6,2), \
+     '../results/ft-f12-avg.csv' u 1:3 w lines smooth sbezier title "Mean In Pkt Size" ls 6 dt (2,2), \
+     '../results/ft-f13-avg.csv' u 1:3 w lines smooth sbezier title "Mean Out Pkt Size" ls 7 dt (2,1,1,1)
+
