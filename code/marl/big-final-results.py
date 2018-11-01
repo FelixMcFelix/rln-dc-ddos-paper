@@ -63,12 +63,12 @@ host_ps = [(2, 0.05), (4, 0.05), (8, 0.05), (16, 0.01)]
 # prefix, tcp?
 traffic_types = [
 	("udp", False),
-	("tcp", True)
+	("tcp", True),
 ]
 
 # prefix, reward_band, estimate_const_limit,
 reward_bands = [
-	("uncap", 1.0, False)
+	("uncap", 1.0, False),
 	("natural", 1.0, True),
 	("banded", 0.99, True),
 ]
@@ -120,7 +120,7 @@ if __name__ == "__main__":
 		"actions_target_flows": True,
 		"trs_maxtime": 0.001,
 
-		"split_codings": True
+		"split_codings": True,
 		"feature_max": 18,
 	}
 
@@ -167,3 +167,4 @@ if __name__ == "__main__":
 
 	writeResults(csv_dir, results)
 	makeResultsAverage(csv_dir, avg_csv_dir)
+	#print "would write to: {}".format(csv_dir)
