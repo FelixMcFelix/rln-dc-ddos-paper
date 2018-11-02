@@ -3,52 +3,6 @@ from marl import *
 import sys
 from writer import writeResults, makeResultsAverage
 
-def run(restrict, state, rewards, good_traffic_percents, total_loads):
-	results = marlExperiment(
-		n_teams = 2,#5,
-
-		n_inters = 2,
-		n_learners = 3,
-		host_range = [hosts_p, hosts_p],
-
-
-		explore_episodes = 0.8,
-		episodes = 1,
-		episode_length = 10000,
-		separate_episodes = True,
-
-		alpha = 0.05,
-		epsilon = 0.2,
-		discount = 0,
-
-
-		dt = 0.05,
-
-	#	old_style=True,
-
-		rf = "ctl",
-		use_controller = True,
-		actions_target_flows = restrict is not None,
-
-		restrict = restrict,
-
-		rand_state = state,
-		rewards = rewards,
-		good_traffic_percents = good_traffic_percents,
-		total_loads = total_loads,
-
-		evil_range = [4,7],
-		model = "nginx",
-		reward_direction = "out",
-		randomise = True,
-		randomise_count = 3,
-		randomise_new_ip = True,
-
-		feature_max = 18,
-	)
-
-	return results
-
 results_dir = "../../results/"
 
 # prefix, spiffy_mode, discount
@@ -111,7 +65,7 @@ if __name__ == "__main__":
 		"dt": 0.05,
 
 		"explore_episodes": 0.8,
-		"episodes": 1,
+		"episodes": 10,
 		"episode_length": 10000,
 		"separate_episodes": True,
 
