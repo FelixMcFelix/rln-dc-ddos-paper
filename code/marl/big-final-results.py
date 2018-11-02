@@ -109,6 +109,7 @@ if __name__ == "__main__":
 	if single_index is not None:
 		(indiv_prefix, single_learner) = single_learners[single_index]
 		params["single_learner"] = single_learner
+		params["estimate_const_limit"] = True
 
 	results = marlExperiment(**params)
 
