@@ -97,7 +97,11 @@ if __name__ == "__main__":
 		params["randomise_new_ip"] = True
 		params["reward_direction"] = "out"
 		params["evil_range"] = [4, 7]
+		#params["use_controller"] = True
 	else:
+		params["model"] = "nginx"
+		params["submodel"] = "udp-flood"
+		#params["use_controller"] = False
 		pass
 
 	# indiv stuff

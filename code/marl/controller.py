@@ -30,6 +30,7 @@ class SmartishRouter(app_manager.RyuApp):
 		# may want to use the actual outbound mac, later
 		self.pretend_mac = "00:00:00:01:00:00"
 		self.outsiders = {}
+		self.ignores = {}
 
 		# probably open a conn to mininet here, and wait to receive params...
 		with closing(
@@ -76,6 +77,8 @@ class SmartishRouter(app_manager.RyuApp):
 			#print "I believe", dpid, "to be external (?)"
 			# this is an external switch, it's being managed elsewhere...
 			return
+
+		self.ignores[dpid] = set()
 
 		# Table 0: (categorisation)
 		#	arp -> proxy
@@ -237,6 +240,11 @@ class SmartishRouter(app_manager.RyuApp):
 		ipv4_pkt = pkt.get_protocol(ipv4.ipv4)
 		ether_pkt = pkt.get_protocol(ethernet.ethernet)
 
+		if dpid not in self.ignores:
+			self.ignores[dpid] = set()
+
+		ignore_list = self.ignores[dpid]
+
 		if arp_pkt is not None:
 			#print "it's ARP"
 			# in both cases: build and send a reply
@@ -338,12 +346,17 @@ class SmartishRouter(app_manager.RyuApp):
 				actions=actions, data=msg.data)
 			#print out, dp, msg.buffer_id, in_port, actions, msg.data.encode("hex_codec"), port, adj
 			dp.send_msg(out)
-			self.logger.debug("haned back")
+			self.logger.debug("handed back")
 			return
 
-		#print "it's ipv4"
+		#print "it's ipv4?"
+		#if ipv4_pkt.src in ignore_list:
+		#	return
+		#ignore_list.add(ipv4_pkt.src)
 
 		external_ip = ipv4_pkt.src
+
+		#print ipv4_pkt
 
 		# Packet in means we've been notified about a flow (out->in)
 		# which has yet to be seen. Record that we've seen it in T2
@@ -373,7 +386,7 @@ class SmartishRouter(app_manager.RyuApp):
 			table_id=2,
 			importance=0)
 			
-		#print ipv4_pkt.dst
+		#print ipv4_pkt.src, ipv4_pkt.dst
 		(port, adj) = (1, True) \
 			if dpid not in self.entry_map \
 			else self.entry_map[dpid][ipv4_pkt.dst]

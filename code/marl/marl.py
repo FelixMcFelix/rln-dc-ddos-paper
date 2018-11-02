@@ -1323,6 +1323,13 @@ def marlExperiment(
 		server_ip = server.IP()
 
 		# gen traffic at each host. This MUST happen after the bootstrap.
+		#time.sleep(3)
+		#if use_controller:
+		#	p_cmd = "ping -c 1 " + server_ip
+		#	for (_, _, _, _, hosts, _) in teams:
+		#		for (host, good, bw, link, ip) in hosts:
+		#			host.cmd(p_cmd)
+
 		for (_, _, _, _, hosts, _) in teams:
 			for (host, good, bw, link, ip) in hosts:
 				if model == "tcpreplay":
