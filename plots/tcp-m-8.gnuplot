@@ -1,7 +1,7 @@
 set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}'
 set output "tcp-m-8.tex"
 
-load "parula.pal"
+load "inferno.pal"
 
 set style line 102 lc rgb '#a0a0a0' lt 1 lw 1
 set border ls 102
@@ -22,7 +22,7 @@ set xlabel "Iteration ($t \\cdot{} \\SI{50}{\\milli\\second}$)"
 set ylabel "Ratio Legit Traffic Preserved"
 
 set yrange [0.0:1.0]
-set key inside bottom right
+set key inside top right
 
 plot '../results/online-8-avg.csv' u 1:3 w lines smooth sbezier title "MARL" dt 1, \
      '../results/m-tcp-natural-8' u 1:3 w lines smooth sbezier title "MARL++" dt (18,2,2,2), \
