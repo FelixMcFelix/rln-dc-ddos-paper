@@ -24,7 +24,7 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 set key inside top right
 
-plot '../results/online-4-avg.csv' u 1:3 w lines smooth sbezier title "MARL" dt 1, \
+plot '../results/online-4-avg-ng.csv' u 1:3 w lines smooth sbezier title "MARL" dt 1, \
      '../results/spf-tcp-natural-4' u 1:3 w lines smooth sbezier title "SPF" dt (18,2,2,2), \
      '../results/spf-tcp-banded-4' u 1:3 w lines smooth sbezier title "SPF (Banded)" ls 4  dt (6,2,2,2), \
      '../results/spf-tcp-single-4' u 1:3 w lines smooth sbezier title "SPF (Single Agent)" ls 5 dt (18,2), \
