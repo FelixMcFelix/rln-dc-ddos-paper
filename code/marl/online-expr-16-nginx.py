@@ -2,7 +2,7 @@ import logging
 from marl import *
 from writer import writeResults, makeResultsAverage
 
-logging.basicConfig(filename="yawn.log", level=logging.DEBUG)
+#logging.basicConfig(filename="yawn.log", level=logging.DEBUG)
 
 hosts_p = 16
 
