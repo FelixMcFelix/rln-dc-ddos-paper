@@ -2,7 +2,7 @@ import cPickle
 from marl import *
 from writer import writeResults, makeResultsAverage
 
-hosts_p = 16
+hosts_p = 8
 
 def run(restrict, state, rewards, good_traffic_percents, total_loads):
 	results = marlExperiment(

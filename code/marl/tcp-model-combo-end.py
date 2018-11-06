@@ -1,5 +1,6 @@
 import cPickle
 from marl import *
+import sys
 from writer import writeResults, makeResultsAverage
 
 ft = __import__("tcp-model-combo-prep")
@@ -52,6 +53,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, contributo
 # For each episode, we want to...
 
 host_ps = [2, 4, 8, 16]
+host_ps = [ host_ps[int(sys.argv[1])] ]
 combo_result_sets = [([], [], []) for a in host_ps]
 
 configs = [
