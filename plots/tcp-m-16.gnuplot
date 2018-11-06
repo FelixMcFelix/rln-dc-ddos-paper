@@ -29,3 +29,4 @@ plot '../results/online-16-avg-ng.csv' u 1:3 w lines smooth sbezier title "MARL"
      '../results/m-tcp-banded-16' u 1:3 w lines smooth sbezier title "MARL++ (Banded)" ls 4  dt (6,2,2,2), \
      '../results/m-tcp-single-16' u 1:3 w lines smooth sbezier title "MARL++ (Single Agent)" ls 5 dt (18,2), \
      '../results/m-tcp-uncap-16' u 1:3 w lines smooth sbezier title "MARL++ (Uncapped)" ls 6 dt (6,2), \
+     '../results/tcp-combo-16-avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Pretrain)" ls 7 dt (2,2), \
