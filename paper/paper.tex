@@ -13,8 +13,10 @@
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, calc, fit, positioning}
 
+\usepackage{etoolbox}
 \usepackage[binary-units, per-mode=symbol]{siunitx}
-\sisetup{detect-all, range-phrase=--, range-units=single}
+\robustify\bfseries
+\sisetup{detect-all, range-phrase=--, range-units=single, detect-weight=true,detect-inline-weight=math}
 
 \makeatletter
 \let\MYcaption\@makecaption
@@ -123,6 +125,8 @@ uniquelist=false]{biblatex}
 \newtheorem{corr}{Corollary}[thm]
 
 \newcommand{\fakepara}[1]{\noindent\textbf{#1:}}
+
+\makeatletter\let\expandableinput\@@input\makeatother
 
 \makeatletter
 \DeclareRobustCommand{\rvdots}{%
@@ -659,11 +663,10 @@ Following \textcite{DBLP:conf/sigcomm/ChenL0L18}'s observations concerning short
 We expect this should be tuned based on the frequency at which statistics arrive.
 %?? Prune old? We can get through 8 per iteration, might use this as a basis for knowing when to say ``enough is enough''.
 
-{
-\newcommand{\load}[2]{\operatorname{load}^{#2}_{t}(#1)}
-\newcommand{\uload}[1]{\load{#1}{\uparrow}}
-\newcommand{\dload}[1]{\load{#1}{\downarrow}}
-\newcommand{\bload}[1]{\load{#1}{\updownarrow}}
+\newcommand{\arrload}[2]{\operatorname{load}^{#2}_{t}(#1)}
+\newcommand{\uload}[1]{\arrload{#1}{\uparrow}}
+\newcommand{\dload}[1]{\arrload{#1}{\downarrow}}
+\newcommand{\bload}[1]{\arrload{#1}{\updownarrow}}
 \newcommand{\cond}[2]{\operatorname{c}_{#1,t}#2}
 %\fakepara{Reward function directionality}
 The reward functions, as defined, do not take traffic direction into account.
@@ -676,9 +679,9 @@ Denoting the upstream, downstream and combined loads $\uload{s}, \dload{s}, \blo
 \end{gather}
 \label{eqn:reward-but-better}
 \end{subequations}
-replacing $\load{t}{}$ in \crefrange{eqn:reward-rt}{eqn:reward-rctl} with whichever directional load is prioritised.
+replacing $\arrload{t}{}$ in \crefrange{eqn:reward-rt}{eqn:reward-rctl} with whichever directional load is prioritised.
 We choose $\uload{\cdot}$ for our UDP-based models and $\dload{\cdot}$ for HTTP, though we expect that $\bload{\cdot}$ would be the most suitable for general deployment or heterogeneous traffic patterns.
-}
+
 
 %Explicitly mention \emph{why} we don't make use of neural networks, and instead favour more classical function approximation. Latency concerns, energy usage, graphics/TPU/whatever hardware availability or lack thereof across switches/routers/etc.
 To make decisions cheaply and at low latency, we maintain the usage of semi-gradient Sarsa with tile coding, rather than making use of neural networks or more complicated function approximators.
@@ -802,7 +805,7 @@ An extraordinarily long flow, having sent a lot of data, could be more likely to
 
 \fakepara{Correspondence ratio}
 the ratio between upstream and downstream traffic for a source IP.
-We define this to be $C_X = \min(\mathit{up}, \mathit{down})/\max(\mathit{up}, \mathit{down})$, where a value close to 0 indicates strong asymmetry.
+We define this to be $C_X = \min(\uload{\cdot}, \dload{\cdot})/\max(\uload{\cdot}, \dload{\cdot})$, where a value close to 0 indicates strong asymmetry.
 
 \fakepara{$\mathbf{\Delta}$ Send/receive rate}
 the change in traffic rates caused by the last action.
@@ -850,21 +853,22 @@ All of the above features, save for global state, are 1-dimensional.
 Each is tile-coded with 4 tilings and 6 tiles per dimension, using the windows described in \cref{tab:codings}.
 We chose to take a separate tile-coding over each feature, ignoring combinatorial effects at present to minimise the amount of extra work an agent must perform.
 Indeed, combining too many features into one tile-coding can lead to poor performance due to an inability to generalise action values across similar states.
-On the other hand, treating each individually allows us to achieve a quick understanding of the importance of each while seeing adequate performance.
+On the other hand, treating features individually allows us to reach a quick understanding of the importance of each while seeing adequate performance.
 
-\Cref{fig:udp-feature-plots} shows the effectiveness of each for UDP (resp.\ \cref{fig:udp-feature-plots} for TCP), using a topology with $n=2$ hosts per egress point.
+\Cref{fig:udp-feature-plots} shows the effectiveness of each feature for UDP (resp.\ \cref{fig:udp-feature-plots} for TCP), using a topology with $n=2$ hosts per egress point.
 %?? Core findings---different protocols need different features, so everything we proposed above has a use!
 The plots demonstrate that different protocols and traffic classes are best defended by different features---as such, every feature presented has value in a complete model.
 In general, some of the most effective features are the global state, mean IAT, mean inbound packet size and $\Delta$ rates.
 %?? How do they do when combined after individual training? Pretty well, especially for TCP.
-Additional testing shows that the learned policies may be effectively combined (by summing action values), and are particularly effective for TCP; these results are omitted to preserve space.
+Additional testing shows that the learned per-feature policies may be easily combined (by summing action values), and that this technique is particularly effective for TCP; these results are omitted to preserve space.
 
 %?? NEED TO SAY SOMEWHERE: Baselines use TC for establishing interleaving/buffers filling etc., when MARL+ or SPF are in play then disabling TC (thus allowing illegal states, with \num{-1} reward marking them as such---``negative reinforcement'') may accelerate learning. We have a choice---but the results show that for TCP we WANT TC enabled... For UDP, we actually get a slight degradation in performance. This suggests a kind of ``banding'', perhaps? Important to mention that it easily learns how to maintain a logical bandwidth limit.
 During training of the above feature models, we elected to remove the physical bandwidth limit to allow agents to visit illegal states and receive \emph{negative reinforcement} for doing so.
 It is important to note that this did not affect the agents' ability to keep the total load below $U_s$, as this behaviour can be easily learned in all cases.
 %?? talk about cap difference: \cref{fig:tcp-cap-feature-plots}---we want cap enabled for TCP.
-We found this led to a marginal improvement in efficacy when UDP was the primary source of benign traffic, but observed that this hindered learning when TCP was the primary protocol under protection (\cref{fig:tcp-cap-feature-plots})---likely due to the loss of key system dynamics.
-It is anticipated that this difference might prove problematic for heterogeneous traffic mixtures one way of solving this may be to investigate the effect of replacing $U_s$ with e.g., $0.99 U_s$ in \cref{eqn:reward-but-better} to introduce a small band of negative reinforcement without actually removing the load restriction in the environment.
+We found this led to a marginal improvement in efficacy when UDP was the primary source of benign traffic, but observed that this hindered learning when TCP was the primary protocol under protection (\cref{fig:tcp-cap-feature-plots}), likely due to the loss of key system dynamics.
+It is anticipated that this difference might prove problematic for heterogeneous traffic mixtures.
+One way of solving this may be to investigate the effect of replacing $U_s$ with e.g., $0.99 U_s$ in \cref{eqn:reward-but-better}, to introduce a small band of negative reinforcement without actually removing the load restriction in the environment.
 Our intent is to potentially accelerate learning while preserving the effects of system dynamics---we term these \emph{banded} rewards.
 
 %\subsection{What's done with these?}
@@ -877,11 +881,91 @@ Our intent is to potentially accelerate learning while preserving the effects of
 
 \section{The Results of Doing So}\label{sec:the-results-of-doing-so}
 
-?? They'd probably look real nice...
+We now examine the performance of our two new models as compared against existing RL work under different traffic behaviour, for varying $n$.
+%?? Probably best just to look at top level stuff, and THEN a simplified comparison for each intended improvement (like banded rewards).
+Additionally, we examine the performance effects of environmental characteristics and potential improvements: negative reinforcement, the case where one agent makes all decisions, and pre-training on individual features.
+We present the average rewards for all combinations of these factors in \cref{tab:av-vals}---these provide a rough idea of expected performance, giving the highest-performing model in bold.
 
-?? How to organise? by traffic type, or by model?
+Unless stated otherwise, these experiments use all \num{18} features introduced in \cref{sec:rethinking-the-state-space} (tile-coded individually), and make use of the physical bandwidth cap rather than pursuing negative reinforcement.
+Test system specifications match those given in \cref{sec:performance-in-an-emulated-environment}.
 
-?? Probably best just to look at top level stuff, and THEN a simplified comparison for each intended improvement (like banded rewards).
+\begin{table*}
+	\centering
+	\caption{Average reward for combinations of model, host density and traffic class.\label{tab:av-vals}}
+	
+	\expandableinput ../tables/big-avg-reward.tex
+\end{table*}
+
+\subsection{Congestion-unaware traffic}
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{../plots/udp-2}
+	
+	\caption{
+		Online performance for $n=2$ hosts per egress point.
+		\label{fig:udp-2}
+	}
+\end{figure}
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{../plots/udp-16}
+	
+	\caption{
+		It's a thing.
+		\label{fig:udp-16}
+	}
+\end{figure}
+
+Yeah, Marl ++ is good. So what. \Crefrange{fig:udp-2}{fig:udp-16}
+
+\subsection{Congestion-aware traffic}
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{../plots/tcp-2}
+	
+	\caption{
+		It's a thing.
+		\label{fig:tcp-2}
+	}
+\end{figure}
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{../plots/tcp-16}
+	
+	\caption{
+		It's a thing.
+		\label{fig:tcp-16}
+	}
+\end{figure}
+
+Yeah, Marl ++ is still good. So what. \Crefrange{fig:tcp-2}{fig:tcp-16}
+
+\subsection{Banded rewards and negative reinforcement}
+
+?? Generally? Not good.
+?? While uncapped led to a per-feature improvement for UDP, Uncapped worse in all cases when all features included.
+
+\subsection{Single-agent performance}
+
+?? Curiously, MARL suffers but SPF actually become usable.
+
+\subsection{Per-feature training}
+
+?? Not yet performed.
+
+\section{Discussion}
+
+Talk about flaws here, what could go wrong...
+
+?? Most importantly this still trails behind existing (exact) DDoS flow detection mechanisms
+
+?? What if there are too many flows and a decision set is never completed? Uh... trap door and skip to next set after 50 flow decisions or something?
+
+?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other! Alternatively, monitor the health of canary flows which cross the team boundary (i.e. only one in-out link).
+
+?? Is the state space interpretable? Yes!
+
+?? What concessions will we have to make in order to make per-flow processing more viable? Intelligent sampling/reanalysis of flows when needed (i.e. an external heuristic guiding method)? In SPIFFY's \cite{DBLP:conf/ndss/KangGS16} evaluation, we see clearly that it can take around \SI{2}{\second} for a flow to react fully to a rate increase---I think for the TCP step it may be wise to factor this in, too!
 
 \section{Related Work}
 
@@ -915,7 +999,7 @@ A \emph{direct-control} RL problem is one where the RL agent(s) are learning opt
 We feel there is a shortage of work in this category at present, at least in the field of networks; whether this is due to disinterest or difficulty is as-yet unknown.
 To date, the best-fitting example we have encountered is that of \textcite{DBLP:journals/eaai/MalialisK15}, which we have covered extensively in \cref{sec:environment-and-rl-algorithm}.
 
-An \emph{indirect-control} RL problem, where the role played by the agents is to act in service to \emph{another technique} responsible for decision-making, further optimising or generalising aspects of its operation beyond that of hand-coded heuristics.
+An \emph{indirect-control} RL problem is one where the role played by the agents is to act in service to \emph{another technique} responsible for decision-making, further optimising or generalising aspects of its operation beyond that of hand-coded heuristics.
 A past example includes learning when best to \emph{communicate} and share knowledge between \emph{hidden Markov model} anomaly detectors \cite{DBLP:conf/paisi/XuSH07}.
 The position of this work is weakened by its reliance on the discredited `DARPA99' dataset \cite{DARPA-IDD, DBLP:conf/cisda/TavallaeeBLG09, DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
 Outside of anomaly/intrusion detection, there has been growing interest in the use of reinforcement learning in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for resource-constrained process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
@@ -929,27 +1013,9 @@ The second agent makes bespoke decisions about routing, prioritisation etc.\ for
 
 %These works emphasise the necessity of ingenuity in effectively handling how states and actions are represented.
 
-\section{Discussion}
-
-Talk about flaws here, what could go wrong...
-
-?? What if there are too many flows and a decision set is never completed? Uh... trap door and skip to next set after 50 flow decisions or something?
-
-?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other! Alternatively, monitor the health of canary flows which cross the team boundary (i.e. only one in-out link).
-
-?? Is the state space interpretable? Yes!
-
-?? What concessions will we have to make in order to make per-flow processing more viable? Intelligent sampling/reanalysis of flows when needed (i.e. an external heuristic guiding method)? In SPIFFY's \cite{DBLP:conf/ndss/KangGS16} evaluation, we see clearly that it can take around \SI{2}{\second} for a flow to react fully to a rate increase---I think for the TCP step it may be wise to factor this in, too!
-
-\subsection{Future Work}
+\section{Future Work}
 
 Airlift half of the ``conclusion'' and paste it in here, so that it can be a lot neater.
-
-\section{Conclusion}
-
-It all ends here...
-
-?? Please write me once everything else is in place.
 
 ?? Future Work? I.e., \emph{everything}: no one else is really looking at/interested in this specific kind of application of RL yet. \emph{Yet}.
 
@@ -959,7 +1025,6 @@ It all ends here...
 
 ?? Benefit of the more realistic emulation environment is that it is far closer in behaviour and architecture (i.e. viable) to a real SDN-enabled deployment, captures some dynamics which were otherwise hidden/lost by human ignorance. It also allows me to develop the system towards evolving traffic models where it is expected that RL should shine over and above standard ML techniques. THEN: Room to introduce/roll-in dynamic changepoint detection or adaptive exploration \cite{DBLP:conf/ki/Tokic10, DBLP:conf/ki/TokicP11, DBLP:conf/annpr/TokicP12}?
 
-?? Overarching goal: works which \emph{respect the complexity of the network environment} (rather than na\"{i}ve simulation, blind ML applications etc.) and choose well-considered pathways to solution. \emph{Call-to-action}?
 
 ?? Security? I suspect that the very qualities that make inference difficult in IDS/IPS also increase the level of challenge an advanced threat must overcome.
 System state which is dependent on many signals drawn from across a wide network, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
@@ -968,7 +1033,14 @@ System state which is dependent on many signals drawn from across a wide network
 
 ?? More future work --- share knowledge between agents. ``Knowledge bases'' for this purpose? (see: Qianru).
 
-?? Can probably fold a lot of this out into discussion or something.
+\section{Conclusion}
+
+It all ends here...
+
+?? Please write me once everything else is in place.
+
+?? Overarching goal: works which \emph{respect the complexity of the network environment} (rather than na\"{i}ve simulation, blind ML applications etc.) and choose well-considered pathways to solution. \emph{Call-to-action}?
+
 
 \section*{Acknowledgements}
 %Our thanks go to Simon Rogers, Mircea Iordache, Qianru Zhou, Charles Rutherford, Marco Cook and Richard Cziva for their advice, comments and technical assistance.

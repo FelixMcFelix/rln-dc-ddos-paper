@@ -14,12 +14,15 @@ variants = [
 ]
 
 def get_average_reward(filename):
-	with open(filename, "rb") as csvfile:
+	with open(filename, "r") as csvfile:
 		reader = csv.reader(csvfile)
-		_ = reader.next()
+		# _ = nereader.next()
 
 		dats = []
-		for row in reader:
+		for i, row in enumerate(reader):
+			if i == 0:
+				continue
+
 			dats.append(float(row[3]))
 
 		return np.mean(dats)
@@ -29,7 +32,7 @@ def write_table(out_file, data):
 	lv = len(variants)
 
 	out_file.write(
-		"\\begin{{tabular}}{{@{{}}lc{}@{{}}}}\n".format("S"*((lm*lv)+1))
+		"\\begin{{tabular}}{{@{{}}cc{}@{{}}}}\n".format("S"*((lm*lv)+1))
 	)
 	out_file.write(
 		"\\toprule\\multicolumn{1}{c}{Traffic} & " + \
@@ -37,7 +40,8 @@ def write_table(out_file, data):
 		"\\multicolumn{1}{c}{Marl} & " + \
 		"\\multicolumn{{{}}}{{c}}{{Marl++}} & ".format(lv) + \
 		"\\multicolumn{{{}}}{{c}}{{SPF}} ".format(lv) + \
-		"\\cmidrule(lr){{4-{}}}\\cmidrule(lr){{{}-{}}} \\\\\n".format(4 + lv-1, 4 + lv, 3 + lv + lv) + \
+		"\\\\\n" + \
+		"\\cmidrule(lr){{4-{}}}\\cmidrule(lr){{{}-{}}} ".format(4 + lv-1, 4 + lv, 3 + lv + lv) + \
 		" & & "
 	)
 
@@ -56,12 +60,12 @@ def write_table(out_file, data):
 			row = data[key]
 			to_bold = np.argmax(row)
 			for j, val in enumerate(row):
-				base = "& {} " if j != to_bold else "& \\textbf{{{}}} "
+				base = "& {:.3f} " if j != to_bold else "& \\bfseries {:.3f} "
 				out_file.write(base.format(val))
 
 			out_file.write("\\\\ \n")
 
-	out_file.write("\\bottomrule\n\\end{{tabular}}")
+	out_file.write("\\bottomrule\n\\end{tabular}")
 
 def get_data():
 	data = {}
@@ -93,7 +97,6 @@ def main():
 	out_name = path.splitext(script_name)[0] + ".tex"
 
 	data = get_data()
-	print data
 
 	with open(out_name, "w") as outf:
 		write_table(outf, data)
