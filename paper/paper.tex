@@ -1,6 +1,7 @@
 % !TeX document-id = {e7fef4b9-afbc-4e81-94aa-c4847183d047}
 % !BIB program = biber
 \documentclass[conference, letterpaper, 10pt, times]{IEEEtran}
+\usepackage{nopageno}
 
 %\usepackage[T1]{fontenc}
 \usepackage{amsfonts}
@@ -84,6 +85,7 @@ uniquelist=false]{biblatex}
 
 %opening!
 
+%\newcommand{\mytitle}{Improving Direct-Control Reinforcement Learning for Network Intrusion Prevention}
 \newcommand{\mytitle}{Improving Direct-Control Reinforcement Learning for Network Intrusion Prevention}
 
 \usepackage{url}
@@ -104,17 +106,17 @@ uniquelist=false]{biblatex}
 \newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
 
 \usepackage{titling}
-\settowidth{\thanksmarkwidth}{*}
-\setlength{\thanksmargin}{-\thanksmarkwidth}
-
-%% Enable /thanks
-\IEEEoverridecommandlockouts
-\makeatletter
-\def\footnoterule{\relax%
-	\kern-5pt
-	\hbox to \columnwidth{\hfill\vrule width 0.5\columnwidth height 0.4pt\hfill}
-	\kern4.6pt}
-\makeatother
+%\settowidth{\thanksmarkwidth}{*}
+%\setlength{\thanksmargin}{-\thanksmarkwidth}
+%
+%%% Enable /thanks
+%\IEEEoverridecommandlockouts
+%\makeatletter
+%\def\footnoterule{\relax%
+%	\kern-5pt
+%	\hbox to \columnwidth{\hfill\vrule width 0.5\columnwidth height 0.4pt\hfill}
+%	\kern4.6pt}
+%\makeatother
 
 % make math easy
 \newcommand{\acval}[3]{\ensuremath{\operatorname{\hat{q}}(#1, #2, #3)}}
@@ -170,7 +172,7 @@ uniquelist=false]{biblatex}
 %	Dimitrios P.\ Pezaros\\
 %	University of Glasgow, Glasgow, Scotland,\\
 %	\email{k.simpson.1@research.gla.ac.uk}
-Anonymous Giraffe\thanks{This work was supported by a nameless funder [grant number 7].},
+Anonymous Giraffe,
 Anonymous Badger\\
 Unnamed Department, Nowhere\\
 \email{giraffe.a@unnamed.com}
@@ -193,6 +195,8 @@ Network intrusion detection and prevention systems backed by machine learning (a
 The detection problem in this domain is fraught with difficulty; it is an evolving, non-stationary problem as usage patterns shift, new protocols and applications are introduced, and is compounded by burstiness and seasonal variation.
 
 \emph{Reinforcement learning} (RL) may overcome the detection problem for certain classes of anomaly by managing and monitoring \emph{consequences}; an agent's role is to learn to optimise performance criteria (which are always available).
+
+?? We explore the design space, and improve upon existing approaches.
 
 We present...
 ?? Contribs
@@ -789,37 +793,37 @@ Elaborating further on the statistics discussed in \cref{sec:motivation} which o
 %?? We use these features, and why...
 
 \fakepara{Global state ($\mathbf{4\cdot{}}$Load)}
-these are the existing set of load measurements introduced in \cref{sec:environment-and-rl-algorithm}.
+These are the existing set of load measurements introduced in \cref{sec:environment-and-rl-algorithm}.
 These indicate the overall health of the network, and crucially are all measurements which an agent directly controls.
 
 \fakepara{Source IP address}
-while ordinarily trivial to spoof, in real-world scenarios the addresses of a set of reflector nodes might exhibit similarity, most likely through geography.
+While ordinarily trivial to spoof, in real-world scenarios the addresses of a set of reflector nodes might exhibit similarity, most likely through geography.
 
 \fakepara{Last action taken}
-this encodes an agent's current belief in the maliciousness of a flow.
+This encodes an agent's current belief in the maliciousness of a flow.
 This feature also potentially allows forgiveness, serving as a reference point for determining whether a source mistakenly marked as malicious exhibits different falloff behaviour after punishment.
 
 \fakepara{Flow duration and size}
-features which describe the length of time a connection has been active, and the amount of data transferred within that time.
+Features which describe the length of time a connection has been active, and the amount of data transferred within that time.
 An extraordinarily long flow, having sent a lot of data, could be more likely to be an amplifier.
 
 \fakepara{Correspondence ratio}
-the ratio between upstream and downstream traffic for a source IP.
+The ratio between upstream and downstream traffic for a source IP.
 We define this to be $C_X = \min(\uload{\cdot}, \dload{\cdot})/\max(\uload{\cdot}, \dload{\cdot})$, where a value close to 0 indicates strong asymmetry.
 
 \fakepara{$\mathbf{\Delta}$ Send/receive rate}
-the change in traffic rates caused by the last action.
+The change in traffic rates caused by the last action.
 Behavioural changes induced by bandwidth expansion/reduction are expected to be most visible in these fields.
 
 \fakepara{Mean inter-arrival time (IAT)}
-a measure of how often packets arrive at the agent's parent switch; low IATs indicate a high number of packets per second, and can be a possible marker of malicious behaviour.
+A measure of how often packets arrive at the agent's parent switch; low IATs indicate a high number of packets per second, and can be a possible marker of malicious behaviour.
 We only make use of the mean IAT of \emph{inbound} traffic.
 
 \fakepara{(Per-window) packet count}
-the amount of packets sent to/from a source over a flow's lifetime (or the current window of measurement), similar in use to flow size and mean IAT.
+The amount of packets sent to/from a source over a flow's lifetime (or the current window of measurement), similar in use to flow size and mean IAT.
 
 \fakepara{Mean packet size per-window}
-legitimate flows, both TCP- and UDP-based, often transmit packets with a distribution of sizes.
+Legitimate flows, both TCP- and UDP-based, often transmit packets with a distribution of sizes.
 Attack traffic is not likely to be so diverse: we might expect solely max-size packets in the case of amplification attacks, or minimum-size packets in other classes of flooding attack.
 
 The exclusion of features such as source/destination ports or protocol numbers is a deliberate choice.
@@ -850,12 +854,12 @@ Our aim was to design around this constraint as a form of future-proofing.
 \end{table}
 
 All of the above features, save for global state, are 1-dimensional.
-Each is tile-coded with 4 tilings and 6 tiles per dimension, using the windows described in \cref{tab:codings}.
+Each is tile-coded with 8 tilings and 6 tiles per dimension, using the windows described in \cref{tab:codings}.
 We chose to take a separate tile-coding over each feature, ignoring combinatorial effects at present to minimise the amount of extra work an agent must perform.
 Indeed, combining too many features into one tile-coding can lead to poor performance due to an inability to generalise action values across similar states.
 On the other hand, treating features individually allows us to reach a quick understanding of the importance of each while seeing adequate performance.
 
-\Cref{fig:udp-feature-plots} shows the effectiveness of each feature for UDP (resp.\ \cref{fig:udp-feature-plots} for TCP), using a topology with $n=2$ hosts per egress point.
+\Cref{fig:udp-feature-plots} shows the effectiveness of each feature for UDP (resp.\ \cref{fig:tcp-feature-plots} for TCP), using a topology with $n=2$ hosts per egress point averaged over 10 episodes.
 %?? Core findings---different protocols need different features, so everything we proposed above has a use!
 The plots demonstrate that different protocols and traffic classes are best defended by different features---as such, every feature presented has value in a complete model.
 In general, some of the most effective features are the global state, mean IAT, mean inbound packet size and $\Delta$ rates.
@@ -879,14 +883,19 @@ Our intent is to potentially accelerate learning while preserving the effects of
 
 %?? What other consequences are there? We're training each agent on all the flows it's acting on which means slight theoretical changes (we have multiple experience traces, and each uses its last state + new state + new target value (reward) as an update to the \emph{current model}).
 
-\section{The Results of Doing So}\label{sec:the-results-of-doing-so}
+\section{The Results of Doing So}
+\label{sec:the-results-of-doing-so}
 
-We now examine the performance of our two new models as compared against existing RL work under different traffic behaviour, for varying $n$.
+We now examine the performance of our two new models (\emph{Marl++}, \emph{SPF}) as compared against existing RL work (\emph{Marl}) under different traffic behaviour and varying $n$ as before.
 %?? Probably best just to look at top level stuff, and THEN a simplified comparison for each intended improvement (like banded rewards).
 Additionally, we examine the performance effects of environmental characteristics and potential improvements: negative reinforcement, the case where one agent makes all decisions, and pre-training on individual features.
-We present the average rewards for all combinations of these factors in \cref{tab:av-vals}---these provide a rough idea of expected performance, giving the highest-performing model in bold.
 
-Unless stated otherwise, these experiments use all \num{18} features introduced in \cref{sec:rethinking-the-state-space} (tile-coded individually), and make use of the physical bandwidth cap rather than pursuing negative reinforcement.
+We present the average rewards for all combinations of these factors in \cref{tab:av-vals}---these provide a rough idea of expected performance, giving the highest-performing model in bold.
+Average rewards take into account any portions of time that an agent allows illegal system states.
+Several plots augment this, illustrating peak performance or the amount of time which an agent requires to learn.
+
+Unless stated otherwise, these experiments measure average performance over 10 episodes, use all \num{18} features introduced in \cref{sec:rethinking-the-state-space} (tile-coded individually), and make use of the physical bandwidth cap rather than pursuing negative reinforcement.
+In all cases, agents learn control of the network from scratch.
 Test system specifications match those given in \cref{sec:performance-in-an-emulated-environment}.
 
 \begin{table*}
@@ -902,7 +911,9 @@ Test system specifications match those given in \cref{sec:performance-in-an-emul
 	\includegraphics[width=0.9\linewidth]{../plots/udp-2}
 	
 	\caption{
-		Online performance for $n=2$ hosts per egress point.
+		Online performance for $n=2$ hosts per egress point when benign traffic is UDP-like.
+		Although Marl++ offers a marked improvement (a peak $\sim$\SI{30}{\percent} more benign traffic arrives unimpeded), SPF significantly underperforms for this relatively simple topology.
+		Non-SPF agents start off reasonably well, slowly learning better policies.
 		\label{fig:udp-2}
 	}
 \end{figure}
@@ -911,12 +922,16 @@ Test system specifications match those given in \cref{sec:performance-in-an-emul
 	\includegraphics[width=0.9\linewidth]{../plots/udp-16}
 	
 	\caption{
-		It's a thing.
+		Online performance for $n=16$ hosts per egress point when benign traffic is UDP-like.
+		Marl++ remains marginally ahead of its predecessor, though both have undergone a significant drop in effectiveness.
+		SPF, remarkably, displays performance on par with Marl++ for this more difficult topology.
+		Both of the new models take longer to train, but achieve better peak and average performance than Marl.
 		\label{fig:udp-16}
 	}
 \end{figure}
 
-Yeah, Marl ++ is good. So what. \Crefrange{fig:udp-2}{fig:udp-16}
+Across all choices of $n$, we see that Marl++ exhibits reduced collateral damage compared to Marl, with SPF starting poorly yet becoming more effective for larger $n$ (\cref{tab:av-vals}, \emph{Capped}, UDP).
+\Cref{fig:udp-2,fig:udp-16} show the behaviour for $n \in \{2, 16\}$ in detail---the remaining choices of $n$ interpolate between these extremes, with the performance difference between Marl and Marl++ shrinking as $n$ increases.
 
 \subsection{Congestion-aware traffic}
 \begin{figure}
@@ -924,7 +939,9 @@ Yeah, Marl ++ is good. So what. \Crefrange{fig:udp-2}{fig:udp-16}
 	\includegraphics[width=0.9\linewidth]{../plots/tcp-2}
 	
 	\caption{
-		It's a thing.
+		Online performance for $n=2$ hosts per egress point when benign traffic is TCP-like.
+		Marl++ and Marl achieve very similar performance, starting off similarly well without notable improvement over an episode.
+		SPF's performance is disappointingly close to baseline, indicating that it is as useful as having no defence system.
 		\label{fig:tcp-2}
 	}
 \end{figure}
@@ -933,39 +950,70 @@ Yeah, Marl ++ is good. So what. \Crefrange{fig:udp-2}{fig:udp-16}
 	\includegraphics[width=0.9\linewidth]{../plots/tcp-16}
 	
 	\caption{
-		It's a thing.
+		Online performance for $n=16$ hosts per egress point when benign traffic is UDP-like.
+		Although Marl++ takes longer to reach its most effective policy, we achieve visibly better peak performance.
+		SPF does manage to learn an improved policy compared to its starting state, but never manages to perform well.
 		\label{fig:tcp-16}
 	}
 \end{figure}
 
-Yeah, Marl ++ is still good. So what. \Crefrange{fig:tcp-2}{fig:tcp-16}
+Marl++ consistently allows more legitimate traffic to reach its destination than Marl, with both significantly above the baseline (\cref{tab:av-vals}, \emph{Capped}, TCP).
+SPF performs consistently poorly across all choices of $n$.
+\Cref{fig:tcp-2}{fig:tcp-16} show two endpoints of a trend in our results: for larger $n$, Marl++ requires around twice as long as Marl to learn its best-achieving policy, underperforming for this period, but achieves notably better peak performance.
 
 \subsection{Banded rewards and negative reinforcement}
+In general, we find that explicitly training a policy to keep the system in a valid state via negative reinforcement (i.e., an \emph{uncapped} network) is most effective for UDP-like traffic with Marl++.
+For SPF, however, negative reinforcement becomes a worse choice for larger $n$.
+Where TCP-like traffic is concerned, we see that this strategy almost always leads to worse policies.
 
-?? Generally? Not good.
-?? While uncapped led to a per-feature improvement for UDP, Uncapped worse in all cases when all features included.
+The usefulness of banded rewards with regard to learning an effective policy appears to be unpredictable.
+For many of the configurations detailed in \cref{tab:av-vals}, for $n>2$ the average reward with banding is likely to lie between that of the capped and uncapped system models, but oscillates heavily.
+In a handful of UDP instances, banding can lead to \emph{better} average performance.
+More study is likely required into this; we choose to replace $U_s$ with $0.99U_s$ to minimise the impact on legitimate states, but this choice remains somewhat arbitrary.
 
 \subsection{Single-agent performance}
-
-?? Curiously, MARL suffers but SPF actually become usable.
+Making all decisions with a single agent is roughly equivalent to having a zero-cost communication channel between each pair of agents, theoretically allowing faster training by giving each agent more experience.
+Curiously, we observe that this often leads to drastically worse policies when used as part of Marl++ for small $n$, but makes SPF a considerably more competitive model---coming ahead of Marl for UDP traffic.
+We discuss our conjectures for why this reversal occurs in \cref{sec:discussion}.
 
 \subsection{Per-feature training}
 
-?? Not yet performed.
+?? Still being performed.
 
-\section{Discussion}
+\section{Discussion}\label{sec:discussion}
 
-Talk about flaws here, what could go wrong...
+%Talk about flaws here, what could go wrong...
 
-?? Most importantly this still trails behind existing (exact) DDoS flow detection mechanisms
+%?? Why does SPF only do well sometimes? Model is actually more difficult to learn, so it seems to do best when it has a larger set of decisions to learn from. But, it does worse for TCP?
+\fakepara{Model performance}
+Of the results presented, SPF's meandering performance is interesting given its far smaller action space.
+It's natural to expect that this would the model easier to learn, but the additional state required appears to make the model \emph{harder}, beyond even the gains we might expect from choosing a non-zero discount factor.
+Accordingly, we see that SPF performs best when agents learn from as much knowledge as possible: high $n$ and single-agent training.
+Paradoxically, Marl++ generally achieves the best performance yet actively suffers when treated as a single learner---this may occur due to a roughly even spread of values between disparate actions, due to shared characteristics between legitimate and malicious flows.
 
-?? What if there are too many flows and a decision set is never completed? Uh... trap door and skip to next set after 50 flow decisions or something?
+%?? May be hard to learn multiple features at once while controlling multiple flows while contending with many more agents, with harder dynamics like TCP. Does this hinder learning in the long run?
+Although we have improved upon Marl in both identified problem cases, the improvements are not quite on the order we'd expect, or hope for.
+We suspect that some of these difficulties originate from the competitive nature of learning that these models embody: agents are learning action values for multiple features simultaneously, taking many actions at once (making it harder to unpick the true value of each action), and controlling shared global state.
+It may be worthwhile to extensively pre-train agents non-competitively on each feature using individual flows, to explore this hypothesis.
 
-?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other! Alternatively, monitor the health of canary flows which cross the team boundary (i.e. only one in-out link).
+%It is likely that the design of Marl++ 
 
-?? Is the state space interpretable? Yes!
+%Finally, it is crucial to note that the models and techniques presented here are an improvement , this work still trails behind existing (exact) DDoS flow detection mechanisms.
+Most importantly, what we wish to impart is the knowledge that while the models and techniques we present here are an improvement over past RL-based work, this work still trails behind existing (exact) DDoS flow detection mechanisms.
+Although we have conducted work to map the territory to some extent, there are still more advancements to be made before RL-based DDoS defence is truly competitive.
 
-?? What concessions will we have to make in order to make per-flow processing more viable? Intelligent sampling/reanalysis of flows when needed (i.e. an external heuristic guiding method)? In SPIFFY's \cite{DBLP:conf/ndss/KangGS16} evaluation, we see clearly that it can take around \SI{2}{\second} for a flow to react fully to a rate increase---I think for the TCP step it may be wise to factor this in, too!
+\fakepara{Security concerns and vulnerability}
+Can an agent be flooded with new flows to reduce their ability to make decisions?
+One of the risks introduced by our timed random sequential policy updates is that so much work can be queued up that an agent is never able to act on some attack flows.
+The natural solution is to impose an upper bound on the amount of action computations/policy updates that can be performed before a work list is discarded completely.
+This removes the guarantee that all flows will be visited fairly often, but if updates occur regularly then this random sampling my be sufficient to achieve good performance.
+
+%?? Is the state space interpretable? Yes!
+Machine learning algorithms have earned a reputation for eluding human interpretation, while being vulnerable to evasion and poisoning.
+Given the risks associated with introducing such techniques in the context of security, it is natural to be concerned with the interpretability of the models we have proposed.
+With the exception of global state, the tile-coding parameters we make use of ensure that the set of all outputs for each new feature we add is relatively enumerable: $n_{\mathit{tilings}}n_{\mathit{tiles}}\dim{f}$ individual action value vectors per feature $f$, though considerably more combinations thereof.
+Furthermore, system state which is dependent on many signals drawn from across a wide network (such as our global state) is difficult to exert precise control over.
+These signals' topological separation, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
 
 \section{Related Work}
 
@@ -1021,13 +1069,15 @@ Airlift half of the ``conclusion'' and paste it in here, so that it can be a lot
 
 ?? IDEA: try out average reward, TD($\lambda$) methods as future work...
 
+?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other! Alternatively, monitor the health of canary flows which cross the team boundary (i.e. only one in-out link).
+
 ?? IDEA: Apply these techniques to programmable data planes etc. While it's pretty neat that what we have works assuming that ach router is a software (x86) switch running OVS, what might we need to consider when applying this to `real' switches? ``PDP can allow this to be added to real routers to make it efficient to keep \& process state in the manner we require, as well as enabling more adaptive deployment''. Cite P4, BPFabric, other work on PDPs?
 
 ?? Benefit of the more realistic emulation environment is that it is far closer in behaviour and architecture (i.e. viable) to a real SDN-enabled deployment, captures some dynamics which were otherwise hidden/lost by human ignorance. It also allows me to develop the system towards evolving traffic models where it is expected that RL should shine over and above standard ML techniques. THEN: Room to introduce/roll-in dynamic changepoint detection or adaptive exploration \cite{DBLP:conf/ki/Tokic10, DBLP:conf/ki/TokicP11, DBLP:conf/annpr/TokicP12}?
 
+?? What concessions will we have to make in order to make per-flow processing more viable? Intelligent sampling/reanalysis of flows when needed (i.e. an external heuristic guiding method)? In SPIFFY's \cite{DBLP:conf/ndss/KangGS16} evaluation, we see clearly that it can take around \SI{2}{\second} for a flow to react fully to a rate increase---I think for the TCP step it may be wise to factor this in, too!
 
 ?? Security? I suspect that the very qualities that make inference difficult in IDS/IPS also increase the level of challenge an advanced threat must overcome.
-System state which is dependent on many signals drawn from across a wide network, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
 ?? Might want to mention it in related work above, but the recent attention on adversarial examples/tricking models needs to be looked into for RL. Poisoning attacks relevant for online techniques: old bounds exist \textcite{DBLP:journals/jmlr/KloftL10}, new stuff concerns collaborative learners \cite{DBLP:conf/acsac/ShenTS16}, nothing for rl. Hot topic in deep networks \cite{DBLP:conf/eurosp/PapernotMJFCS16, DBLP:conf/eurosp/PapernotMSW18}, but naturally still relevant with even linear approximations or exact tabular case due to limits of the PAC assumption. There is now examination of evasion attacks wrt.\ RL \cite{DBLP:journals/corr/HuangPGDA17}!
 ?? evasion attacks by \textcite{DBLP:conf/sp/Carlini017}---all of these are computed by way of a general stochastic optimiser, such as \emph{Adam} \cite{DBLP:journals/corr/KingmaB14}. possible to apply something similar to our learned model to assess its security? would the suggested states even be valid? (i.e. since they're monotonically increasing for the most part).
 
@@ -1041,11 +1091,13 @@ It all ends here...
 
 ?? Overarching goal: works which \emph{respect the complexity of the network environment} (rather than na\"{i}ve simulation, blind ML applications etc.) and choose well-considered pathways to solution. \emph{Call-to-action}?
 
+We stress once again that this work still trails behind existing (exact) DDoS flow detection mechanisms, yet ...
 
 \section*{Acknowledgements}
 %Our thanks go to Simon Rogers, Mircea Iordache, Qianru Zhou, Charles Rutherford, Marco Cook and Richard Cziva for their advice, comments and technical assistance.
 Our thanks go to Anonymous, Anonymous, Anonymous, Anonymous, Anonymous and Anonymous for their advice, comments and technical assistance.
 %Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
+This work was supported by a nameless funder [grant number 0].
 
 \renewcommand*{\bibfont}{\small}
 \printbibliography
