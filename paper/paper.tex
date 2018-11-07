@@ -881,7 +881,7 @@ Our intent is to potentially accelerate learning while preserving the effects of
 
 We now examine the performance of our two new models (\emph{Marl++}, \emph{SPF}) as compared against existing RL work (\emph{Marl}) under different traffic behaviour and varying $n$ as before.
 %?? Probably best just to look at top level stuff, and THEN a simplified comparison for each intended improvement (like banded rewards).
-Additionally, we examine the performance effects of environmental characteristics and potential improvements: negative reinforcement, the case where one agent makes all decisions, and pre-training on individual features.
+Additionally, we examine the performance effects of environmental characteristics and potential improvements: negative reinforcement, and the case where one agent makes all decisions.%, and pre-training on individual features.
 
 We present the average rewards for all combinations of these factors in \cref{tab:av-vals}---these provide a rough idea of expected performance, giving the highest-performing model in bold.
 Average rewards take into account any portions of time that an agent allows illegal system states.
@@ -969,9 +969,9 @@ Making all decisions with a single agent is roughly equivalent to having a zero-
 Curiously, we observe that this often leads to drastically worse policies when used as part of Marl++ for small $n$, but makes SPF a considerably more competitive model---coming ahead of Marl for UDP traffic.
 We discuss our conjectures for why this reversal occurs in \cref{sec:discussion}.
 
-\subsection{Per-feature training}
-
-?? Still being performed.
+%\subsection{Per-feature training}
+%
+%?? Still being performed.
 
 \section{Discussion}\label{sec:discussion}
 
@@ -1004,7 +1004,7 @@ This removes the guarantee that all flows will be visited fairly often, but if u
 %?? Is the state space interpretable? Yes!
 Machine learning algorithms have earned a reputation for eluding human interpretation, while being vulnerable to evasion and poisoning.
 Given the risks associated with introducing such techniques in the context of security, it is natural to be concerned with the interpretability of the models we have proposed.
-With the exception of global state, the tile-coding parameters we make use of ensure that the set of all outputs for each new feature we add is relatively enumerable: $n_{\mathit{tilings}}n_{\mathit{tiles}}\dim{f}$ individual action value vectors per feature $f$, though considerably more combinations thereof.
+With the exception of global state, the tile-coding parameters we make use of ensure that the set of all outputs for each new feature we add is relatively enumerable: for $n$ tilings and $c$ tiles per dimension there are $nc^{\dim{f}}$ individual action value vectors per feature $f$ (\num{48} for the new features we introduce, \num{10368} for global state), though considerably more combinations thereof ($c^{n \cdot \dim{f}}$).
 Furthermore, system state which is dependent on many signals drawn from across a wide network (such as our global state) is difficult to exert precise control over.
 These signals' topological separation, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
 
