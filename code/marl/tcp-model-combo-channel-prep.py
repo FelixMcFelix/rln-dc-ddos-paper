@@ -94,7 +94,7 @@ if __name__ == "__main__":
 			(rs, gs, ls, store_sarsas, rng_state, _) = run(
 				restriction,
 				state[1],
-				rewards, good_traffic_percents, total_loads
+				rewards, good_traffic_percents, total_loads,
 				hosts_p
 			)
 
