@@ -81,12 +81,12 @@ if __name__ == "__main__":
 
 	if in_progress:
 		with open(in_progress_file_dir, "rb") as of:
-			(start_i, result_sets, things_to_pickle) = cPickle.load(outfile)
+			(start_i, result_sets, things_to_pickle) = cPickle.load(of)
 
 	things_to_pickle = []
 
 	randstate = None
-	for i in xrange(start_i, n_episodes_per_step):
+	for i in xrange(start_i, start_i + n_episodes_per_step):
 		state = (i, randstate)
 		agents = []
 		for j, restriction in enumerate(restrict_sets):
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
 		# list of: rng states and the set of agents generated from each.
 		things_to_pickle.append((state, agents))
-		start_i += 1
+	start_i += n_episodes_per_step
 
 	# what to do if still work to do? give up.
 	if start_i < n_episodes:
