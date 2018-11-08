@@ -7,11 +7,17 @@ traffics = ["udp", "tcp"]
 ns = [2, 4, 8, 16]
 models = ["m", "spf"]
 variants = [
-	("natural", "Capped"),
-	("uncap", "Uncapped"),
-	("banded", "Banded"),
-	("single", "Single"),
+	("natural", None, "Capped"),
+	("uncap", None, "Uncapped"),
+	("banded", None, "Banded"),
+	("single", None, "Single"),
+	("channel", "../results/tcp-combo-{2}-{3}.csv", "Pretrain"),
 ]
+
+illegal_combos = set()
+illegal_combos.add(("m", "udp", "channel"))
+illegal_combos.add(("spf", "udp", "channel"))
+illegal_combos.add(("spf", "tcp", "channel"))
 
 def get_average_reward(filename):
 	with open(filename, "r") as csvfile:
@@ -46,7 +52,7 @@ def write_table(out_file, data):
 	)
 
 	for _ in models:
-		for (_fn, pres) in variants:
+		for (_fn, _replace_str, pres) in variants:
 			out_file.write("& \\multicolumn{{1}}{{c}}{{{}}} ".format(pres))
 
 	out_file.write("\\\\ \\midrule\n")
@@ -58,9 +64,25 @@ def write_table(out_file, data):
 			out_file.write("{} & {} ".format("" if i>0 else traffic.upper(), n))
 
 			row = data[key]
+			for j, _ in enumerate(row):
+				if j == 0:
+					continue
+
+				j -= 1
+				# print(j, len(variants))
+				model = models[int(j/len(variants))]
+				variant = variants[j%len(variants)][0]
+				if (model, traffic, variant) in illegal_combos:
+					row[j+1] = -1000.0
+
 			to_bold = np.argmax(row)
+
 			for j, val in enumerate(row):
 				base = "& {:.3f} " if j != to_bold else "& \\bfseries {:.3f} "
+
+				if val < -999.0:
+					base = "& \\multicolumn{{1}}{{c}}{{---}} "					
+
 				out_file.write(base.format(val))
 
 			out_file.write("\\\\ \n")
@@ -84,8 +106,9 @@ def get_data():
 			# do it for all parts now.
 			for m in models:
 				for v in variants:
+					f_str = "../results/{}-{}-{}-{}.csv" if v[1] is None else v[1]
 					row.append(get_average_reward(
-						"../results/{}-{}-{}-{}.csv".format(m, t, v[0], n)
+						f_str.format(m, t, v[0], n)
 					))
 
 			data[key] = np.array(row)

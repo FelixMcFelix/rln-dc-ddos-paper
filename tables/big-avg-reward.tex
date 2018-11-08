@@ -1,13 +1,13 @@
-\begin{tabular}{@{}ccSSSSSSSSS@{}}
-\toprule\multicolumn{1}{c}{Traffic} & \multicolumn{1}{c}{$n$} & \multicolumn{1}{c}{Marl} & \multicolumn{4}{c}{Marl++} & \multicolumn{4}{c}{SPF} \\
-\cmidrule(lr){4-7}\cmidrule(lr){8-11}  & & & \multicolumn{1}{c}{Capped} & \multicolumn{1}{c}{Uncapped} & \multicolumn{1}{c}{Banded} & \multicolumn{1}{c}{Single} & \multicolumn{1}{c}{Capped} & \multicolumn{1}{c}{Uncapped} & \multicolumn{1}{c}{Banded} & \multicolumn{1}{c}{Single} \\ \midrule
-UDP & 2 & 0.609 & \bfseries 0.778 & 0.728 & 0.616 & 0.336 & 0.394 & 0.450 & 0.312 & 0.666 \\ 
- & 4 & 0.502 & 0.614 & \bfseries 0.635 & 0.623 & 0.426 & 0.319 & 0.295 & 0.352 & 0.596 \\ 
- & 8 & 0.451 & 0.516 & 0.518 & 0.542 & 0.509 & 0.474 & 0.324 & 0.314 & \bfseries 0.551 \\ 
- & 16 & 0.361 & 0.443 & \bfseries 0.473 & 0.454 & 0.436 & 0.449 & 0.384 & 0.405 & 0.464 \\ 
-TCP & 2 & 0.251 & \bfseries 0.357 & 0.320 & 0.138 & 0.109 & 0.170 & 0.168 & 0.156 & 0.104 \\ 
- & 4 & 0.327 & \bfseries 0.364 & 0.302 & 0.345 & 0.121 & 0.145 & 0.201 & 0.181 & 0.170 \\ 
- & 8 & 0.301 & \bfseries 0.369 & 0.285 & 0.290 & 0.221 & 0.182 & 0.148 & 0.153 & 0.280 \\ 
- & 16 & 0.268 & \bfseries 0.307 & 0.285 & 0.260 & 0.210 & 0.152 & 0.121 & 0.135 & 0.073 \\ 
+\begin{tabular}{@{}ccSSSSSSSSSSS@{}}
+\toprule\multicolumn{1}{c}{Traffic} & \multicolumn{1}{c}{$n$} & \multicolumn{1}{c}{Marl} & \multicolumn{5}{c}{Marl++} & \multicolumn{5}{c}{SPF} \\
+\cmidrule(lr){4-8}\cmidrule(lr){9-13}  & & & \multicolumn{1}{c}{Capped} & \multicolumn{1}{c}{Uncapped} & \multicolumn{1}{c}{Banded} & \multicolumn{1}{c}{Single} & \multicolumn{1}{c}{Pretrain} & \multicolumn{1}{c}{Capped} & \multicolumn{1}{c}{Uncapped} & \multicolumn{1}{c}{Banded} & \multicolumn{1}{c}{Single} & \multicolumn{1}{c}{Pretrain} \\ \midrule
+UDP & 2 & 0.609 & \bfseries 0.778 & 0.728 & 0.616 & 0.336 & \multicolumn{1}{c}{---} & 0.394 & 0.450 & 0.312 & 0.666 & \multicolumn{1}{c}{---} \\ 
+ & 4 & 0.502 & 0.614 & \bfseries 0.635 & 0.623 & 0.426 & \multicolumn{1}{c}{---} & 0.319 & 0.295 & 0.352 & 0.596 & \multicolumn{1}{c}{---} \\ 
+ & 8 & 0.451 & 0.516 & 0.518 & 0.542 & 0.509 & \multicolumn{1}{c}{---} & 0.474 & 0.324 & 0.314 & \bfseries 0.551 & \multicolumn{1}{c}{---} \\ 
+ & 16 & 0.361 & 0.443 & \bfseries 0.473 & 0.454 & 0.436 & \multicolumn{1}{c}{---} & 0.449 & 0.384 & 0.405 & 0.464 & \multicolumn{1}{c}{---} \\ 
+TCP & 2 & 0.251 & \bfseries 0.357 & 0.320 & 0.138 & 0.109 & 0.343 & 0.170 & 0.168 & 0.156 & 0.104 & \multicolumn{1}{c}{---} \\ 
+ & 4 & 0.327 & 0.364 & 0.302 & 0.345 & 0.121 & \bfseries 0.398 & 0.145 & 0.201 & 0.181 & 0.170 & \multicolumn{1}{c}{---} \\ 
+ & 8 & 0.301 & 0.369 & 0.285 & 0.290 & 0.221 & \bfseries 0.439 & 0.182 & 0.148 & 0.153 & 0.280 & \multicolumn{1}{c}{---} \\ 
+ & 16 & 0.268 & \bfseries 0.307 & 0.285 & 0.260 & 0.210 & 0.281 & 0.152 & 0.121 & 0.135 & 0.073 & \multicolumn{1}{c}{---} \\ 
 \bottomrule
 \end{tabular}
