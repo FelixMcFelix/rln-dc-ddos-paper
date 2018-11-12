@@ -49,6 +49,10 @@ set boxwidth 1
 unset key
 set pointsize 0.1
 
+stats '../results/baseline-2-avg-ng.csv' u 3
+set arrow from -1.0,STATS_up_quartile to 23.0,STATS_up_quartile nohead ls 1 dt "-" lc rgb '#77000004' 
+set arrow from -1.0,STATS_lo_quartile to 23.0,STATS_lo_quartile nohead ls 1 dt "-" lc rgb '#77000004' 
+
 plot '../results/baseline-2-avg-ng.csv' u (0.0):3:(1.0) ls 1 ps .1, \
      '../results/ft-tcp-cap-g-avg.csv' u (1.5):3:(1.0) ls 2 ps .1, \
      '../results/ft-tcp-cap-f0-avg.csv' u (3.0):3:(1.0) ls 3 ps .1, \
