@@ -1,10 +1,11 @@
 from collections import Counter
 import cPickle as pickle
+import csv
 import numpy as np
 
 results_dir = "../../results/"
 pickle_chooser = "tcp-combo-channel-prep-{}.pickle"
-out_file = "udp-action-f{}-{}.csv"
+out_file = "tcp-action-f{}-{}-{}.csv"
 
 restricts = [5, 6, 7]
 txrestricts = [a + 4 for a in restricts]
@@ -68,20 +69,44 @@ for n in ns:
 		mosts = []
 		means = []
 		avs = []
+		avm = []
 		for (p_set, (action_choices, a_vals)) in space.iteritems():
 			c = Counter(action_choices)
 			x_vals.append(p_set)
 			q = c.most_common(4)
-			print q
+			#print q
 			mosts.append(q[0][0])
 			means.append(np.median(action_choices))
+			avs.append(np.sum(a_vals, axis=0))
+			avm.append(np.mean(a_vals, axis=0))
 
-		nx = np.array(x_vals)
-		nmo = np.array(mosts)
-		nme = np.array(means)
+		order = np.argsort(x_vals)
+		nx = np.array(x_vals)[order]
+		nmo = np.array(mosts)[order]
+		nme = np.array(means)[order]
+		avso = np.array(avs)[order]
+		avmo = np.array(avm)[order]
 
-		order = np.argsort(nx)
+		#print "n={}, feat={}, most_ac={}".format(n, i, nmo)
+		#print "mean_ac={}".format(nme)
+		#print "sum_policy={}".format(avso)
+		#print "mean_policy={}".format(avmo)
 
-		print "n={}, feat={}, most_ac={}".format(n, i, nmo[order])
-		print "mean_ac={}".format(nme[order])
-		#print ""
+		things = [
+			("mode-a", nmo, False),
+			("mean-a", nme, False),
+			("sum-p", avso, True),
+			("mean-p", avmo, True),
+		]
+
+		f_no = restricts[i]
+		for (name, data, is_matrix) in things:
+			print data.shape
+			with open(results_dir + out_file.format(f_no, n, name), "wb") as of:
+				writ = csv.writer(of)
+				rest_header = [str(i) for i in xrange(data.shape[1])] if is_matrix else ["action"]
+				writ.writerow(["#x"] + rest_header)
+				for row in data:
+					if not is_matrix:
+						row = [row]
+					writ.writerow(row)
