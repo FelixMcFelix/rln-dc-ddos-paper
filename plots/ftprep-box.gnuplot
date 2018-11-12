@@ -49,7 +49,12 @@ set boxwidth 1
 unset key
 set pointsize 0.1
 
+stats '../results/baseline-2-avg.csv' u 3
+set arrow from -1.0,STATS_up_quartile to 23.0,STATS_up_quartile nohead ls 1 dt "-" lc rgb '#77352a87'
+set arrow from -1.0,STATS_lo_quartile to 23.0,STATS_lo_quartile nohead ls 1 dt "-" lc rgb '#77352a87'
+
 plot '../results/baseline-2-avg.csv' u (0.0):3:(1.0) ls 1, \
+     '../results/baseline-2-avg.csv' u (0.0):3:(1.0) ls 1, \
      '../results/ft-g-avg.csv' u (1.5):3:(1.0) ls 2, \
      '../results/ft-f0-avg.csv' u (3.0):3:(1.0) ls 3, \
      '../results/ft-f1-avg.csv' u (4.5):3:(1.0) ls 4, \
