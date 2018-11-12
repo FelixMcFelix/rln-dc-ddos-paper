@@ -747,7 +747,8 @@ def marlExperiment(
 				if len(state) == 0:
 					action = default_machine_state
 				else:
-					(_, action) = state
+					((_svec, action), machine) = state
+					action = machine.action()
 				a = action if override_action is None else override_action
 				tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 				updateUpstreamRoute(node, ac_prob=tx_ac)
@@ -1708,7 +1709,10 @@ def marlExperiment(
 					else:
 						prev_state = learner_traces[l_index]
 						if prev_state == {}:
-							prev_state = sarsa.last_act
+							machine = AcTrans()
+							prev_state = (sarsa.last_act, machine)
+
+						(last_act, machine) = prev_state
 
 						# Start time of action computation
 						s_t = time.time()
@@ -1717,8 +1721,9 @@ def marlExperiment(
 						state = sarsa.to_state(np.array(state_vec))
 
 						# Learn!
-						target_sarsa.update(state, reward, prev_state)
-						learner_traces[l_index] = target_sarsa.last_act
+						target_sarsa.update(state, reward, last_act)
+						machine.move(sarsa.last_act[1])
+						learner_traces[l_index] = (sarsa.last_act, machine)
 
 						# End time.
 						e_t = time.time()
