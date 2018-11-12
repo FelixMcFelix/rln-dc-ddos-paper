@@ -44,7 +44,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, h_p):
 		reward_direction = "out",
 		randomise = True,
 		randomise_count = 3,
-t
+
 		randomise_new_ip = True,
 
 		estimate_const_limit = True,
