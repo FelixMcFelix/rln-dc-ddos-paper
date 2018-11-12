@@ -1,4 +1,4 @@
-set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}' createstyle
+set terminal tikz standalone color size 12cm,7.5cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}' createstyle
 set output "ftprep-tcp-cap-box.tex"
 
 #load "parula.pal"
@@ -26,44 +26,44 @@ set datafile separator ","
 set ylabel "Ratio Legit Traffic Preserved"
 
 set yrange [0.0:1.0]
-set xrange [-1.0:15.5]
+set xrange [-1.0:23.0]
 set xtics ("Baseline" 0.0, \
-	"4 $\\cdot{}$ Load" 1.1, \
-	"IP" 2.2, \
-	"Last Action" 3.3, \
-	"Duration" 4.4, \
-	"Baseline" 5.5, \
-	"Correspondence Ratio" 6.6, \
-	"Mean IAT" 7.7, \
-	"$\\Delta$ In Rate" 8.8, \
-	"$\\Delta$ Out Rate" 9.9, \
-	"Packets In" 11.0, \
-	"Packets Out" 12.1, \
-	"Packets In Window" 13.2, \
-	"Packets Out Window" 14.3, \
-	"Mean In Packet Size" 15.4, \
-	"Mean Out Packet Size" 16.5, \
+	"Global" 1.5, \
+	"IP" 3.0, \
+	"Last Action" 4.5, \
+	"Duration" 6.0, \
+	"Baseline" 7.5, \
+	"$C_X$" 9.0, \
+	"Mean IAT" 10.5, \
+	"$\\Delta$ In Rate" 12.0, \
+	"$\\Delta$ Out Rate" 13.5, \
+	"Packets In" 15.0, \
+	"Packets Out" 16.5, \
+	"InPkts (Window)" 18.0, \
+	"OutPkts (Window)" 19.5, \
+	"Mean InPkt Size" 21.0, \
+	"Mean OutPkt Size" 22.5, \
 	) scale 0.0
 #set key inside bottom right
 set boxwidth 1
 unset key
 set pointsize 0.1
 
-plot '../results/baseline-2-avg-ng.csv' u (0.0):3:(1.0) ps .1, \
-     '../results/ft-tcp-cap-g-avg.csv' u (1.1):3:(1.0) ls 2 ps .1, \
-     '../results/ft-tcp-cap-f0-avg.csv' u (2.2):3:(1.0) ls 3 ps .1, \
-     '../results/ft-tcp-cap-f1-avg.csv' u (3.3):3:(1.0) ls 4 ps .1, \
-     '../results/ft-tcp-cap-f2-avg.csv' u (4.4):3:(1.0) ls 5 ps .1, \
-     '../results/ft-tcp-cap-f3-avg.csv' u (5.5):3:(1.0) ls 6 ps .1, \
-     '../results/ft-tcp-cap-f4-avg.csv' u (6.6):3:(1.0) ls 7 ps .1, \
-     '../results/ft-tcp-cap-f5-avg.csv' u (7.7):3:(1.0) ls 8 ps .1, \
-     '../results/ft-tcp-cap-f6-avg.csv' u (8.8):3:(1.0) ls 2 ps .1, \
-     '../results/ft-tcp-cap-f7-avg.csv' u (9.9):3:(1.0) ls 3 ps .1, \
-     '../results/ft-tcp-cap-f8-avg.csv' u (11.0):3:(1.0) ls 4 ps .1, \
-     '../results/ft-tcp-cap-f9-avg.csv' u (12.1):3:(1.0) ls 5 ps .1, \
-     '../results/ft-tcp-cap-f10-avg.csv' u (13.2):3:(1.0) ls 6 ps .1, \
-     '../results/ft-tcp-cap-f11-avg.csv' u (14.3):3:(1.0) ls 7 ps .1, \
-     '../results/ft-tcp-cap-f12-avg.csv' u (15.4):3:(1.0) ls 8 ps .1, \
-     '../results/ft-tcp-cap-f13-avg.csv' u (16.5):3:(1.0) ls 2 ps .1 
+plot '../results/baseline-2-avg-ng.csv' u (0.0):3:(1.0) ls 1 ps .1, \
+     '../results/ft-tcp-cap-g-avg.csv' u (1.5):3:(1.0) ls 2 ps .1, \
+     '../results/ft-tcp-cap-f0-avg.csv' u (3.0):3:(1.0) ls 3 ps .1, \
+     '../results/ft-tcp-cap-f1-avg.csv' u (4.5):3:(1.0) ls 4 ps .1, \
+     '../results/ft-tcp-cap-f2-avg.csv' u (6.0):3:(1.0) ls 5 ps .1, \
+     '../results/ft-tcp-cap-f3-avg.csv' u (7.5):3:(1.0) ls 6 ps .1, \
+     '../results/ft-tcp-cap-f4-avg.csv' u (9.0):3:(1.0) ls 7 ps .1, \
+     '../results/ft-tcp-cap-f5-avg.csv' u (10.5):3:(1.0) ls 8 ps .1, \
+     '../results/ft-tcp-cap-f6-avg.csv' u (12.0):3:(1.0) ls 2 ps .1, \
+     '../results/ft-tcp-cap-f7-avg.csv' u (13.5):3:(1.0) ls 3 ps .1, \
+     '../results/ft-tcp-cap-f8-avg.csv' u (15.0):3:(1.0) ls 4 ps .1, \
+     '../results/ft-tcp-cap-f9-avg.csv' u (16.5):3:(1.0) ls 5 ps .1, \
+     '../results/ft-tcp-cap-f10-avg.csv' u (18.0):3:(1.0) ls 6 ps .1, \
+     '../results/ft-tcp-cap-f11-avg.csv' u (19.5):3:(1.0) ls 7 ps .1, \
+     '../results/ft-tcp-cap-f12-avg.csv' u (21.0):3:(1.0) ls 8 ps .1, \
+     '../results/ft-tcp-cap-f13-avg.csv' u (22.5):3:(1.0) ls 2 ps .1 
 
 set out
