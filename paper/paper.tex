@@ -996,7 +996,7 @@ Test system specifications match those given in \cref{sec:performance-in-an-emul
 \end{figure}
 
 Across all choices of $n$, we see that Marl++ exhibits reduced collateral damage compared to Marl, with SPF starting poorly yet becoming more effective for larger $n$ (\cref{tab:av-vals}, \emph{Capped}, UDP).
-\Cref{fig:udp-2,fig:udp-16} show the behaviour for $n \in \{2, 16\}$ in detail---the remaining choices of $n$ interpolate between these extremes, with the performance difference between Marl and Marl++ shrinking as $n$ increases.
+\Cref{fig:udp-16} shows the behaviour for all choices of $n$ at a high level---specifically, we see that Marl++ typically remains ahead of Marl, though this performance difference shrinks as $n$ increases.
 
 \subsection{Congestion-aware traffic}
 %\begin{figure}
@@ -1036,7 +1036,7 @@ Across all choices of $n$, we see that Marl++ exhibits reduced collateral damage
 
 Marl++ consistently allows more legitimate traffic to reach its destination than Marl, with both significantly above the baseline (\cref{tab:av-vals}, \emph{Capped}, TCP).
 SPF performs consistently poorly across all choices of $n$.
-\Cref{fig:tcp-2,fig:tcp-16} show two endpoints of a trend in our results: for larger $n$, Marl++ requires around twice as long as Marl to learn its best-achieving policy, underperforming for this period, but achieves notably better peak performance.
+\Cref{fig:tcp-16} shows a trend in our results: for larger $n$, Marl++ requires around twice as long as Marl to learn its best-achieving policy, underperforming for this period, but achieves notably better peak and average performance.
 
 \subsection{Banded rewards and negative reinforcement}
 In general, we find that explicitly training a policy to keep the system in a valid state via negative reinforcement (i.e., an \emph{uncapped} network) is most effective for UDP-like traffic with Marl++.
@@ -1095,20 +1095,23 @@ Furthermore, system state which is dependent on many signals drawn from across a
 These signals' topological separation, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
 
 \fakepara{Real-world Deployment}
-Currently, we assume that switches support an extension to OpenFlow to enable remotely installable packet-drop rules, either by running a modified version of OVS on commodity hardware at these locations or through custom firmware for one of these particular egress switch.
+Currently, we assume that switches support an extension to OpenFlow to enable remotely installable packet-drop rules, either by running a modified version of OVS on commodity hardware at these locations or through custom firmware for egress switches.
 Similar functionality could be employed by making use of OpenFlow's meter rules.
-As far as footprints are concerned, although the state space sizes guarantee that a Marl policy remains under \SI{427}{\kibi\byte}, in practice our sparse representation typically leads to far smaller policies---\SIrange{100}{120}{\kibi\byte} from our experiments.
-Beyond this, we require that egress switches are capable of co-hosting an agent (i.e., through \emph{network function virtualisation}, with the necessary statement.)
+
+Where overheads are concerned, the state space sizes guarantee that a Marl policy remains under \SI{427}{\kibi\byte}, although in practice our sparse representation typically leads to far smaller policies---\SIrange{100}{120}{\kibi\byte} from our experiments.
+Beyond this, we require that egress switches are capable of co-hosting an agent (i.e., through \emph{network function virtualisation}), with the necessary hardware to support this choice.
+We believe that it may be possible to implement similar behaviour through application of programmable data planes.
+
 %?? Incorrect, pickling...
 %?? deployment/system guidelines, architecture, and overhead/footprint of doing this
 %?? Mention: probably fewer state measurements than in our emulations, but longer measurements means less noisy (so probably more accurate)
-A real world deployment would be unable to gather and transmit load/flow statistics quite as often as we can in an emulated environment, without inadvertently affecting client traffic.
-However, the measurements acquired in such a scenario are far more likely to be less noisy (by drawing state over longer periods of time), and so could greatly aid effective training.
-We do not forsee this overly harming training.
+Gathering and transmission of load/flow statistics would be difficult to perform quite as often as we can in an emulated environment, without inadvertently affecting host traffic.
+However, the measurements acquired in such a scenario are far more likely to be less noisy (by being drawn over longer periods of time), which could aid effective training.
+The main bottlenecks are most likely in forwarding the load measurements from various aggregation points (which can be made more efficient by way of multicast) and in running some estimator to condition the reward function upon.
 %?? Potential for dividing up pre-feature training across different agents, or train like this locally (sets of flows trained by 1 sub-model).
-
 %?? Different global state per-agent? Seems this must be locally trained, just make it (everything up the chain to key destinations).
-For non-tree-structured topologies, we each a
+We expect that agents will be able to share policies for all fields except global state, which may help to offset the reduced rate of incoming experience.
+Regardless, it will take longer to achieve enough experience to converge on a good policy.
 
 \section{Related Work}\label{sec:related-work}
 
