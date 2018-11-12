@@ -100,8 +100,8 @@ uniquelist=false]{biblatex}
 	linkcolor=black,
 	urlcolor=black,
 	pdftitle={\mytitle{}},
-%	pdfauthor={Kyle A. Simpson, Dimitrios P. Pezaros}
-	pdfauthor={Anonymous Giraffe and Badger}
+%	pdfauthor={Kyle A. Simpson, Dimitrios P. Pezaros, Simon D. Rogers}
+	pdfauthor={Anonymous Giraffe, Anonymous Badger, Anonymous Ibex}
 }
 \newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
 
@@ -169,11 +169,14 @@ uniquelist=false]{biblatex}
 \title{\mytitle{}}
 \author{
 %	Kyle A.\ Simpson\thanks{This work was supported by the Engineering and Physical Sciences Research Council [grant number EP/M508056/1].},
-%	Dimitrios P.\ Pezaros\\
+%	Kyle A.\ Simpson,
+%	Dimitrios P.\ Pezaros,
+%   Simon D.\ Rogers\\
 %	University of Glasgow, Glasgow, Scotland,\\
 %	\email{k.simpson.1@research.gla.ac.uk}
 Anonymous Giraffe,
-Anonymous Badger\\
+Anonymous Badger,
+Anonymous Ibex\\
 Unnamed Department, Nowhere\\
 \email{giraffe.a@unnamed.com}
 }
@@ -211,7 +214,7 @@ Attacks and anomalous behaviours evolve, becoming more sophisticated or employin
 These attacks and anomalies have measurable consequences and symptoms which allow a skilled analyst to infer new signatures for detection by misuse-based classifiers, but unseen attacks may only be defended against after-the-fact.
 This issue is inherent to \emph{misuse-} or \emph{signature-based} intrusion detectors, and it has been long-hoped that \emph{anomaly-based} detectors would surpass this by making effective use of statistical measures \cite{DBLP:journals/comsur/BhuyanBK14}.
 
-While \emph{machine learning} (ML) approaches seem like a sensible fit for this problem, in \citeyear{DBLP:conf/sp/SommerP10} \citeauthor{DBLP:conf/sp/SommerP10} identified the `failure to launch' of ML-based anomaly detection systems---to quite a large extent, this remains the case today \cite{DBLP:conf/sp/SommerP10}.
+While \emph{machine learning} (ML) approaches seem like a sensible fit for this problem, in \citeyear{DBLP:conf/sp/SommerP10} \citeauthor{DBLP:conf/sp/SommerP10} identified the `failure to launch' of ML-based anomaly detection systems, and to quite a large extent this remains the case today \cite{DBLP:conf/sp/SommerP10}.
 Their application is made difficult due to significant operational differences from standard ML tasks, alongside certain characteristics of network traffic.
 Briefly, these are the diversity of network traffic across varying timescales \cite{DBLP:conf/sp/SommerP10} and significant burstiness \cite{DBLP:journals/ccr/LelandWTW95}.
 Above the aggregate level, the constant deployment of new services and new protocols means that traffic is \emph{non-stationary} and displays an evolving notion of normality.
@@ -234,7 +237,7 @@ In service of this goal, this paper contributes:
 \begin{itemize}
 %	\item A DDoS mitigation system based on direct-control reinforcement learning, designed for deployment in real-world software-defined networks (\cref{sec:environment-and-rl-algorithm,sec:acting-on-individual-sources}).
 	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}. We offer a deconstruction and empirical study on their formulation, flaws, and risk factors concerning different traffic distributions---in addition, we demonstrate modifications enabling for deployment in real-world software-defined networks (\cref{sec:performance-in-an-emulated-environment}).
-	\item A reactive simulation of web-server traffic, designed to test system characteristics which packet trace playback fails to capture (\cref{sec:a-new-normal}).
+	\item A reactive simulation of web-server traffic, designed to test system characteristics that packet trace playback fails to capture (\cref{sec:a-new-normal}).
 	\item An in-depth investigation into suitable features for an automatic DDoS mitigation system, with qualitative and quantitative justification (\cref{sec:rethinking-the-state-space}).
 	\item Two source-level granularity approaches to RL-driven DDoS prevention, improving upon past aggregate-based models (\cref{sec:acting-on-individual-sources}), alongside an empirical evaluation (\cref{sec:the-results-of-doing-so}).
 \end{itemize}
@@ -276,9 +279,9 @@ Actions with maximal value can be chosen each time (the \emph{greedy} policy), w
 
 This combination of algorithm and coding strategy is well-optimised.
 If $\operatorname{A}(s) = \mathcal{A}$ in every state (and actions are themselves discrete), these properties allow a particularly efficient (vectorised) implementation of the policy and update rules by storing a vector of action values for each state encountered.
-Action values for any state are then obtained by summation of the weight vectors from all activated tiles.
+Action values for any state are then obtained by summation of the weight vectors from all activated tiles---taking $|\mathcal{A}|(n_{\mathit{tilings}})$ floating point additions per decision.
 Observing that $\nabla{\acval{s}{a}{\wvec{}}} = \operatorname{\mathbf{x}}(s, a)$, further optimisations arise by considering that a tile-coded feature vector is a binary vector of constant Hamming weight (and so is amenable to representation as an array of indices, $s_{\mathit{list}}$).
-This means that we need only perform $n_{\mathit{tilings}}$ floating point additions per model update:
+This means that we need only perform $n_{\mathit{tilings}} + 2$ floating point additions and \num{2} multiplications per model update:
 \begin{equation}
 	\bm{w}_{t+1}[i][\operatorname{index}(A_t)] = \bm{w}_{t}[i][\operatorname{index}(A_t)] + \alpha \delta_t, \forall i \in s_{\mathit{list}}.
 	\label{eqn:sg-sarsa-opt}
@@ -770,6 +773,7 @@ We found the setting  $\gamma = 0.8$ to be the most effective choice for this hy
 \end{figure}
 
 \begin{figure}
+	\centering
 	\includegraphics[width=0.8\linewidth]{../plots/ftprep-good-2}
 	\caption{
 		Demonstration of learning rate for several features included as part of \cref{fig:udp-feature-plots}.
@@ -911,6 +915,7 @@ On the other hand, treating features individually allows us to reach a quick und
 \Cref{fig:udp-feature-plots} shows the effectiveness of each feature for UDP (resp.\ \cref{fig:tcp-feature-plots} for TCP), using a topology with $n=2$ hosts per egress point averaged over 10 episodes.
 %?? Core findings---different protocols need different features, so everything we proposed above has a use!
 The plots demonstrate that different protocols and traffic classes are best defended by different features---as such, every feature presented has value in a complete model.
+All features converge to their highest-observed performance within around \num{4000} timesteps: \cref{fig:udp-fp-converge} shows an example of this behaviour for differently performing features.
 In general, some of the most effective features are the global state, mean IAT, mean inbound packet size and $\Delta$ rates.
 %?? How do they do when combined after individual training? Pretty well, especially for TCP.
 Additional testing shows that the learned per-feature policies may be easily combined (by summing action values), and that this technique is particularly effective for TCP; these results are omitted to preserve space.
@@ -1070,7 +1075,10 @@ Paradoxically, Marl++ generally achieves the best performance yet actively suffe
 
 %?? May be hard to learn multiple features at once while controlling multiple flows while contending with many more agents, with harder dynamics like TCP. Does this hinder learning in the long run?
 Although we have improved upon Marl in both identified problem cases, the improvements are not quite on the order we'd expect, or hope for.
-We suspect that some of these difficulties originate from the competitive nature of learning that these models embody: agents are learning action values for multiple features simultaneously, taking many actions at once (making it harder to unpick the true value of each action), and controlling shared global state.
+%?? I don’t know if you want to also mention the problem of things getting “stuck” in locally optimal (but globally sub-optimal) policies. I think it’s fairly uncontroversial that an increase in state space would make this more likely. Also, the lack of discounting could play a large role (and more so as the state space becomes more complex…
+The most likely explanation is that agents are converging to, and becoming stuck in, locally optimal (but globally sub-optimal) policies.
+The increased state-space size makes this a more likely occurrence, as is the unclear affect of hyperparameters ($\alpha$, $\gamma$) as we scale up the state-space.
+We suspect that these difficulties may be exacerbated by the competitive nature of learning that these models embody: agents are learning action values for multiple features simultaneously, taking many actions at once (making it harder to unpick the true value of each action), and controlling shared global state.
 It may be worthwhile to extensively pre-train agents non-competitively on each feature using individual flows, to explore this hypothesis.
 
 %It is likely that the design of Marl++ 
@@ -1079,7 +1087,7 @@ It may be worthwhile to extensively pre-train agents non-competitively on each f
 Most importantly, what we wish to impart is the knowledge that while the models and techniques we present here are an improvement over past RL-based work, this work still trails behind existing (exact) DDoS flow detection mechanisms.
 Although we have conducted work to map the territory to some extent, there are still more advancements to be made before RL-based DDoS defence is truly competitive.
 The benefits we have at present are, however, substantial.
-What we offer above the alternate approaches we discussed in \cref{sec:related-work} are potentially more flexible deployments and the ability to adapt by design to changing network traffic characteristics, without requiring the network resources or capabilities that the most effective techniques rely upon.
+What we offer above the alternate approaches we discussed in \cref{sec:related-work} are potentially more flexible deployments and low-overhead decision-making, without requiring active measurement or the network resources and capabilities that the most effective techniques rely upon.
 
 \fakepara{Security concerns and vulnerability}
 Can an agent be flooded with new flows to reduce their ability to make decisions?
@@ -1099,6 +1107,9 @@ Currently, we assume that switches support an extension to OpenFlow to enable re
 Similar functionality could be employed by making use of OpenFlow's meter rules.
 
 Where overheads are concerned, the state space sizes guarantee that a Marl policy remains under \SI{427}{\kibi\byte}, although in practice our sparse representation typically leads to far smaller policies---\SIrange{100}{120}{\kibi\byte} from our experiments.
+As we have described earlier, action updates require a constant number of floating point operations---\num{122} floating point additions and \num{2} multiplications per update of $\wvec{}$, above the \num{140} additions required to choose an action.
+The vast majority of these operations can be vectorised trivially, if such hardware is present.
+Action computation for SPF is cheaper still, requiring only \num{42} additions per action required.
 Beyond this, we require that egress switches are capable of co-hosting an agent (i.e., through \emph{network function virtualisation}), with the necessary hardware to support this choice.
 We believe that it may be possible to implement similar behaviour through application of programmable data planes.
 
@@ -1169,9 +1180,6 @@ We have identified weaknesses in past approaches arising from simulation assumpt
 Supporting this, we've presented an in-depth examination of the design of our feature space, offering quantitative and qualitative justification for our choices.
 Our evaluation shows that our new agent designs advance the state-of-the-art in RL-based DDoS prevention.
 
-While this work still trails behind the performance of exact DDoS flow detection mechanisms, we hope it is clear that the reinforcement learning paradigm holds promise and can inspire further innovation.
-Yet even now, we offer advantages above these works, such as online adaptation and potentially more flexible deployment, without requiring many of the same network resources or capabilities that they rely upon.
-It's hoped that more research in this direction will open the door to works which \emph{respect the complexity of the network environment}; evolving topologies, natural change in traffic and protocol distributions, and the mutation of attacks.
 %(rather than na\"{i}ve simulation, blind ML applications etc.) and choose well-considered pathways to solution. \emph{Call-to-action}?
 
 %\section{Future Work}
@@ -1179,6 +1187,7 @@ It's hoped that more research in this direction will open the door to works whic
 %?? Future Work? I.e., \emph{everything}: no one else is really looking at/interested in this specific kind of application of RL yet. \emph{Yet}.
 
 %?? IDEA: try out average reward, TD($\lambda$) methods as future work...
+The extant weaknesses invite many further improvements worth investigation.
 A natural research direction to enhance this work would be the combination of the classic function approximation techniques we make use of alongside the improved algorithms that the RL community has introduced in the past few years.
 Actor-critic methods, or algorithms based on eligibility traces are good candidates for investigation. 
 
@@ -1204,9 +1213,14 @@ We also expect it will be fruitful to look into \emph{how} agents may share know
 Although we believe that the security landscape for classical RL models is not \emph{identical} to that of neural-network based approaches (particularly with such noisy, volatile, and hard-to-control data), there is still immense value in determining the exact capabilities of a sufficiently powerful adversary as the risk of external control still exists.
 In particular, we believe that poisoning attacks and evasion attacks merit close consideration.
 
+%While this work still trails behind the performance of exact DDoS flow detection mechanisms, w
+We hope it is clear that the reinforcement learning paradigm holds promise and can inspire further innovation.
+We still offer advantages above existing works, such as potentially more flexible deployment and automatically learned low-overhead decision-making, without requiring many of the same network resources or capabilities that they rely upon.
+It's hoped that more research in this direction will open the door to works which \emph{respect the complexity of the network environment}; evolving topologies, natural change in traffic and protocol distributions, and the mutation of attacks.
+
 \section*{Acknowledgements}
-%Our thanks go to Simon Rogers, Mircea Iordache, Qianru Zhou, Charles Rutherford, Marco Cook and Richard Cziva for their advice, comments and technical assistance.
-Our thanks go to Anonymous, Anonymous, Anonymous, Anonymous, Anonymous and Anonymous for their advice, comments and technical assistance.
+%Our thanks go to Mircea Iordache, Qianru Zhou, Charles Rutherford, Marco Cook and Richard Cziva for their advice, comments and technical assistance.
+Our thanks go to Anonymous, Anonymous, Anonymous, Anonymous and Anonymous for their advice, comments and technical assistance.
 %Additional thanks \emph{would} go out to my anonymous reviewers, had I any of them.
 This work was supported by a nameless funder [grant number 0].
 
