@@ -26,4 +26,6 @@ set key inside top right
 
 plot '../results/online-16-avg-ng.csv' u 1:3 w lines smooth sbezier title "MARL" dt 1, \
      '../results/m-tcp-natural-16' u 1:3 w lines smooth sbezier title "MARL++" ls 3 dt (18,2,2,2), \
-     '../results/spf-tcp-banded-16' u 1:3 w lines smooth sbezier title "SPF" ls 7 dt (6,2,2,2), \
+     '../results/spf-tcp-banded-16' u 1:3 w lines smooth sbezier title "SPF" ls 4 dt (6,2,2,2), \
+     '../results/tcp-combo-channel-16-avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Pretrain)" ls 6 dt (18,2), \
+     '../results/tcp-combo-16-avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Weird Pretrain)" ls 7 dt (6,2), \

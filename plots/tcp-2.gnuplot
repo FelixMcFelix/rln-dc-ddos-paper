@@ -26,7 +26,7 @@ set key inside top right
 
 plot '../results/online-2-avg-ng.csv' u 1:3 w lines smooth sbezier title "MARL" dt 1, \
      '../results/m-tcp-natural-2' u 1:3 w lines smooth sbezier title "MARL++" ls 3 dt (18,2,2,2), \
-     '../results/spf-tcp-banded-2' u 1:3 w lines smooth sbezier title "SPF" ls 7 dt (6,2,2,2), \
-     #'../results/m-tcp-single-2' u 1:3 w lines smooth sbezier title "MARL++ (Single Agent)" ls 5 dt (18,2), \
-     #'../results/m-tcp-uncap-2' u 1:3 w lines smooth sbezier title "MARL++ (Uncapped)" ls 6 dt (6,2), \
-     #'../results/tcp-combo-2-avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Pretrain)" ls 7 dt (2,2), \
+     '../results/spf-tcp-banded-2' u 1:3 w lines smooth sbezier title "SPF" ls 4 dt (6,2,2,2), \
+     '../results/tcp-combo-channel-2-avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Pretrain)" ls 6 dt (18,2), \
+     '../results/m-tcp-uncap-2' u 1:3 w lines smooth sbezier title "MARL++ (Weird Pretrain)" ls 7 dt (6,2), \
+     #'../results/tcp-combo-2-avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Weird Pretrain)" ls 7 dt (2,2), \
