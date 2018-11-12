@@ -1,4 +1,4 @@
-set terminal tikz standalone color size 12cm,7.5cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}' createstyle
+set terminal tikz standalone color size 10cm,6.67cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}' createstyle
 set output "ftprep-tcp-cap-box.tex"
 
 #load "parula.pal"
