@@ -29,6 +29,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, h_p):
 		rf = "ctl",
 		use_controller = True,
 		actions_target_flows = restrict is not None,
+		trs_maxtime = 0.001,
 
 		restrict = restrict,
 
@@ -79,12 +80,12 @@ if __name__ == "__main__":
 	# pickle has last experiment state...
 	start_i = 0
 	in_progress = len(sys.argv) > 2
+	things_to_pickle = []
 
 	if in_progress:
 		with open(in_progress_file_dir, "rb") as of:
 			(start_i, result_sets, things_to_pickle) = cPickle.load(of)
 
-	things_to_pickle = []
 
 	randstate = None
 	for i in xrange(start_i, start_i + n_episodes_per_step):

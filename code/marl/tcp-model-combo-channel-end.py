@@ -27,6 +27,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, contributo
 		rf = "ctl",
 		use_controller = True,
 		actions_target_flows = restrict is not None,
+		trs_maxtime = 0.001,
 
 		restrict = restrict,
 

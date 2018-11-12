@@ -3,7 +3,7 @@ from marl import *
 import sys
 from writer import writeResults, makeResultsAverage
 
-ft = __import__("udp-model-combo-channel-prep")
+ft = __import__("udp-spf-combo-channel-prep")
 
 def run(restrict, state, rewards, good_traffic_percents, total_loads, contributors=None, store_sarsas=[], ep_len=10000, h_p=2):
 	results = marlExperiment(
@@ -20,7 +20,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, contributo
 
 		alpha = 0.05,
 		epsilon = 0.2,
-		discount = 0,
+		discount = 0.8,
 
 		dt = 0.01,
 
@@ -48,6 +48,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, contributo
 		#randomise_new_ip = True,
 
 		estimate_const_limit = True,
+		spiffy_mode = True,
 	)
 
 	return results
@@ -91,8 +92,8 @@ if __name__ == "__main__":
 	# Now, write out the results!
 	for (target_results, start_fresh, config_name, ep_len) in configs:
 		(rs, gs, ls) = target_results
-		csv_dir = ft.results_dir + "udp-combo-channel-{}.csv".format(hosts_p)
-		avg_csv_dir = ft.results_dir + "udp-combo-channel-{}-avg.csv".format(hosts_p)
+		csv_dir = ft.results_dir + "udp-spf-combo-channel-{}.csv".format(hosts_p)
+		avg_csv_dir = ft.results_dir + "udp-spf-combo-channel-{}-avg.csv".format(hosts_p)
 
 		results = (rs, gs, ls, None, None, None)
 

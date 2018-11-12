@@ -19,7 +19,7 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, h_p):
 
 		alpha = 0.05,
 		epsilon = 0.2,
-		discount = 0,
+		discount = 0.8,
 
 
 		dt = 0.01,
@@ -40,12 +40,15 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, h_p):
 
 		evil_range = [4,7],
 		model = "nginx",
+		#submodel = "udp-flood",
 		reward_direction = "out",
 		randomise = True,
 		randomise_count = 3,
+t
 		randomise_new_ip = True,
 
 		estimate_const_limit = True,
+		spiffy_mode = True,
 	)
 
 	return results
@@ -55,8 +58,8 @@ def run(restrict, state, rewards, good_traffic_percents, total_loads, h_p):
 
 host_ps = [2, 4, 8, 16]
 results_dir = "../../results/"
-file_dir = results_dir + "tcp-combo-channel-prep-{}.pickle"
-in_progress_file_dir = results_dir + "tcp-combo-channel-prg-{}.pickle"
+file_dir = results_dir + "tcp-spf-combo-channel-prep-{}.pickle"
+in_progress_file_dir = results_dir + "tcp-spf-combo-channel-prg-{}.pickle"
 chosen_features = [
 	5, # Mean IAT
 	7, # Delta Out Rate
@@ -121,8 +124,8 @@ if __name__ == "__main__":
 
 	# Now, write out the results!
 	for ((rs, gs, ls), out_name) in zip(result_sets, out_names):
-		csv_dir = results_dir + "tcp-combo-channel-prep-{}-{}.csv".format(out_name, hosts_p)
-		avg_csv_dir = results_dir + "tcp-combo-channel-prep-{}-{}-avg.csv".format(out_name, hosts_p)
+		csv_dir = results_dir + "tcp-spf-combo-channel-prep-{}-{}.csv".format(out_name, hosts_p)
+		avg_csv_dir = results_dir + "tcp-spf-combo-channel-prep-{}-{}-avg.csv".format(out_name, hosts_p)
 
 		results = (rs, gs, ls, None, None, None)
 
