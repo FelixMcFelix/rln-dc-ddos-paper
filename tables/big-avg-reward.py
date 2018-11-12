@@ -11,11 +11,11 @@ variants = [
 	("uncap", None, "Uncapped"),
 	("banded", None, "Banded"),
 	("single", None, "Single"),
-	("channel", "../results/tcp-combo-{2}-{3}.csv", "Pretrain"),
+	("channel", "../results/{1}-combo-{2}-{3}.csv", "Pretrain"),
 ]
 
 illegal_combos = set()
-illegal_combos.add(("m", "udp", "channel"))
+# illegal_combos.add(("m", "udp", "channel"))
 illegal_combos.add(("spf", "udp", "channel"))
 illegal_combos.add(("spf", "tcp", "channel"))
 
