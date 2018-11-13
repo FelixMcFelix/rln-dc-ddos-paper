@@ -16,7 +16,8 @@ set label textcolor rgb "black"
 set border 3
 #set grid y
 set xtics nomirror
-#set xtics rotate by -45
+set xtics offset 2,0
+set xtics (0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 set ytics nomirror
 
 #set key autotitle columnhead
@@ -24,11 +25,17 @@ set datafile separator ","
 
 set xlabel "Action"
 set ylabel "Mean IAT ($\\si{\milli\second}$)"
+set cblabel "Value"
 
-#set yrange [0.0:1.0]
-#set xrange [-1.0:23.0]
+set yrange [0.0:10000.0]
+set xrange [0.0:10.0]
 #set key inside bottom right
 
-plot '../results/tcp-action-f5-16-mean-p.csv' matrix u 1:2:3 every ::2 with image pixels notitle
+set log cb
+
+xs(x) = x - .5
+ys(y) = y * (10000.0 / 50.0)
+
+plot '../results/tcp-action-f5-16-mean-p.csv' matrix u (xs($1)):(ys($2)):3 every ::1 with image pixels notitle
 
 set out
