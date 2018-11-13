@@ -106,7 +106,7 @@ for n in ns:
 				writ = csv.writer(of)
 				rest_header = [str(i) for i in xrange(data.shape[1])] if is_matrix else ["action"]
 				writ.writerow(["#x"] + rest_header)
-				for row in data:
+				for j, row in enumerate(data):
 					if not is_matrix:
 						row = [row]
-					writ.writerow(row)
+					writ.writerow([nx[j]] + list(row))
