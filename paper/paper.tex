@@ -1150,6 +1150,7 @@ This removes the guarantee that all flows will be visited fairly often, but if u
 		Mean Marl action values from pre-training on mean IATs ($n=16$).
 		As these are mean values, lighter cells in each row indicate actions \emph{likely} to be taken by an agent's policy.
 		Repeated values originate from the bias tile, which is always active, and indicate regions of the state-space which have yet to be visited---here, this is most of the state space.
+		Agents visibly learn action values for tiles which override the default bias tile's preferences.
 		The measured effectiveness of this feature then suggests that a low-resolution coding over the standard region may, in fact, be a better choice.
 		We see that agents prefer to choose $p=0.0$ in most states, but higher $p$ when IATs are particularly small.
 		\label{fig:intern-16-tcp-iat}
@@ -1162,7 +1163,7 @@ This removes the guarantee that all flows will be visited fairly often, but if u
 	
 	\caption{
 		Mean Marl action values from pre-training on $\Delta$ out rates ($n=4$).
-		A sudden ramp-up of server-to-host traffic is used as a strong indicator of flow legitimacy, while more punishing actions have comparatively higher value as $n$ decreases.
+		A sudden ramp-up of server-to-host traffic is used as a strong indicator of flow legitimacy, while more punishing actions have comparatively higher value as $\Delta$ out rate decreases.
 		Furthermore, we see again that a region of the state space has gone somewhat unexplored---we observed after plotting this visualisation that many decreases in this feature are too small to hit the adjacent tile, which implies a mixed-resolution coding may improve an agent's policy further.
 		\label{fig:intern-16-tcp-something}
 	}
