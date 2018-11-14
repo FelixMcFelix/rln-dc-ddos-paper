@@ -1102,7 +1102,7 @@ We discuss our conjectures for why this reversal occurs in \cref{sec:discussion}
 To investigate the effects of pre-training individual features, we chose our four best-performing features (global state, mean IAT, $\Delta$ in/out rates) and trained each over \num{10000} iterations, before evaluating the policy obtained by summing the action values suggested by each.
 This may be achieved in a real network by randomly assigning new hosts to be controlled exclusively by one feature's policy, allowing agents to more easily learn \emph{which} information led to the correct action being taken.
 To reflect this (and train all parts of an agent in the same time frame), we reduce the timestep length to \SI{10}{\milli\second} to train each agent in less wall-clock time, at the cost of noisier data (and reduced learning rate).
-The results show no real change for Marl++, but a considerable gain for SPF (though smaller than a single learner).
+The results show little change for Marl++, but generally indicate a considerable gain for SPF (though smaller than what we'd measured for a single agent system).
 %It's most likely that SPF is sensitive to noisy data when trying to learn how to act on TCP, and that as the different protocols did in \cref{fig:udp-feature-plots,fig:tcp-cap-feature-plots}, Marl++ and SPF have different optimal feature sets for different traffic behaviours---many of which may have been excluded.
 
 \section{Discussion}\label{sec:discussion}
