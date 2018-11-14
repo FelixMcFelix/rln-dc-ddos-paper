@@ -261,7 +261,7 @@ What approaches do exist are aimed towards the task of adaptive online DDoS miti
 We find that the existing work for this task fails to account for congestion-aware traffic (i.e., TCP) and deployment environments with high host density per egress point, achieving poor results due to an overly coarse view of the network.
 The approach we identify to remedy this is to make throttling decisions on a per-source basis, and we present the engineering decisions this mandates: updating RL agents from multiple traces per timestep, timed random sequential action computation and a supporting SDN architecture.
 In tandem with the development and evaluation of an effective state-space and model, we provide the design of a second model inspired by past work on algorithmic DDoS prevention, as an example of the integration of domain-specific knowledge.
-We find that this our per-source decisions improve substantially upon the state-of-the-art, and observe that our second model achieves excellent performance for large $n$.
+Our introduction of per-source decisions improves substantially upon the state-of-the-art, and we show that our second model achieves excellent performance for large $n$.
 Crucially, both models remain protocol- and content-agnostic to offer future-proofing against the rollout of future protocols like QUIC \cite{DBLP:conf/sigcomm/LangleyRWVKZYKS17}.
 %?? Also algorithmic enhancements such as multiple actions per timestep, 
 %?? PROTOCOL-AGNOSTIC -- HOW WILL THESE THINGS COPE WITH QUIC ET AL.?!?!
@@ -1098,7 +1098,7 @@ Curiously, we observe that this often leads to drastically worse policies when u
 Single-agent SPF almost consistently outperforms Marl.
 We discuss our conjectures for why this reversal occurs in \cref{sec:discussion}.
 
-\subsection{Per-feature pretraining}
+\subsection{Per-feature pre-training}
 To investigate the effects of pre-training individual features, we chose our four best-performing features (global state, mean IAT, $\Delta$ in/out rates) and trained each over \num{10000} iterations, before evaluating the policy obtained by summing the action values suggested by each.
 This may be achieved in a real network by randomly assigning new hosts to be controlled exclusively by one feature's policy, allowing agents to more easily learn \emph{which} information led to the correct action being taken.
 To reflect this (and train all parts of an agent in the same time frame), we reduce the timestep length to \SI{10}{\milli\second} to train each agent in less wall-clock time, at the cost of noisier data (and reduced learning rate).
@@ -1147,7 +1147,7 @@ This removes the guarantee that all flows will be visited fairly often, but if u
 	\includegraphics[width=0.9\linewidth]{../plots/policy-16-tcp-f5-mean-log}
 	
 	\caption{
-		Mean Marl action values from pretraining on mean IATs ($n=16$).
+		Mean Marl action values from pre-training on mean IATs ($n=16$).
 		As these are mean values, lighter cells in each row indicate actions \emph{likely} to be taken by an agent's policy.
 		Repeated values originate from the bias tile, which is always active, and indicate regions of the state-space which have yet to be visited---here, this is most of the state space.
 		The measured effectiveness of this feature then suggests that a low-resolution coding over the standard region may, in fact, be a better choice.
@@ -1161,7 +1161,7 @@ This removes the guarantee that all flows will be visited fairly often, but if u
 	\includegraphics[width=0.9\linewidth]{../plots/policy-4-tcp-f7-mean}
 	
 	\caption{
-		Mean Marl action values from pretraining on $\Delta$ out rates ($n=4$).
+		Mean Marl action values from pre-training on $\Delta$ out rates ($n=4$).
 		A sudden ramp-up of server-to-host traffic is used as a strong indicator of flow legitimacy, while more punishing actions have comparatively higher value as $n$ decreases.
 		Furthermore, we see again that a region of the state space has gone somewhat unexplored---we observed after plotting this visualisation that many decreases in this feature are too small to hit the adjacent tile, which implies a mixed-resolution coding may improve an agent's policy further.
 		\label{fig:intern-16-tcp-something}
