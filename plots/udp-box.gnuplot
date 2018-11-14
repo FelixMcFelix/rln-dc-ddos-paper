@@ -28,22 +28,27 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 set xrange [-1.0:14.5]
 set xtics ("Marl" 0.0, \
-	"Marl++ ($n=2$)" 1.0, \
+	"Marl++" 1.0, \
 	"SPF" 2.0, \
 	"Marl" 4.0, \
-	"Marl++ ($n=4$)" 5.0, \
+	"Marl++" 5.0, \
 	"SPF" 6.0, \
 	"Marl" 8.0, \
-	"Marl++ ($n=8$)" 9.0, \
+	"Marl++" 9.0, \
 	"SPF" 10.0, \
 	"Marl" 12.0, \
-	"Marl++ ($n=16$)" 13.0, \
+	"Marl++" 13.0, \
 	"SPF" 14.0, \
 	) scale 0.0
 #set key inside bottom right
 set boxwidth 1
 unset key
 set pointsize 0.1
+
+set label "$n=2$" at graph 0.06,-0.22
+set label "$n=4$" at graph 0.317,-0.22
+set label "$n=8$" at graph 0.573,-0.22
+set label "$n=16$" at graph 0.83,-0.22
 
 plot '../results/online-2-avg.csv' u (0.0):3:(1.0) ls 1 ps .1, \
      '../results/m-udp-natural-2' u (1.0):3:(1.0) ls 1 ps .1, \
