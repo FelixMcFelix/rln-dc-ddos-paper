@@ -253,19 +253,25 @@ The intent is to augment what existing misuse-based solutions can provide, by au
 
 To date, there have been few applications of this class of algorithms towards intrusion detection and prevention which make use of their full potential for online control, rather than using them as the basis for a classifier.
 We aim to take steps to redress this and establish their proper capabilities, beyond simple ``blind application''.
+%?? Expand as required
+What approaches do exist are aimed towards the task of adaptive online DDoS mitigation, and rely upon learning control of probabilistic packet drop.
+%?? THAT IS A MAJOR CONTRIB, MENTION IT EVERYWHERE YOU CAN
 
-?? Expand as required
-
-?? PROTOCOL-AGNOSTIC -- HOW WILL THESE THINGS COPE WITH QUIC ET AL.?!?!
-?? THAT IS A MAJOR CONTRIB, MENTION IT EVERYWHERE YOU CAN
-
-In service of this goal, this paper contributes:
+%?? Discuss the most important conclusions before the outline.
+We find that the existing work for this task fails to account for congestion-aware traffic (i.e., TCP) and deployment environments with high host density per egress point, achieving poor results due to an overly coarse view of the network.
+The approach we identify to remedy this is to make throttling decisions on a per-source basis, and we present the engineering decisions this mandates: updating RL agents from multiple traces per timestep, timed random sequential action computation and a supporting SDN architecture.
+In tandem with the development and evaluation of an effective state-space and model, we provide the design of a second model inspired by past work on algorithmic DDoS prevention, as an example of the integration of domain-specific knowledge.
+We find that this our per-source decisions improve substantially upon the state-of-the-art, and observe that our second model achieves excellent performance for large $n$.
+Crucially, both models remain protocol- and content-agnostic to offer future-proofing against the rollout of future protocols like QUIC \cite{DBLP:conf/sigcomm/LangleyRWVKZYKS17}.
+%?? Also algorithmic enhancements such as multiple actions per timestep, 
+%?? PROTOCOL-AGNOSTIC -- HOW WILL THESE THINGS COPE WITH QUIC ET AL.?!?!
+Briefly, this paper contributes:
 \begin{itemize}
 %	\item A DDoS mitigation system based on direct-control reinforcement learning, designed for deployment in real-world software-defined networks (\cref{sec:environment-and-rl-algorithm,sec:acting-on-individual-sources}).
 	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}. We offer a deconstruction and empirical study on their formulation, flaws, and risk factors concerning different traffic distributions---in addition, we demonstrate modifications enabling deployment in real-world software-defined networks (\cref{sec:performance-in-an-emulated-environment}).
 	\item A reactive simulation of web-server traffic, designed to test system characteristics that packet trace playback fails to capture (\cref{sec:a-new-normal}).
 	\item An in-depth investigation into suitable features for an automatic DDoS mitigation system, with qualitative and quantitative justification (\cref{sec:rethinking-the-state-space}).
-	\item Two source-level granularity approaches to RL-driven DDoS prevention, improving upon past aggregate-based models (\cref{sec:acting-on-individual-sources}), alongside an empirical evaluation (\cref{sec:the-results-of-doing-so}).
+	\item Two source-level granularity approaches to RL-driven DDoS prevention (\emph{Marl++}, \emph{SPF}), improving upon past aggregate-based models (\cref{sec:acting-on-individual-sources}), alongside an empirical evaluation (\cref{sec:the-results-of-doing-so}) and discussion of security concerns and real-world deployment (\cref{sec:discussion}).
 \end{itemize}
 
 \section{Background and Threat Model}
@@ -407,7 +413,7 @@ All links have unbounded capacity, save for the server-switch connection which i
 
 \begin{figure}
 \centering
-\resizebox{\linewidth}{!}{
+\resizebox{0.9\linewidth}{!}{
 				\begin{tikzpicture}[
 texts/.style = {text=black},
 labeltexts/.style = {text=uofgsandstone},
@@ -492,6 +498,7 @@ We employ the reward functions introduced by \textcite{DBLP:journals/eaai/Malial
 These assume the presence of a classifier, $g(\cdot)$, which estimates the volume of `legitimate traffic' received at any point in the network.
 At time $t$, an agent $v$ (with team leader $l_v$) receives either $R_{t}^{\mathit{Global}}$ or $R_{t}^{\mathit{CTL}}$:
 \begin{subequations}
+	\vspace{-0.5cm}
 \newcommand{\cond}[2]{\operatorname{c}_{#1,t}#2}
 \newcommand{\load}[1]{\operatorname{load}_{t}(#1)}
 \begin{gather}
@@ -546,7 +553,8 @@ Host allocations were generated pseudorandomly to ensure fairness between choice
 These parameter choices match those of the original study to enable direct comparison, and are (to the best of our knowledge) arbitrary, but we justify our range of $n$ as capturing increasing scales of host activity.
 
 \begin{figure}
-	\includegraphics[width=\linewidth]{../plots/online-varyN-binary}
+	\centering
+	\includegraphics[width=0.90\linewidth]{../plots/online-varyN-binary}
 	\caption{
 		MARL pushback control system performance plotted over time for various settings of $n$ hosts per agent.
 		This plot shows that, from the perspective of benign hosts, service guarantees degrade as inference and actions become less granular.
@@ -571,7 +579,7 @@ Defining \emph{imperfect service} to mean any case where all $n$ hosts connectin
 	\begin{align*}
 	P_G^n + P_B^n &\ge P_G^{n+1} + P_B^{n+1}\\
 	1 - (P_G^n + P_B^n) &\le 1 - (P_G^{n+1} + P_B^{n+1})\\
-	P_{M,n} &\le P_{M,n+1}
+	P_{M,n} &\le P_{M,n+1} \qedhere
 	\end{align*}
 \end{proof}
 \begin{corr}
@@ -600,7 +608,8 @@ Defining \emph{imperfect service} to mean any case where all $n$ hosts connectin
 %\end{figure}
 
 \begin{figure}
-	\includegraphics[width=\linewidth]{../plots/online-varyN-nginx}
+	\centering
+	\includegraphics[width=0.95\linewidth]{../plots/online-varyN-nginx}
 	\caption{
 		Comparison of preserved traffic across different traffic models, choosing $n=2$ hosts per egress node.
 		No actions are taken in the ``baseline'' entries.
@@ -789,6 +798,7 @@ We found the setting $\gamma = 0.8$ to be the most effective choice for this hyp
 %		\includegraphics[width=\linewidth]{../plots/ftprep-good-3}
 %	\end{subfigure}
 	\includegraphics[width=\linewidth]{../plots/ftprep-box}
+	\vspace{-1.2cm}
 	\caption{
 %		Features: how good are they really? These are for UDP. As you can see, Most things are pretty average (except for \emph{Mean IAT}, which dominates).
 		Learned performance of Marl++ agents when benign traffic is UDP-like, using only a single feature as a basis for decisions.
@@ -826,6 +836,7 @@ We found the setting $\gamma = 0.8$ to be the most effective choice for this hyp
 %\end{figure*}
 
 \begin{figure}
+	\centering
 %	\begin{subfigure}{0.32\linewidth}
 %		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-good}
 %	\end{subfigure}
@@ -836,7 +847,7 @@ We found the setting $\gamma = 0.8$ to be the most effective choice for this hyp
 %		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-good-3}
 %	\end{subfigure}
 	\includegraphics[width=\linewidth]{../plots/ftprep-tcp-box}
-	
+	\vspace{-1.2cm}
 	\caption{
 %		Features: how good are they really (part 2)? These are for TCP. These are less conclusive...
 		Learned performance of Marl++ agents when benign traffic is TCP-like, using only a single feature as a basis for decisions (uncapped as in \cref{fig:udp-feature-plots}).
@@ -847,6 +858,7 @@ We found the setting $\gamma = 0.8$ to be the most effective choice for this hyp
 \end{figure}
 
 \begin{figure}
+	\centering
 %	\begin{subfigure}{0.32\linewidth}
 %		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-cap-good}
 %	\end{subfigure}
@@ -857,7 +869,7 @@ We found the setting $\gamma = 0.8$ to be the most effective choice for this hyp
 %		\includegraphics[width=\linewidth]{../plots/ftprep-tcp-cap-good-3}
 %	\end{subfigure}
 	\includegraphics[width=\linewidth]{../plots/ftprep-tcp-cap-box}
-	
+	\vspace{-1.2cm}
 	\caption{
 %		Features: how good are they really (part 3)? These are for TCP, but capped. These are less conclusive...
 		Learned performance of Marl++ agents when benign traffic is TCP-like, using only a single feature as a basis for decisions (with bandwidth capped physically).
@@ -1014,7 +1026,7 @@ Test system specifications match those given in \cref{sec:performance-in-an-emul
 %\end{figure}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.9\linewidth]{../plots/udp-box}
+	\includegraphics[width=0.95\linewidth]{../plots/udp-box}
 	
 	\caption{
 		Online performance for UDP-like benign traffic.
@@ -1043,7 +1055,7 @@ Across all choices of $n$, we see that Marl++ exhibits reduced collateral damage
 %\end{figure}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.9\linewidth]{../plots/tcp-box}
+	\includegraphics[width=0.95\linewidth]{../plots/tcp-box}
 	
 	\caption{
 		Online performance for TCP-like benign traffic.
@@ -1054,7 +1066,7 @@ Across all choices of $n$, we see that Marl++ exhibits reduced collateral damage
 \end{figure}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.9\linewidth]{../plots/tcp-16-single}
+	\includegraphics[width=0.95\linewidth]{../plots/tcp-16-single}
 	
 	\caption{
 		Online performance of standard and single-agent models with $n=16$ hosts per egress point and TCP-like benign traffic.
@@ -1090,8 +1102,8 @@ We discuss our conjectures for why this reversal occurs in \cref{sec:discussion}
 To investigate the effects of pre-training individual features, we chose our four best-performing features (global state, mean IAT, $\Delta$ in/out rates) and trained each over \num{10000} iterations, before evaluating the policy obtained by summing the action values suggested by each.
 This may be achieved in a real network by randomly assigning new hosts to be controlled exclusively by one feature's policy, allowing agents to more easily learn \emph{which} information led to the correct action being taken.
 To reflect this (and train all parts of an agent in the same time frame), we reduce the timestep length to \SI{10}{\milli\second} to train each agent in less wall-clock time, at the cost of noisier data (and reduced learning rate).
-The results show no real change for Marl++, but a considerable gain for SPF against UDP (and performance drop against TCP).
-It's most likely that SPF is sensitive to noisy data when trying to learn how to act on TCP, and that as the different protocols did in \cref{fig:udp-feature-plots,fig:tcp-cap-feature-plots}, Marl++ and SPF have different optimal feature sets for different traffic behaviours---many of which may have been excluded.
+The results show no real change for Marl++, but a considerable gain for SPF (though smaller than a single learner).
+%It's most likely that SPF is sensitive to noisy data when trying to learn how to act on TCP, and that as the different protocols did in \cref{fig:udp-feature-plots,fig:tcp-cap-feature-plots}, Marl++ and SPF have different optimal feature sets for different traffic behaviours---many of which may have been excluded.
 
 \section{Discussion}\label{sec:discussion}
 
@@ -1135,11 +1147,24 @@ This removes the guarantee that all flows will be visited fairly often, but if u
 	\includegraphics[width=0.9\linewidth]{../plots/policy-16-tcp-f5-mean-log}
 	
 	\caption{
-		Mean Marl action values for Mean IAT when $n=16$.
-		The lightest cell in any row would ordinarily be the action most likely to be chosen: this isn't actually a policy because it's mean'd.
-		Repeated values originate from the bias tile, which is always active.
-		?? Shows... what?
+		Mean Marl action values from pretraining on mean IATs ($n=16$).
+		As these are mean values, lighter cells in each row indicate actions \emph{likely} to be taken by an agent's policy.
+		Repeated values originate from the bias tile, which is always active, and indicate regions of the state-space which have yet to be visited---here, this is most of the state space.
+		The measured effectiveness of this feature then suggests that a low-resolution coding over the standard region may, in fact, be a better choice.
+		We see that agents prefer to choose $p=0.0$ in most states, but higher $p$ when IATs are particularly small.
 		\label{fig:intern-16-tcp-iat}
+	}
+\end{figure}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{../plots/policy-4-tcp-f7-mean}
+	
+	\caption{
+		Mean Marl action values from pretraining on $\Delta$ out rates ($n=4$).
+		A sudden ramp-up of server-to-host traffic is used as a strong indicator of flow legitimacy, while more punishing actions have comparatively higher value as $n$ decreases.
+		Furthermore, we see again that a region of the state space has gone somewhat unexplored---we observed after plotting this visualisation that many decreases in this feature are too small to hit the adjacent tile, which implies a mixed-resolution coding may improve an agent's policy further.
+		\label{fig:intern-16-tcp-something}
 	}
 \end{figure}
 
@@ -1147,7 +1172,7 @@ This removes the guarantee that all flows will be visited fairly often, but if u
 Machine learning algorithms have earned a reputation for eluding human interpretation, while being vulnerable to evasion and poisoning.
 Given the risks associated with introducing such techniques in the context of security, it is natural to be concerned with the interpretability of the models we have proposed.
 With the exception of global state, the tile-coding parameters we make use of ensure that the set of all outputs for each new feature we add is relatively enumerable: for $n$ tilings and $c$ tiles per dimension there are $nc^{\dim{f}}$ individual action value vectors per feature $f$ (\num{48} for the new features we introduce, \num{10368} for global state), though considerably more combinations thereof ($c^{n \cdot \dim{f}}$).
-\Cref{fig:intern-16-tcp-iat} shows how we may visualise the portion of a policy for a single feature.
+\Cref{fig:intern-16-tcp-iat,fig:intern-16-tcp-something} show how we may visualise the portion of a policy for each feature, and describe what information can be gained from doing so.
 Furthermore, system state which is dependent on many signals drawn from across a wide network (such as our global state) is difficult to exert precise control over.
 These signals' topological separation, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
 
