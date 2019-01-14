@@ -107,8 +107,8 @@ uniquelist=false]{biblatex}
 
 %opening!
 
-%\newcommand{\mytitle}{Improving Direct-Control Reinforcement Learning for Network Intrusion Prevention}
 \newcommand{\mytitle}{Improving Direct-Control Reinforcement Learning for Network Intrusion Prevention}
+%\newcommand{\mytitle}{Per-Host DDoS Mitigation by Direct-Control Reinforcement Learning}
 
 \usepackage{url}
 \usepackage{hyperref}
@@ -201,16 +201,16 @@ uniquelist=false]{biblatex}
 \title{\mytitle{}}
 \author{
 %	Kyle A.\ Simpson\thanks{This work was supported by the Engineering and Physical Sciences Research Council [grant number EP/M508056/1].},
-	Kyle A.\ Simpson,
-	Simon Rogers,
-	Dimitrios P.\ Pezaros,\\
-	University of Glasgow, Glasgow, Scotland,\\
-	\email{k.simpson.1@research.gla.ac.uk}
-%Anonymous Giraffe,
-%Anonymous Badger,
-%Anonymous Ibex\\
-%Unnamed Department, Nowhere\\
-%\email{giraffe.a@unnamed.com}
+%	Kyle A.\ Simpson,
+%	Simon Rogers,
+%	Dimitrios P.\ Pezaros,\\
+%	University of Glasgow, Glasgow, Scotland,\\
+%	\email{k.simpson.1@research.gla.ac.uk}
+Anonymous Giraffe,
+Anonymous Badger,
+Anonymous Ibex\\
+Unnamed Department, Nowhere\\
+\email{giraffe.a@unnamed.com}
 }
 
 % Remove date, leave no spacing.
@@ -242,28 +242,27 @@ We show that the new RL agent models can offer a significant increase in goodput
 
 \section{Introduction}
 
-Network anomaly detection and intrusion detection/prevention are continually evolving problems, compounded by the partial, non-IID view of data at each point in the network.
+Network anomaly detection and intrusion detection/prevention are continually evolving problems, compounded by the partial, non-\emph{independent and identically distributed} (IID) view of data at each point in the network.
 Attacks and anomalous behaviours evolve, becoming more sophisticated or employing new vectors to harm a network or system's confidentiality, integrity, and availability without being detected \cite{DBLP:journals/comsur/BhuyanBK14}.
 These attacks and anomalies have measurable consequences and symptoms which allow a skilled analyst to infer new signatures for detection by misuse-based classifiers, but unseen attacks may only be defended against after-the-fact.
 This issue is inherent to \emph{misuse-} or \emph{signature-based} intrusion detectors, and it has been long-hoped that \emph{anomaly-based} detectors would surpass this by making effective use of statistical measures \cite{DBLP:journals/comsur/BhuyanBK14}.
 
 While \emph{machine learning} (ML) approaches seem like a sensible fit for this problem, in \citeyear{DBLP:conf/sp/SommerP10} \citeauthor{DBLP:conf/sp/SommerP10} identified the `failure to launch' of ML-based anomaly detection systems---a distinct lack of real-world system deployments \cite{DBLP:conf/sp/SommerP10}.
 To quite a large extent, this remains the case today.
-?? RESTRUCTURE
-These authors posit that their application is made difficult due to significant operational differences from standard ML tasks.
-?? (quoted: high cost of errors, lack of training data, semantic gap between results and operational interpretation, variability in input data, fundamental difficulties for conducting sound evaluation)
-This is further aggravated by certain characteristics of network traffic; the diversity of network traffic across varying timescales \cite{DBLP:conf/sp/SommerP10} and significant burstiness \cite{DBLP:journals/ccr/LelandWTW95}.
+These authors posit that their application is made difficult due to significant operational differences from standard ML tasks, including: the high cost of errors and extraordinarily low tolerance for false positives inherent to network intrusion detection \cite{DBLP:conf/ccs/Axelsson99}; a general lack of recent, openly available (and high-quality) training data; and diversity of network traffic across varying timescales combined with significant burstiness \cite{DBLP:journals/ccr/LelandWTW95}.
 Above the aggregate level, the constant deployment of new services and new protocols means that traffic is \emph{non-stationary} and displays an evolving notion of normality.
-Further issues arise from the extraordinarily low tolerance for false positives inherent to network intrusion detection \cite{DBLP:conf/ccs/Axelsson99}, and the challenges encountered when learning from unlabelled (often partial) data.
+Learning is made harder still by the challenges encountered when learning from unlabelled (often partial) data.
 All of these factors greatly inflate the difficulty of the detection problem.
 
-?? Make it clearer here what problem I specifically want to solve: principally a particular class of DDoS attacks; volume-based DDoS attacks. Amplification attacks are just a specialisation, this can be made more obvious. I think I need to be clearer about the \emph{intended deployment environment} of service hosts (i.e., not ISPs).
+%?? Make it clearer here what problem I specifically want to solve: principally a particular class of DDoS attacks; volume-based DDoS attacks. Amplification attacks are just a specialisation, this can be made more obvious. I think I need to be clearer about the \emph{intended deployment environment} of service hosts (i.e., not ISPs).
 
-For certain classes of problem e.g., flooding-based DDoS attacks, \emph{reinforcement learning} (RL) offers another perspective.
-?? Unclear explanation of RL here?
-The role of a RL agent differs from that of a standard classifier, adaptively reacting to threats by assuming the role of a feedback loop for network optimisation, typically to safeguard service guarantees.
-In a sense, this allows us to ``overcome'' the difficulties of the detection problem by monitoring \emph{performance characteristics and consequences} in real-time; by looking for the effect rather than the cause.
-The intent is to augment what existing misuse-based solutions can provide, by automatically alerting, recording and controlling what are believed to be illegal system states.
+For certain classes of problem e.g., volume-based \emph{distributed denial of service} (DDoS) attacks, \emph{reinforcement learning} (RL) offers another perspective.
+%?? Unclear explanation of RL here?
+RL agents operate by following a \emph{policy} to interact with or control a system, while at the same time using observed performance metrics and deliberate exploration to dynamically improve this policy.
+In this way the role of a RL agent differs from that of a standard classifier, adaptively reacting to threats by assuming the role of a feedback loop for network optimisation, typically to safeguard service guarantees.
+In a sense, this allows us to ``overcome'' some of the difficulties of the detection problem by monitoring \emph{performance characteristics and consequences} in real-time; by looking for (and controlling) the effect rather than the cause.
+Long-term, we expect that the value of RL-based defence systems will be to augment what existing misuse-based solutions can provide, by automatically alerting, recording and controlling what are believed to be illegal system states.
+The goal of this work is much less general; we aim to prevent volume-based DDoS attacks with the aid of RL-based techniques (an important goal in its own right), while bringing to light the flexibility and applicability of these techniques in the security domain.
 %Whether it takes direct control of the network, or is used indirectly to optimise a key part of another system, more powerful `deep' RL techniques (and well-founded action spaces) aren't yet well explored for network IDS/IPS.
 %These range from more modern training algorithms \cite{DBLP:journals/corr/SchulmanWDRK17, DBLP:conf/icml/SchulmanLAJM15}, to evolutionary strategies \cite{DBLP:journals/corr/SalimansHCS17, DBLP:journals/corr/abs-1802-08842}, hierarchical action composition \cite{DBLP:journals/corr/abs-1710-09767}, and competitive multi-agent learning \cite{DBLP:journals/corr/abs-1710-03748}.
 
@@ -275,7 +274,7 @@ What approaches do exist are aimed towards the task of adaptive online DDoS miti
 
 %?? Discuss the most important conclusions before the outline.
 We find that the existing work for this task fails to account for congestion-aware traffic (i.e., TCP) and deployment environments with high host density per egress point, achieving poor results due to an overly coarse view of the network.
-The approach we identify to remedy this is to make throttling decisions on a per-source basis, and we present the engineering decisions this mandates: updating RL agents from multiple traces per timestep, timed random sequential action computation and a supporting SDN architecture.
+The approach we identify to remedy this is to make throttling decisions on a per-source basis, and we present the engineering decisions this mandates: updating RL agents from multiple traces per timestep, timed random sequential action computation and a supporting \emph{software-defined network} (SDN) architecture.
 In tandem with the development and evaluation of an effective state-space and model, we provide the design of a second model inspired by past work on algorithmic DDoS prevention, as an example of the integration of domain-specific knowledge.
 Our introduction of per-source decisions improves substantially upon the state-of-the-art, and we show that our second model achieves excellent performance for high host density.
 Crucially, both models remain protocol- and content-agnostic to offer future-proofing against the rollout of future protocols like QUIC \cite{DBLP:conf/sigcomm/LangleyRWVKZYKS17}.
@@ -422,7 +421,7 @@ To cope with a continuous state and/or action space, one valuable technique is t
 		\draw [->] (2.45, -1.9) -- (2.45, -1.65);
 		\end{tikzpicture}
 		}
-		\caption{Action Selection\label{fig:tilecode-select}}
+		\caption{\centering Value Estimation and Action Selection\label{fig:tilecode-select}}
 	\end{subfigure}
 	
 	\caption{
@@ -437,7 +436,7 @@ To cope with a continuous state and/or action space, one valuable technique is t
 
 Tile coding is a form of feature representation which converts a state-action pair into a sparse boolean feature vector $\operatorname{\mathbf{x}}(s, a)$ by subdividing a $d$-dimensional subset of the space into a number of overlapping grids with an optional bias component.
 Each tile corresponds to an entry of $\operatorname{\mathbf{x}}(s, a)$ which is set to 1 if the state-action pair lies within it.
-\Cref{fig:tilecode-code} demonstrates the process for a 2-dimensional state space, and how the numbers of tilings and tiles per dimension control feature resolution and generalisation.
+\Cref{fig:tilecode-code} demonstrates the process for a 2-dimensional state space, and that the numbers of tilings and tiles per dimension control feature resolution and generalisation.
 Moreover, to capture combinatorial effects or create multi-scale representation we may combine codings by concatenating individual feature vectors.
 We may then approximate an action's value with respect to a policy parameter vector $\wvec{}$, defining some $\acval{s}{a}{\wvec{}} \approx \operatorname{q}(s, a)$:
 \begin{equation}
@@ -452,14 +451,14 @@ Given a learning rate $\alpha \in \mathbb{R}$ and initialising $\wvec{0}=\bm{0}$
 	\begin{gather}
 	\delta_t = R_{t+1} + \gamma \acval{S_{t+1}}{A_{t+1}}{\wvec{t}} - \acval{S_t}{A_t}{\wvec{t}},\\
 	\bm{w}_{t+1} = \bm{w}_{t} + \alpha \delta_t \nabla{\acval{S_t}{A_t}{\wvec{t}}},
-	\end{gather}
-	\label{eqn:sg-sarsa}
+	\end{gather}%
+	\label{eqn:sg-sarsa}%
 	where $\delta_t$ is known as the \emph{temporal-difference} (TD) error, and the vector gradient $\nabla$ is taken with respect to $\wvec{}$.
 \end{subequations}
 
 Computing the approximate value of every action available in the current state forms the basis of a policy.
 Actions with maximal value can be chosen each time (the \emph{greedy} policy), we might modify this by taking random actions with probability $\epsilon$ to encourage early exploration (the \emph{$\epsilon$-greedy policy}), or we might use some other mechanism.
-\Cref{fig:tilecode-select} extends our working example to show how the value of each action is computed, combining a global estimate ($T_{\mathit{bias}}$) with knowledge particular to each state.
+\Cref{fig:tilecode-select} extends the prior working example to show how the value of each action is computed (and which action would be chosen by a greedy policy), combining a global estimate ($T_{\mathit{bias}}$) with knowledge particular to each state.
 
 \begin{figure}
 	\centering
@@ -521,14 +520,13 @@ Actions with maximal value can be chosen each time (the \emph{greedy} policy), w
 
 \caption{
 	The update step for \cref{fig:tilecode}, given an observed TD error $\delta_t=-0.2$ (indicating a lower observed reward than the expected long-term value of \num{0.7}) and $\alpha=0.5$.
-	Action 4's value is thus reduced in the tiles associated with state $s$, but remains the most likely choice; the negative $delta_t$ may have arisen from noise in the reward signal.
-	For illustrative purposes, we choose an unrealistically high $\alpha$ (typically, $\alpha=0.05$ or lower is a more reasonable choice).
+	Action 4's value is thus reduced in the tiles associated with state $s$, but remains the most likely choice; the negative $\delta_t$ may have arisen from noise in the reward signal.
+	For illustrative purposes, we choose an unrealistically high $\alpha$ (typically, $\alpha\le0.05$ is a more reasonable choice).
 	\label{fig:tilecode-update}
 }
 \end{figure}
 
-This combination of algorithm and coding strategy is well-optimised.
-If $\operatorname{A}(s) = \mathcal{A}$ in every state (and actions are themselves discrete), these properties allow a particularly efficient (vectorised) implementation of the policy and update rules by storing a vector of action values for each state encountered.
+This combination of algorithm and coding strategy is well-optimised, if actions are discrete; this allows a particularly efficient (vectorised) implementation of the policy and update rules by storing a vector of action values for each tile.
 Action values for any state are then obtained by summation of the weight vectors from all activated tiles---taking $|\mathcal{A}|(n_{\mathit{tilings}}-1)$ floating point additions per decision.
 Observing that $\nabla{\acval{s}{a}{\wvec{}}} = \operatorname{\mathbf{x}}(s, a)$, further optimisations arise by considering that a tile-coded feature vector is a binary vector of constant Hamming weight (and so is amenable to representation as an array of indices, $s_{\mathit{list}}$).
 This means that we need only perform $n_{\mathit{tilings}} + 2$ additions and \num{2} multiplications per model update:
