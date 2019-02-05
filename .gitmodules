@@ -7,3 +7,6 @@
 [submodule "code/traffic-host/mcfelix.me"]
 	path = code/traffic-host/mcfelix.me
 	url = https://github.com/FelixMcFelix/mcfelix.me
+[submodule "code/caida-stats"]
+	path = code/caida-stats
+	url = https://github.com/FelixMcFelix/caida-stats.git
