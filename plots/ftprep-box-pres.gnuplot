@@ -32,7 +32,7 @@ set xtics ("Baseline" 0.0, \
 	"IP" 3.0, \
 	"Last Action" 4.5, \
 	"Duration" 6.0, \
-	"Baseline" 7.5, \
+	"Flow Size" 7.5, \
 	"$C_X$" 9.0, \
 	"Mean IAT" 10.5, \
 	"$\\Delta$ In Rate" 12.0, \
@@ -54,7 +54,6 @@ set arrow from -1.0,STATS_up_quartile to 23.0,STATS_up_quartile nohead ls 1 dt "
 set arrow from -1.0,STATS_lo_quartile to 23.0,STATS_lo_quartile nohead ls 1 dt "." lc rgb '#a7352a87'
 
 plot '../results/baseline-2-avg.csv' u (0.0):3:(1.0) ls 1, \
-     '../results/baseline-2-avg.csv' u (0.0):3:(1.0) ls 1, \
      '../results/ft-g-avg.csv' u (1.5):3:(1.0) ls 2, \
      '../results/ft-f0-avg.csv' u (3.0):3:(1.0) ls 3, \
      '../results/ft-f1-avg.csv' u (4.5):3:(1.0) ls 4, \

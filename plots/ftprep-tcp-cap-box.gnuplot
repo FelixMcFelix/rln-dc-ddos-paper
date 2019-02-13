@@ -32,7 +32,7 @@ set xtics ("Baseline" 0.0, \
 	"IP" 3.0, \
 	"Last Action" 4.5, \
 	"Duration" 6.0, \
-	"Baseline" 7.5, \
+	"Flow Size" 7.5, \
 	"$C_X$" 9.0, \
 	"Mean IAT" 10.5, \
 	"$\\Delta$ In Rate" 12.0, \
