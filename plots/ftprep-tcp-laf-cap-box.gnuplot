@@ -1,5 +1,5 @@
 set terminal tikz standalone color size 10cm,6.67cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}' createstyle
-set output "ftprep-tcp-cap-box.tex"
+set output "ftprep-tcp-laf-cap-box.tex"
 
 #load "parula.pal"
 load "inferno.pal"
@@ -55,18 +55,18 @@ set arrow from -1.0,STATS_lo_quartile to 23.0,STATS_lo_quartile nohead ls 1 dt "
 
 plot '../results/baseline-2-avg-ng.csv' u (0.0):3:(1.0) ls 1, \
      '../results/ft-tcp-cap-g-avg.csv' u (1.5):3:(1.0) ls 2, \
-     '../results/ft-tcp-cap-f0-avg.csv' u (3.0):3:(1.0) ls 3, \
-     '../results/ft-tcp-cap-f2-avg.csv' u (4.5):3:(1.0) ls 4, \
-     '../results/ft-tcp-cap-f3-avg.csv' u (6.0):3:(1.0) ls 5, \
-     '../results/ft-tcp-cap-f4-avg.csv' u (7.5):3:(1.0) ls 6, \
-     '../results/ft-tcp-cap-f5-avg.csv' u (9.0):3:(1.0) ls 7, \
-     '../results/ft-tcp-cap-f6-avg.csv' u (10.5):3:(1.0) ls 8, \
-     '../results/ft-tcp-cap-f7-avg.csv' u (12.0):3:(1.0) ls 2, \
-     '../results/ft-tcp-cap-f8-avg.csv' u (13.5):3:(1.0) ls 3, \
-     '../results/ft-tcp-cap-f9-avg.csv' u (15.0):3:(1.0) ls 4, \
-     '../results/ft-tcp-cap-f10-avg.csv' u (16.5):3:(1.0) ls 5, \
-     '../results/ft-tcp-cap-f11-avg.csv' u (18.0):3:(1.0) ls 6, \
-     '../results/ft-tcp-cap-f12-avg.csv' u (19.5):3:(1.0) ls 7, \
-     '../results/ft-tcp-cap-f13-avg.csv' u (21.0):3:(1.0) ls 8
+     '../results/ft-tcp-cap-laf,0-avg.csv' u (3.0):3:(1.0) ls 3, \
+     '../results/ft-tcp-cap-laf,2-avg.csv' u (4.5):3:(1.0) ls 4, \
+     '../results/ft-tcp-cap-laf,3-avg.csv' u (6.0):3:(1.0) ls 5, \
+     '../results/ft-tcp-cap-laf,4-avg.csv' u (7.5):3:(1.0) ls 6, \
+     '../results/ft-tcp-cap-laf,5-avg.csv' u (9.0):3:(1.0) ls 7, \
+     '../results/ft-tcp-cap-laf,6-avg.csv' u (10.5):3:(1.0) ls 8, \
+     '../results/ft-tcp-cap-laf,7-avg.csv' u (12.0):3:(1.0) ls 2, \
+     '../results/ft-tcp-cap-laf,8-avg.csv' u (13.5):3:(1.0) ls 3, \
+     '../results/ft-tcp-cap-laf,9-avg.csv' u (15.0):3:(1.0) ls 4, \
+     '../results/ft-tcp-cap-laf,10-avg.csv' u (16.5):3:(1.0) ls 5, \
+     '../results/ft-tcp-cap-laf,11-avg.csv' u (18.0):3:(1.0) ls 6, \
+     '../results/ft-tcp-cap-laf,12-avg.csv' u (19.5):3:(1.0) ls 7, \
+     '../results/ft-tcp-cap-laf,13-avg.csv' u (21.0):3:(1.0) ls 8
 
 set out
