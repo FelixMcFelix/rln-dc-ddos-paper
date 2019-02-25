@@ -126,6 +126,13 @@ def marlExperiment(
 
 		trs_maxtime = None,
 		reward_band = 1.0,
+
+		spiffy_but_bad = False,
+		spiffy_act_time = 2,
+		# 24--192 hosts, pick accordingly.
+		spiffy_max_experiments = 16,
+		spiffy_pick_prob = 0.2,
+		spiffy_drop_rate = 0.15,
 	):
 
 	linkopts_core = linkopts
@@ -201,7 +208,7 @@ def marlExperiment(
 	# gen
 
 	# change the state machine we get to roll with...
-	if spiffy_mode:
+	if spiffy_mode or spiffy_but_bad:
 		AcTrans = SpfMachine
 		aset = range(3)
 		default_machine_state = 1
@@ -209,6 +216,9 @@ def marlExperiment(
 		AcTrans = MarlMachine
 		aset = pdrop_magnitudes
 		default_machine_state = 0
+
+	if spiffy_but_bad:
+		actions_target_flows = True
 
 	if single_learner and single_learner_ep_scale:
 		explore_episodes *= float(n_teams * n_inters * n_learners) 
@@ -634,8 +644,13 @@ def marlExperiment(
 		cmd_list = []
 
 		# Need to find what the default degree of punishment for a flow is...
+		# THis is contingent on the flow state machine's initial, well, state.
 		default_machine = AcTrans()
 		ac = default_machine.action()
+
+		if spiffy_but_bad:
+			ac = spiffy_drop_rate
+
 		p_drop_num = pdrop(1-ac)
 
 		#local_gselect_msg = flow_gselect_msg
@@ -734,7 +749,7 @@ def marlExperiment(
 			for i, (node, sarsa, maps) in enumerate(zip(learners, sarsas, flow_action_sets)):
 				for ip, state in maps.iteritems():
 					#print "{}: {}".format(i, ip)
-					(_, action, machine) = state
+					(_, action, machine, _) = state
 					a = action if override_action is None else override_action
 					# tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 					tx_ac = machine.action() if isinstance(a, (int, long)) else a
@@ -1418,6 +1433,11 @@ def marlExperiment(
 		learner_fvecs = [{} for _ in learner_pos]
 		flows_to_query = []
 
+		# Dict mapping flow-key to speed measurement and time at which it was taken.
+		# [first_measures, current_measures]
+		spiffy_measurements = [{}, {}]
+		spiffy_verdict = {}
+
 		for i in xrange(episode_length):
 			# May need to early exit
 			if interrupted[0]:
@@ -1425,7 +1445,43 @@ def marlExperiment(
 			# Make the last actions a reality!
 			for team_no, (_, _, learners, _, _, sarsas) in enumerate(teams):
 				block_size = len(learners)
-				enactActions(learners, sarsas, learner_traces[team_no * block_size:])
+				if not spiffy_but_bad:
+					enactActions(learners, sarsas, learner_traces[team_no * block_size:])
+				else:
+					curr_time = time.time()
+					# NOTE: go over each entry of spiffy_measurements[0],
+					# s_m[ip] = (rate, timestamp, unlimited, node)
+					# if the entry in table 1 exists (and is older than spiffy_act_time)
+					# look for the corresponding stats in table 2.
+					# Use the ratio of current/first rate to determine a verdict
+					# spiffy_verdict[ip] = true => bad (demote to complete filter)
+					# then delete from the first two tables
+					to_delete = []
+
+					for ip in spiffy_measurements[0]:
+						(rate, timestamp, unlimited, node) = spiffy_measurements[0][ip]
+						if not unlimited:
+							unlimited = True
+							updateUpstreamRoute(node, ac_prob=0, target_ip=ip)
+
+						if curr_time - timestamp >= spiffy_act_time and ip in spiffy_measurements[1]:
+							curr_rate = spiffy_measurements[1][ip]
+							tbe = float(curr_rate)/max(float(rate), 0.0001)
+							bad_flow = tbe < 1/(1-spiffy_drop_rate)
+							spiffy_verdict[ip] = bad_flow
+
+							if bad_flow:
+								updateUpstreamRoute(node, ac_prob=1, target_ip=ip)
+
+							to_delete.append(ip)
+							print ip, rate, curr_rate, tbe, 1/(1-spiffy_drop_rate), bad_flow, "should have been", (ip%2 == 1)
+						else:
+							spiffy_measurements[0][ip] = (rate, timestamp, unlimited, node)
+
+					for ip in to_delete:
+						for el in spiffy_measurements:
+							if ip in el:
+								del el[ip]
 
 			if i == 100:
 				#net.interact()
@@ -1605,6 +1661,15 @@ def marlExperiment(
 							if ip not in local_work_set or ip in local_visited_set:
 								queue_holder["future"].add(ip)
 
+							if spiffy_but_bad:
+								# if already under scrutiny or if there's enough space to add, then (maybe) act
+								# also, don't act if we already made a verdict...
+								total_s_bw = observed_rate_in + observed_rate_out
+								if ip in spiffy_measurements[0]:
+									spiffy_measurements[1][ip] = total_s_bw
+								elif ip not in spiffy_verdict and len(spiffy_measurements[0]) < spiffy_max_experiments and np.random.random() < spiffy_pick_prob:
+									spiffy_measurements[0][ip] = (total_s_bw, time.time(), False, node)
+
 						if local_pos >= len(local_work):
 							local_pos = 0
 							local_work_set = queue_holder["future"]
@@ -1650,31 +1715,34 @@ def marlExperiment(
 							for s_ac_num, (s, r) in enumerate(subactors):
 								tx_vec = total_vec if r is None else [total_vec[i] for i in r]
 								state = s.to_state(np.array(tx_vec))
-								substates.append(state)
 
 								# if there was an earlier decision made on this flow, then update the past state estimates associated.
 								# Compute and store the intended update for each flow.
+
+								# FIXME: Pass around z_vec
 								if ip in flow_traces:
 									dat = flow_traces[ip]
+									(st, z) = dat[0][s_ac_num]
 									machine = dat[2]
-									(would_choose, new_vals) = s.update(
+									(would_choose, new_vals, z_vec) = s.update(
 										state,
 										reward,
-										(dat[0][s_ac_num], dat[1]),
+										(st, dat[1], z),
 										decay=False,
 									)
 								else:
-									(would_choose, new_vals) = s.bootstrap(state)
+									(would_choose, new_vals, z_vec) = s.bootstrap(state)
 									need_decay = False
 									machine = AcTrans()
 
 								ac_vals += new_vals
+								substates.append((state, z_vec))
 
 								last_sarsa = s
 
 							l_action = last_sarsa.select_action_from_vals(ac_vals)
 							machine.move(l_action)
-							flow_traces[ip] = (substates, l_action, machine)
+							flow_traces[ip] = (substates, l_action, machine, z_vec)
 
 							if need_decay:
 								for (s, _) in subactors:

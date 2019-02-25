@@ -17,7 +17,9 @@ class SarsaLearner:
 				epsilon_falloff=1000,
 				break_equal=False,
 				extended_mins=[], extended_maxes=[],
-				tc_indices = None,
+				tc_indices=None,
+				trace_decay=0.0, trace_threshold=0.0001,
+				broken_math=False,
 				AcTrans=MarlMachine):
 		state_range = [
 			[0 for i in xrange(vec_size)] + extended_mins,
@@ -47,6 +49,14 @@ class SarsaLearner:
 		self.values = {}
 		self.default_q = float(default_q)
 
+		self._argmax_in_dt = False
+
+		self.trace_decay = trace_decay
+		self.trace_threshold = trace_threshold
+
+		# in case I ever need to return to the bug in the update rule for verification...
+		self.broken_math = broken_math
+
 		self._step_count = 0
 
 	def _ensure_state_vals_exist(self, state):
@@ -75,8 +85,13 @@ class SarsaLearner:
 		
 		action = self.actions[a_index]
 
-		# action, indiv. values for the action that was chosen, summed values for each action
-		return (a_index, np.array([av[a_index] for av in all_tile_action_vals]), action_vals)
+		# action, indiv. values for the action that was chosen, indiv values for argmax, summed values for each action
+		return (
+			a_index,
+			np.array([av[a_index] for av in all_tile_action_vals]),
+			np.array([av[np.argmax(action_vals)] for av in all_tile_action_vals]),
+			action_vals,
+		)
 
 	def select_action_from_vals(self, vals):
 		# Epsilon-greedy action selection (linear-decreasing).
@@ -92,15 +107,16 @@ class SarsaLearner:
 	# Need to convert state with self.tc(...) first
 	def bootstrap(self, state):
 		# Select an action:
-		(action, _, ac_values) = self.select_action(state)
+		(action, _, _, ac_values) = self.select_action(state)
 
-		self.last_act = (state, action)
+		z = z_vec(state) if self.trace_decay > 0.0 else None
+		self.last_act = (state, action, z)
 		
-		return (action, ac_values)
+		return (action, ac_values, z)
 
 	# Ditto. run self.tc(...) on state observation
 	def update(self, state, reward, subs_last_act=None, decay=True):
-		(last_state, last_action) = (self.last_act if subs_last_act is None else subs_last_act)
+		(last_state, last_action, last_z) = (self.last_act if subs_last_act is None else subs_last_act)
 
 		# because of updates in parallel, we need to grab the current values.
 		# The update depends not on the value they once had, but only on the *current value* and the target (R).
@@ -109,21 +125,42 @@ class SarsaLearner:
 		last_values = np.array([av[last_action] for av in all_tile_action_vals])
 
 		# First, what is the value of the action would we choose in the new state w/ old model
-		(new_action, new_values, ac_values) = self.select_action(state)
+		(new_action, new_values, argmax_values, ac_values) = self.select_action(state)
 
-		updated_vals = last_values + (self.discount*new_values - last_values + reward) * self.learn_rate
+		next_vals = argmax_values if self._argmax_in_dt else new_values
 
-		# Update value accordingly
-		self._update_state_values(last_state, last_action, updated_vals)
+		if self.broken_math:
+			d_t = self.discount * next_vals - last_values + reward
+		else:
+			d_t = self.discount * np.sum(next_vals) - np.sum(last_values) + reward
+
+		ad_t = self.learn_rate * d_t
+
+		if last_z is None:
+			updated_vals = last_values + ad_t
+			self._update_state_values(last_state, last_action, updated_vals)
+
+			# Update value accordingly
+			new_z = None
+		else:
+			(old_indices, old_grads) = last_z
+			old_grads *= (self.trace_decay * self.discount)
+			new_z = merge_z_vec(state, (old_indices, old_grads), self.trace_threshold)
+
+			# use new_z[0] to get the action value vectors we need to mutate
+			state_tiles_to_mutate = self._get_state_values(new_z[0])
+			action_tile_vals = np.array([av[last_action] for av in state_tiles_to_mutate])
+			updated_vals = action_tile_vals + ad_t * new_z[1]
+			self._update_state_values(new_z[0], last_action, updated_vals)
 
 		# Reduce epsilon somehow
 		if decay:
 			self.decay()
 
-		self.last_act = (state, new_action)
+		self.last_act = (state, new_action, new_z)
 
 		# Return the "chosen" action, and the values it was computed from.
-		return (new_action, ac_values)
+		return (new_action, ac_values, new_z)
 
 	def decay(self):
 		self._curr_epsilon = max(0, (1 - self._step_count/float(self.epsilon_falloff)) * self.epsilon)
@@ -132,3 +169,41 @@ class SarsaLearner:
 	def to_state(self, *args):
 		out = self.tc(*args)
 		return tuple(out)
+
+class QLearner(SarsaLearner):
+	def __init__(self, **args):
+		super(**args)
+		self._argmax_in_dt = True
+
+def z_vec(index_list):
+	return (index_list, np.ones(len(index_list)))
+
+def merge_z_vec(s_new, l_old, thres):
+	(s_old, z_old) = l_old
+	i = 0
+	j = 0
+	out_s = []
+	out_z = []
+	s_last = -1 
+	while i < len(s_new) or j < len(s_old):
+		select_old = j < len(s_old) and (not i < len(s_new) or s_old[j] <= s_new[i])
+		(s, val) = (s_old[j], z_old[j]) if select_old else (s_new[i], 1.0)
+
+		if s == s_last:
+			out_z[:1] += val
+		else:
+			out_s.append(s)
+			out_z.append(val)
+
+		s_last = s
+		if select_old:
+			j += 1
+		else:
+			i += 1
+
+	for i in range(len(out_s)).reverse():
+		if out_z[i] < thres:
+			out_s.pop(i)
+			out_z.pop(i)
+
+	return (tuple(out_s), np.array(out_z))

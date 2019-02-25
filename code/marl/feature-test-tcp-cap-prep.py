@@ -57,10 +57,17 @@ results_dir = "../../results/"
 file_dir = results_dir + "ftprep-tcp-cap.pickle"
 n_features = 8
 n_episodes = 10
-restrict_sets = [None] + [[4 + i] for i in xrange(n_features)]
-out_names = ["g"] + ["f{}".format(i) for i in xrange(n_features)]
+#restrict_sets = [None] + [[4 + i] for i in xrange(n_features)]
+#out_names = ["g"] + ["f{}".format(i) for i in xrange(n_features)]
+restrict_sets = ([None] +
+#	[[4 + i] for i in xrange(n_features) if i != 1] +
+	[[4 + i, 5] for i in xrange(n_features) if i != 1])
 
-result_sets = [([], [], []) for i in xrange(1 + n_features)]
+out_names = (["g"] +
+#	["f{}".format(i) for i in xrange(n_features) if i != 1] +
+	["laf,{}".format(i) for i in xrange(n_features) if i != 1])
+
+result_sets = [([], [], []) for i in xrange(len(restrict_sets))]
 
 if __name__ == "__main__":
 	things_to_pickle = []

@@ -57,7 +57,9 @@ host_ps = [ host_ps[int(sys.argv[1])] ]
 combo_result_sets = [([], [], []) for a in host_ps]
 
 configs = [
-	(combo_result_sets, False, "combine", 3000),
+	#(combo_result_sets, False, "combine", 3000),
+	# Temp Test to see longterm...
+	(combo_result_sets, False, "combine", 10000),
 ]
 
 if __name__ == "__main__":

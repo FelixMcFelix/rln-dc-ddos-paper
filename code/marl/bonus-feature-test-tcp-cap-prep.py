@@ -59,10 +59,18 @@ file_dir = results_dir + "bonus-ftprep-tcp-cap.pickle"
 n_features = 8
 n_new_features = 6
 n_episodes = 10
-restrict_sets = [[4 + n_features + i] for i in xrange(n_new_features)]
-out_names = ["f{}".format(n_features + i) for i in xrange(n_new_features)]
 
-result_sets = [([], [], []) for i in xrange(n_new_features)]
+restrict_sets = (
+#	[[4 + n_features + i] for i in xrange(n_new_features)] +
+	[[4 + n_features + i, 5] for i in xrange(n_new_features)]
+)
+
+out_names = (
+#	["f{}".format(n_features + i) for i in xrange(n_new_features)] +
+	["laf,{}".format(n_features + i) for i in xrange(n_new_features)]
+)
+
+result_sets = [([], [], []) for i in xrange(len(restrict_sets))]
 
 if __name__ == "__main__":
 	things_to_pickle = []
