@@ -62,11 +62,11 @@ plot '../results/baseline-2-avg.csv' u (0.0):3:(1.0) ls 1, \
      '../results/ft-cap-laf,5-avg.csv' u (9.0):3:(1.0) ls 7, \
      '../results/ft-cap-laf,6-avg.csv' u (10.5):3:(1.0) ls 8, \
      '../results/ft-cap-laf,7-avg.csv' u (12.0):3:(1.0) ls 2, \
-     #'../results/ft-cap-laf,8-avg.csv' u (13.5):3:(1.0) ls 3, \
-     #'../results/ft-cap-laf,9-avg.csv' u (15.0):3:(1.0) ls 4, \
-     #'../results/ft-cap-laf,10-avg.csv' u (16.5):3:(1.0) ls 5, \
-     #'../results/ft-cap-laf,11-avg.csv' u (18.0):3:(1.0) ls 6, \
-     #'../results/ft-cap-laf,12-avg.csv' u (19.5):3:(1.0) ls 7, \
-     #'../results/ft-cap-laf,13-avg.csv' u (21.0):3:(1.0) ls 8
+     '../results/ft-cap-laf,8-avg.csv' u (13.5):3:(1.0) ls 3, \
+     '../results/ft-cap-laf,9-avg.csv' u (15.0):3:(1.0) ls 4, \
+     '../results/ft-cap-laf,10-avg.csv' u (16.5):3:(1.0) ls 5, \
+     '../results/ft-cap-laf,11-avg.csv' u (18.0):3:(1.0) ls 6, \
+     '../results/ft-cap-laf,12-avg.csv' u (19.5):3:(1.0) ls 7, \
+     '../results/ft-cap-laf,13-avg.csv' u (21.0):3:(1.0) ls 8
 
 set out
