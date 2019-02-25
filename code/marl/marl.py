@@ -19,7 +19,7 @@ import networkx as nx
 import numpy as np
 import os
 import random
-from sarsa import SarsaLearner
+from sarsa import SarsaLearner, QLearner
 import select
 import signal
 import socket
@@ -64,6 +64,10 @@ def marlExperiment(
 		epsilon = 0.3,
 		discount = 0,
 		break_equal = None,
+
+		algo = "sarsa",
+		trace_decay = 0.0,
+		trace_threshold = 0.0001,
 
 		model = "tcpreplay",
 		submodel = None,
@@ -133,7 +137,15 @@ def marlExperiment(
 		spiffy_max_experiments = 16,
 		spiffy_pick_prob = 0.2,
 		spiffy_drop_rate = 0.15,
+
+		broken_math = False,
 	):
+
+	agent_classes = {
+		"sarsa": SarsaLearner,
+		"q": QLearner,
+	}
+	AgentClass = agent_classes[algo]
 
 	linkopts_core = linkopts
 	linkopts_core["bw"] = manual_early_limit
@@ -251,6 +263,9 @@ def marlExperiment(
 		# "default_q": 0,
 		"epsilon_falloff": explore_episodes * episode_length,
 		"AcTrans": AcTrans,
+		"trace_decay": trace_decay,
+		"trace_threshold": trace_threshold,
+		"broken_math": broken_math,
 	}
 
 	if actions_target_flows:
@@ -852,7 +867,7 @@ def marlExperiment(
 				# Init and pair the actual learning agent here, too!
 				# Bootstrapping happens later -- per-episode, in the 0-load state.
 				if newSarsas:
-					sarsas.append(SarsaLearner(**sarsaParams))
+					sarsas.append(AgentClass(**sarsaParams))
 				
 				learners.append(new_learn)
 
