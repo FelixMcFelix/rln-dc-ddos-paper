@@ -50,6 +50,7 @@ class SarsaLearner:
 		self.default_q = float(default_q)
 
 		self._argmax_in_dt = False
+		self._wipe_trace_if_not_argmax = False
 
 		self.trace_decay = trace_decay
 		self.trace_threshold = trace_threshold
@@ -128,6 +129,7 @@ class SarsaLearner:
 		(new_action, new_values, argmax_values, ac_values) = self.select_action(state)
 
 		next_vals = argmax_values if self._argmax_in_dt else new_values
+		argmax_chosen = new_values == argmax_values
 
 		if self.broken_math:
 			d_t = self.discount * next_vals - last_values + reward
@@ -144,7 +146,12 @@ class SarsaLearner:
 			new_z = None
 		else:
 			(old_indices, old_grads) = last_z
-			old_grads *= (self.trace_decay * self.discount)
+			if self._wipe_trace_if_not_argmax and not argmax_chosen:
+				old_grads = np.array([]) 
+				old_indices = tuple([])
+			else:
+				old_grads *= (self.trace_decay * self.discount)
+
 			new_z = merge_z_vec(state, (old_indices, old_grads), self.trace_threshold)
 
 			# use new_z[0] to get the action value vectors we need to mutate
@@ -174,6 +181,7 @@ class QLearner(SarsaLearner):
 	def __init__(self, **args):
 		super(**args)
 		self._argmax_in_dt = True
+		self._wipe_trace_if_not_argmax = True
 
 def z_vec(index_list):
 	return (index_list, np.ones(len(index_list)))
