@@ -143,4 +143,4 @@ if __name__ == "__main__":
 
 	writeResults(csv_dir, results)
 	makeResultsAverage(csv_dir, avg_csv_dir)
-	#print "would write to: {}".format(csv_dir)
+	#print "{} would write to: {}".format(experiment, csv_dir)

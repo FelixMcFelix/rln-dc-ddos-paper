@@ -129,7 +129,7 @@ class SarsaLearner:
 		(new_action, new_values, argmax_values, ac_values) = self.select_action(state)
 
 		next_vals = argmax_values if self._argmax_in_dt else new_values
-		argmax_chosen = new_values == argmax_values
+		argmax_chosen = np.all(new_values == argmax_values)
 
 		if self.broken_math:
 			d_t = self.discount * next_vals - last_values + reward
@@ -179,7 +179,7 @@ class SarsaLearner:
 
 class QLearner(SarsaLearner):
 	def __init__(self, **args):
-		super(**args)
+		SarsaLearner.__init__(self, **args)
 		self._argmax_in_dt = True
 		self._wipe_trace_if_not_argmax = True
 
@@ -198,7 +198,7 @@ def merge_z_vec(s_new, l_old, thres):
 		(s, val) = (s_old[j], z_old[j]) if select_old else (s_new[i], 1.0)
 
 		if s == s_last:
-			out_z[:1] += val
+			out_z[-1] += val
 		else:
 			out_s.append(s)
 			out_z.append(val)
@@ -209,9 +209,11 @@ def merge_z_vec(s_new, l_old, thres):
 		else:
 			i += 1
 
-	for i in range(len(out_s)).reverse():
+	i = len(out_s) - 1
+	while i >= 0:
 		if out_z[i] < thres:
 			out_s.pop(i)
 			out_z.pop(i)
+		i -= 1
 
 	return (tuple(out_s), np.array(out_z))
