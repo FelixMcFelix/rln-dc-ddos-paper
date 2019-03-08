@@ -110,7 +110,9 @@ def marlExperiment(
 		bw_mon_socketed = False,
 		unix_sock = True,
 		print_times = False,
+		# FIXME: these two flags ae incompatible
 		record_times = False,
+		record_deltas_in_times = False,
 
 		contributors = [],
 		restrict = None,
@@ -303,7 +305,7 @@ def marlExperiment(
 		if not split_codings:
 			sarsaParams["tc_indices"] = [np.arange(sarsaParams["vec_size"])]
 		else:
-			sarsaParams["tc_indices"] = [np.arange(4)] + [np.array(i) for i in xrange(4, sarsaParams["vec_size"])]
+			sarsaParams["tc_indices"] = [np.arange(4)] + [[i] for i in xrange(4, sarsaParams["vec_size"])]
 
 		sarsaParams["tc_indices"] += extra_codings
 
@@ -1730,21 +1732,27 @@ def marlExperiment(
 							for s_ac_num, (s, r) in enumerate(subactors):
 								tx_vec = total_vec if r is None else [total_vec[i] for i in r]
 								state = s.to_state(np.array(tx_vec))
+								#print "state len (from, to)", (len(tx_vec), len(state))
 
 								# if there was an earlier decision made on this flow, then update the past state estimates associated.
 								# Compute and store the intended update for each flow.
-
-								# FIXME: Pass around z_vec
 								if ip in flow_traces:
+									dm = [i] if record_deltas_in_times else None
+										
 									dat = flow_traces[ip]
 									(st, z) = dat[0][s_ac_num]
 									machine = dat[2]
+									
 									(would_choose, new_vals, z_vec) = s.update(
 										state,
 										reward,
 										(st, dat[1], z),
 										decay=False,
+										delta_space=dm,
 									)
+
+									if record_deltas_in_times:
+										action_comps[-1].append(dm)
 								else:
 									(would_choose, new_vals, z_vec) = s.bootstrap(state)
 									need_decay = False

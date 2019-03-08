@@ -27,11 +27,16 @@ class SarsaLearner:
 		]
 
 		tc_indices = tc_indices if tc_indices is not None else [np.arange(vec_size)]
+		ntiles = [tile_c for _ in tc_indices]
+		ntilings = [tilings_c for _ in tc_indices]
+
+		#print "tc has been configured with indices", tc_indices, "tiles", ntiles, "tilings", ntilings
 
 		self.tc = r.TileCoding(
 			input_indices = tc_indices, 
-			ntiles = [tile_c],
-			ntilings = [tilings_c],
+			# FIXME: allow arbitrary tile settings.
+			ntiles = ntiles,
+			ntilings = ntilings,
 			hashing = None,
 			state_range = state_range,
 			rnd_stream = np.random.RandomState(),
@@ -116,7 +121,7 @@ class SarsaLearner:
 		return (action, ac_values, z)
 
 	# Ditto. run self.tc(...) on state observation
-	def update(self, state, reward, subs_last_act=None, decay=True):
+	def update(self, state, reward, subs_last_act=None, decay=True, delta_space=None):
 		(last_state, last_action, last_z) = (self.last_act if subs_last_act is None else subs_last_act)
 
 		# because of updates in parallel, we need to grab the current values.
@@ -130,11 +135,19 @@ class SarsaLearner:
 
 		next_vals = argmax_values if self._argmax_in_dt else new_values
 		argmax_chosen = np.all(new_values == argmax_values)
+		vec_d_t = self.discount * next_vals - last_values + reward
+		scalar_d_t = self.discount * np.sum(next_vals) - np.sum(last_values) + reward
 
 		if self.broken_math:
-			d_t = self.discount * next_vals - last_values + reward
+			d_t = vec_d_t
 		else:
-			d_t = self.discount * np.sum(next_vals) - np.sum(last_values) + reward
+			d_t = scalar_d_t
+
+		#print "state is:", len(state), "vals are:", len(new_values), "vd_t is:", vec_d_t.shape
+
+		if delta_space is not None:
+			delta_space.append(scalar_d_t)
+			delta_space += list(vec_d_t)
 
 		ad_t = self.learn_rate * d_t
 

@@ -146,3 +146,18 @@ def lastTimestepsAndEpAverages(in_path, out_path):
 
 			for i, (s_row, l_row) in enumerate(zip(stats, lasts)):
 				c_out.writerow([i] + l_row + [np.mean(np.array(c)) for c in s_row])
+
+def dumbWriter(outDir, data):
+	# honestly don't expect more than one level of depth here...
+	if len(data) > 0 and isinstance(data[0], (list,)):
+		true_dat = []
+		for ep, data_ep in enumerate(data):
+			for data_row in data_ep:
+				true_dat.append([ep] + data_row)
+	else:
+		true_dat = data
+
+	with open(outDir, "wb") as of:
+		w = csv.writer(of)
+		for row in true_dat:
+			w.writerow(row)

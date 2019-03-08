@@ -1,7 +1,7 @@
 import cPickle
 from marl import *
 import sys
-from writer import writeResults, makeResultsAverage
+from writer import writeResults, makeResultsAverage, dumbWriter
 
 results_dir = "../../results/"
 
@@ -41,7 +41,13 @@ single_learners = [
 	("single", True),
 ]
 
-total_per_model = len(discounts) * len(algos) * len(host_ps) * len(traffic_types) * len(single_learners) * len(maths)
+# prefix, record_deltas_in_times
+measures = [
+	("", False),
+	("-observed", True),
+]
+
+total_per_model = len(discounts) * len(algos) * len(host_ps) * len(traffic_types) * len(single_learners) * len(maths) * len(measures)
 
 if __name__ == "__main__":
 	# If <2 args, return the upper bound of expts per model.
@@ -71,7 +77,9 @@ if __name__ == "__main__":
 
 		"explore_episodes": 0.8,
 		"episodes": 10,
-		"episode_length": 10000,
+		#"episodes": 2,
+		"episode_length": 30000,
+		#"episode_length": 30,
 		"separate_episodes": True,
 
 		"rf": "ctl",
@@ -81,6 +89,7 @@ if __name__ == "__main__":
 
 		"split_codings": True,
 		"feature_max": 18,
+
 	}
 
 	deps = []
@@ -129,20 +138,27 @@ if __name__ == "__main__":
 	params["estimate_const_limit"] = True
 	deps.append(single_learners)
 
+	(measure_prefix, measure) = expt_part(measures, deps)
+	params["record_deltas_in_times"] = measure
+	deps.append(measures)
+
 	results = marlExperiment(**params)
 	(rewards, good_traffic_percents, total_loads, store_sarsas, rng, action_comps) = results
 
-	file_name_part = "bmath-{}".format(broken_math)
+	file_name_part = "bmath-{}{}".format(broken_math, measure_prefix)
 	file_name = file_name_part + ".csv"
 	file_name_avg = file_name_part + ".avg.csv"
 	file_name_sarsas = file_name_part + ".pickle"
+	file_name_deltas = file_name_part + ".deltas.csv"
 
 	csv_dir = results_dir + file_name
 	avg_csv_dir = results_dir + file_name_avg
 	sarsas_dir = results_dir + file_name_sarsas
+	deltas_dir = results_dir + file_name_deltas
 
 	writeResults(csv_dir, results)
 	makeResultsAverage(csv_dir, avg_csv_dir)
+	dumbWriter(deltas_dir, action_comps)
 	with open(sarsas_dir, "wb") as f:
 		cPickle.dump(store_sarsas, f)
 	#print "{} would write to: {}".format(experiment, csv_dir)
