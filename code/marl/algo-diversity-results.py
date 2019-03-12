@@ -133,14 +133,19 @@ if __name__ == "__main__":
 	deps.append(single_learners)
 
 	results = marlExperiment(**params)
+	(rewards, good_traffic_percents, total_loads, store_sarsas, rng, action_comps) = results
 
 	file_name_part = "algotest-{}-{}-{}-{}-{}-{}-{}".format(model_prefix, indiv_prefix, traffic_prefix, algo, host_p, discount, lamb)
 	file_name = file_name_part + ".csv"
 	file_name_avg = file_name_part + ".avg.csv"
+	file_name_sarsas = file_name_part + ".pickle"
 
 	csv_dir = results_dir + file_name
 	avg_csv_dir = results_dir + file_name_avg
+	sarsas_dir = results_dir + file_name_sarsas
 
 	writeResults(csv_dir, results)
 	makeResultsAverage(csv_dir, avg_csv_dir)
+	with open(sarsas_dir, "wb") as f:
+		cPickle.dump(store_sarsas, f)
 	#print "{} would write to: {}".format(experiment, csv_dir)

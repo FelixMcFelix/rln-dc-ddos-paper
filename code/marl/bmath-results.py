@@ -127,6 +127,15 @@ if __name__ == "__main__":
 
 	broken_math = expt_part(maths, deps)
 	params["broken_math"] = broken_math
+	if not broken_math:
+		# Need to reduce alpha
+		# convergence guarantees and all that
+		# reduce it by ratio of active tiles
+		# The high choice works if the tiles are all 
+		# learning independently (broken math)
+		#params["alpha"] = params["alpha"] * 9.0 / 121.0
+		pass
+	print params["alpha"]
 	deps.append(maths)
 
 	algo = expt_part(algos, deps)

@@ -20,6 +20,7 @@ class SarsaLearner:
 				tc_indices=None,
 				trace_decay=0.0, trace_threshold=0.0001,
 				broken_math=False,
+				rescale_alpha=9.0,
 				AcTrans=MarlMachine):
 		state_range = [
 			[0 for i in xrange(vec_size)] + extended_mins,
@@ -41,6 +42,9 @@ class SarsaLearner:
 			state_range = state_range,
 			rnd_stream = np.random.RandomState(),
 		)
+
+		if rescale_alpha is not None:
+			learn_rate = (learn_rate * rescale_alpha) / float(sum(ntilings))
 
 		self.epsilon = epsilon
 		self._curr_epsilon = epsilon
@@ -157,6 +161,7 @@ class SarsaLearner:
 
 			# Update value accordingly
 			new_z = None
+			#print "vals are:", updated_vals, "from:", last_values, "by:", d_t
 		else:
 			(old_indices, old_grads) = last_z
 			if self._wipe_trace_if_not_argmax and not argmax_chosen:
@@ -172,6 +177,7 @@ class SarsaLearner:
 			action_tile_vals = np.array([av[last_action] for av in state_tiles_to_mutate])
 			updated_vals = action_tile_vals + ad_t * new_z[1]
 			self._update_state_values(new_z[0], last_action, updated_vals)
+			print "vals are:", updated_values, "from:", action_tile_vals, "by:", d_t
 
 		# Reduce epsilon somehow
 		if decay:
