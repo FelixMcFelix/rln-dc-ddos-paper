@@ -20,7 +20,7 @@ class SarsaLearner:
 				tc_indices=None,
 				trace_decay=0.0, trace_threshold=0.0001,
 				broken_math=False,
-				rescale_alpha=9.0,
+				rescale_alpha=1.0,
 				AcTrans=MarlMachine):
 		state_range = [
 			[0 for i in xrange(vec_size)] + extended_mins,
