@@ -123,6 +123,7 @@ if __name__ == "__main__":
 		params["estimate_const_limit"] = True
 
 	results = marlExperiment(**params)
+	(rewards, good_traffic_percents, total_loads, store_sarsas, rng, action_comps) = results
 
 	file_name_part = "{}-{}-{}-{}".format(model_prefix, traffic_prefix, indiv_prefix, host_p)
 	file_name = file_name_part + ".csv"
