@@ -43,7 +43,7 @@ class SarsaLearner:
 			rnd_stream = np.random.RandomState(),
 		)
 
-		if rescale_alpha is not None:
+		if rescale_alpha is not None and not broken_math:
 			learn_rate = (learn_rate * rescale_alpha) / float(sum(ntilings))
 
 		self.epsilon = epsilon
