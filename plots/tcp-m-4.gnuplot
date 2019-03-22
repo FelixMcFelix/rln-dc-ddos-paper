@@ -25,8 +25,8 @@ set yrange [0.0:1.0]
 set key inside top right
 
 plot '../results/online-4-avg-ng.csv' u 1:3 w lines smooth sbezier title "MARL" dt 1, \
-     '../results/m-tcp-natural-4' u 1:3 w lines smooth sbezier title "MARL++" dt (18,2,2,2), \
-     '../results/m-tcp-banded-4' u 1:3 w lines smooth sbezier title "MARL++ (Banded)" ls 4  dt (6,2,2,2), \
-     '../results/m-tcp-single-4' u 1:3 w lines smooth sbezier title "MARL++ (Single Agent)" ls 5 dt (18,2), \
-     '../results/m-tcp-uncap-4' u 1:3 w lines smooth sbezier title "MARL++ (Uncapped)" ls 6 dt (6,2), \
+     '../results/m-tcp-natural-4.avg.csv' u 1:3 w lines smooth sbezier title "MARL++" dt (18,2,2,2), \
+     '../results/m-tcp-banded-4.avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Banded)" ls 4  dt (6,2,2,2), \
+     '../results/m-tcp-single-4.avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Single Agent)" ls 5 dt (18,2), \
+     '../results/m-tcp-uncap-4.avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Uncapped)" ls 6 dt (6,2), \
      '../results/tcp-combo-4-avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Pretrain)" ls 7 dt (2,2), \
