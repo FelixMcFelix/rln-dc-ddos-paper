@@ -25,7 +25,7 @@ set yrange [0.0:1.0]
 set key inside bottom right
 
 plot '../results/online-16-avg.csv' u 1:3 w lines smooth sbezier title "MARL" dt 1, \
-     '../results/m-udp-natural-16' u 1:3 w lines smooth sbezier title "MARL++" dt (18,2,2,2), \
-     '../results/m-udp-banded-16' u 1:3 w lines smooth sbezier title "MARL++ (Banded)" ls 4  dt (6,2,2,2), \
-     '../results/m-udp-single-16' u 1:3 w lines smooth sbezier title "MARL++ (Single Agent)" ls 5 dt (18,2), \
-     '../results/m-udp-uncap-16' u 1:3 w lines smooth sbezier title "MARL++ (Uncapped)" ls 6 dt (6,2), \
+     '../results/m-udp-natural-16.avg.csv' u 1:3 w lines smooth sbezier title "MARL++" dt (18,2,2,2), \
+     '../results/m-udp-banded-16.avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Banded)" ls 4  dt (6,2,2,2), \
+     '../results/m-udp-single-16.avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Single Agent)" ls 5 dt (18,2), \
+     '../results/m-udp-uncap-16.avg.csv' u 1:3 w lines smooth sbezier title "MARL++ (Uncapped)" ls 6 dt (6,2), \

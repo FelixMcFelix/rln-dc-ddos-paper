@@ -70,13 +70,13 @@ pub fn run(options: Config<'static>) {
 
 	// Here: listen for EOL (and then kill inner thread).
 	// Inner thread does request loop.
-    let await = options.requests.is_none();
+	let await = options.requests.is_none();
 
 	let handle = thread::spawn(move || request_loop(rx, options));
-    if await {
-    	stdin.read_line(&mut buffer);
-	    tx.send(CliCommand::End);
-    }
+	if await {
+		stdin.read_line(&mut buffer);
+		tx.send(CliCommand::End);
+	}
 
 	handle.join();
 }
@@ -142,7 +142,7 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 		}
 	}
 
-    let tracker = options.requests.clone();
+	let tracker = options.requests.clone();
 
 	enqueue(
 		available_targets.get(draw.sample(&mut rng_local))
@@ -150,10 +150,10 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 		&mut work_queue,
 		&mut visited,
 		&dep_list.name_map);
-    
-    let mut tracker = tracker.map(|x| x.checked_sub(1).unwrap_or(0));
+	
+	let mut tracker = tracker.map(|x| x.checked_sub(1).unwrap_or(0));
 
-    let empty_dur = Duration::default();
+	let empty_dur = Duration::default();
 
 	loop {
 		match rx.try_recv() {
@@ -189,21 +189,21 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 
 				// add random element, wipe the visited list.
 				if work_queue.is_empty() {
-                    if tracker == Some(0) {
-                        break;
-                    }
+					if tracker == Some(0) {
+						break;
+					}
 
 					for i in 0..visited.len() {
 						visited[i] = false;
 					}
 
-                    if options.wait_ms > empty_dur {
-    					// Wait the flow prune time.
-    					thread::sleep(
-                            //Duration::new(2, 100000000)
-                            options.wait_ms
-                        );
-                    }
+					if options.wait_ms > empty_dur {
+						// Wait the flow prune time.
+						thread::sleep(
+							//Duration::new(2, 100000000)
+							options.wait_ms
+						);
+					}
 					
 					enqueue(
 						available_targets.get(draw.sample(&mut rng_local))
@@ -212,7 +212,7 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 						&mut visited,
 						&dep_list.name_map);
 
-                    tracker = tracker.map(|x| x.checked_sub(1).unwrap_or(0));
+					tracker = tracker.map(|x| x.checked_sub(1).unwrap_or(0));
 				}
 			}
 			Ok(CliCommand::End) | Err(_) => {break;},

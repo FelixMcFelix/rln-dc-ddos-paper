@@ -38,7 +38,7 @@ set xtics ("Marl" 0.0, \
 	"SPF" 10.0, \
 	"Marl" 12.0, \
 	"Marl++" 13.0, \
-	"SPF" 14.0, \
+	"SPF " 14.0, \
 	) scale 0.0
 #set key inside bottom right
 set boxwidth 1

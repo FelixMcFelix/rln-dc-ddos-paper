@@ -25,7 +25,7 @@ set yrange [0.0:1.0]
 set key inside bottom right
 
 plot '../results/online-2-avg.csv' u 1:3 w lines smooth sbezier title "MARL" dt 1, \
-     '../results/spf-udp-natural-2' u 1:3 w lines smooth sbezier title "SPF" dt (18,2,2,2), \
-     '../results/spf-udp-banded-2' u 1:3 w lines smooth sbezier title "SPF (Banded)" ls 4  dt (6,2,2,2), \
-     '../results/spf-udp-single-2' u 1:3 w lines smooth sbezier title "SPF (Single Agent)" ls 5 dt (18,2), \
-     '../results/spf-udp-uncap-2' u 1:3 w lines smooth sbezier title "SPF (Uncapped)" ls 6 dt (6,2), \
+     '../results/spf-udp-natural-2.avg.csv' u 1:3 w lines smooth sbezier title "SPF" dt (18,2,2,2), \
+     '../results/spf-udp-banded-2.avg.csv' u 1:3 w lines smooth sbezier title "SPF (Banded)" ls 4  dt (6,2,2,2), \
+     '../results/spf-udp-single-2.avg.csv' u 1:3 w lines smooth sbezier title "SPF (Single Agent)" ls 5 dt (18,2), \
+     '../results/spf-udp-uncap-2.avg.csv' u 1:3 w lines smooth sbezier title "SPF (Uncapped)" ls 6 dt (6,2), \

@@ -3,8 +3,8 @@ extern crate traffic_host;
 
 use clap::{App, Arg, ArgMatches};
 use std::{
-    borrow::Cow,
-    time::Duration,
+	borrow::Cow,
+	time::Duration,
 };
 
 static BYTES_IN_MEGABYTE: f64 = 1_048_576.0;
@@ -106,11 +106,11 @@ fn main() {
 		.expect("Count MUST be an integer value.");
 
 	let wait_ms = Duration::from_millis(
-        matches.value_of_lossy("wait")
-    		.expect("Wait-time always guaranteed to exist.")
-		    .parse::<u64>()
-    		.expect("Wait-time MUST be an integer value.")
-        );
+		matches.value_of_lossy("wait")
+			.expect("Wait-time always guaranteed to exist.")
+			.parse::<u64>()
+			.expect("Wait-time MUST be an integer value.")
+		);
 
 	let requests = if requests == 0 {
 		None
@@ -129,9 +129,9 @@ fn main() {
 			max_down: 0,
 			max_up: 0,
 			randomise,
-            requests,
+			requests,
 			url,
-            wait_ms,
+			wait_ms,
 		};
 
 		traffic_host::bless(config);
@@ -145,9 +145,9 @@ fn main() {
 			max_down,
 			max_up,
 			randomise,
-            requests,
+			requests,
 			url,
-            wait_ms,
+			wait_ms,
 		};
 
 		traffic_host::run(config);
