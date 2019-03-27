@@ -1,5 +1,6 @@
 from contextlib import closing
-import cPickle as pickle
+#import cPickle as pickle
+import pickle
 import socket
 import struct
 
@@ -39,7 +40,7 @@ class SmartishRouter(app_manager.RyuApp):
 			# read a length (usize, 8bytes) then that many bytes in turn.
 			# unpickle to receive the data needed to start controlling.
 
-			buf = ""
+			buf = b""
 			while len(buf) < 8:
 				buf += data_sock.recv(4096)
 			(pickle_len,) = struct.unpack("!Q", buf[:8])
@@ -49,7 +50,8 @@ class SmartishRouter(app_manager.RyuApp):
 				buf += data_sock.recv(4096)
 
 			(routes, macs) = pickle.loads(buf)
-			#print routes, macs
+			print(pickle_len)
+			print(routes, macs)
 			self.entry_map = routes
 			self.macs = macs
 		#print "I am now alive, controlling all...!"
@@ -142,7 +144,8 @@ class SmartishRouter(app_manager.RyuApp):
 
 		#if dpid in self.entry_map:
 		l_dict = self.entry_map[dpid]
-		for ip, (port, adjacent) in l_dict.iteritems():
+		print(l_dict)
+		for ip, (port, adjacent) in l_dict.items():
 			#print ip, "on port", port, "is adjacent?", adjacent
 			rewrites = [] if not adjacent else [
 				parser.OFPActionSetField(
@@ -169,6 +172,7 @@ class SmartishRouter(app_manager.RyuApp):
 		#		actions=[parser.OFPActionOutput(0)],
 		#		table_id=t
 		#	)
+		print("done setting up switch")
 			
 	def add_flow(self, datapath, priority, match, actions=None, table_id=0, next_table=None, importance=1):
 		ofproto = datapath.ofproto
