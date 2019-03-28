@@ -18,7 +18,7 @@ discounts = [
 ]
 maths = [
 	True,
-	False,
+#	False,
 ]
 
 algos = [

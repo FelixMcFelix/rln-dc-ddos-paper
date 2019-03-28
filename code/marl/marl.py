@@ -1856,12 +1856,21 @@ def marlExperiment(
 			bw_sock.close()
 
 		if server_proc is not None:
-			server_proc.terminate()
+			try:
+				server_proc.terminate()
+			except:
+				print "couldn't cleanly shutdown server process..."
 		if ctl_proc is not None:
 			#print "I have good reason to believe that I'm killing ryu."
-			ctl_proc.terminate()
+			try:
+				ctl_proc.terminate()
+			except:
+				print "couldn't cleanly shutdown control process..."
 		for proc in host_procs:
-			proc.terminate()
+			try:
+				proc.terminate()
+			except:
+				print "couldn't cleanly shutdown host process..."
 
 		host_procs = []
 		server_proc = None
