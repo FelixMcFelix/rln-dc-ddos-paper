@@ -7,6 +7,7 @@ mod trace;
 pub use config::Config;
 
 use byteorder::{
+	LittleEndian,
 	NetworkEndian,
 	ReadBytesExt,
 	WriteBytesExt,
@@ -15,6 +16,7 @@ use net2::{
 	unix::UnixUdpBuilderExt,
 	UdpBuilder,
 };
+use parking_lot::RwLock;
 use rand::{
 	distributions::{
 		Uniform,
@@ -31,6 +33,7 @@ use std::{
 		UdpSocket,
 		SocketAddr,
 	},
+	sync::Arc,
 	thread,
 	time::{
 		Duration,
@@ -54,7 +57,7 @@ fn make_udp_socket(port: u16, non_block: bool) -> IoResult<UdpSocket> {
 	Ok(out)
 }
 
-pub fn client(config: Config) {
+pub fn client(config: &Config) {
 	let ts = trace::read_traces();
 
 	crossbeam::scope(|s| {
@@ -77,91 +80,162 @@ fn inner_client(config: &Config, ts: &Vec<Trace>) {
 	let port_distrib = Uniform::new(30000, 54000);
 	let port = port_distrib.sample(&mut rng);
 
+	let mut buf = [0u8; 1560];
+	let mut rxbuf = [0u8; 1560];
+
+	let ka_freq = Duration::from_secs(5);
+	let mut ka_count: u64 = 1;
+	let mut ka_buf = [0u8; 8];
+	let mut ka_time = None;
+
+	let start = Instant::now();
 	let end = if config.randomise_duration {
 		let time_distrib = Uniform::new(
 			config.duration_lb,
 			config.duration_ub
 				.expect("No upper bound set: cannot randomise call time."),
 		);
-		let port = time_distrib.sample(&mut rng);
+		Some(time_distrib.sample(&mut rng))
 	} else {
-		config.duration_ub;
+		config.duration_ub
 	};
 
-	let el = &ts[draw.sample(&mut rng)];
-	
 	let socket = make_udp_socket(port, true).unwrap();
 
 	println!("Listening on port {:?}", port);
-
-	let mut buf = [0u8; 1560];
-	let mut rxbuf = [0u8; 1560];
 	let ssrc = rng.gen::<u32>();
 	(&mut buf[8..12]).write_u32::<NetworkEndian>(ssrc);
 
-	let start = Instant::now();
-	let mut last_size = None;
-	for pkt in el {
-		use PacketChainLink::*;
-		let mut sleep_time = 20 + match pkt {
-			Packet(p) => {
-				let p = usize::from(p.get());
-				last_size = Some(p);
-				println!("Sending packet of size {:?} (before CMAC, RTP, ... )", p);
-				socket.send_to(&buf[..p + CMAC_BYTES + RTP_BYTES], &config.address);
-				0
-			},
-			Missing(t) => {
-				if let Some(p) = last_size {
+	// IDEA: if we haven't passed the LB then draw another entry.
+	// BUT if there's a RANDOM UB defined, we need to keep drawing to hit that.
+	while start.elapsed() < config.duration_lb || (config.randomise_duration && start.elapsed() < end.unwrap()) {
+		let el = &ts[draw.sample(&mut rng)];
+
+		// FIXME: need to draw more sessions if we hit end prematurely...
+		let mut last_size = None;
+		for pkt in el {
+			use PacketChainLink::*;
+			let mut sleep_time = 20 + match pkt {
+				Packet(p) => {
+					let p = usize::from(p.get());
+					last_size = Some(p);
 					println!("Sending packet of size {:?} (before CMAC, RTP, ... )", p);
 					socket.send_to(&buf[..p + CMAC_BYTES + RTP_BYTES], &config.address);
+					0
+				},
+				Missing(t) => {
+					if let Some(p) = last_size {
+						println!("Sending packet of size {:?} (before CMAC, RTP, ... )", p);
+						socket.send_to(&buf[..p + CMAC_BYTES + RTP_BYTES], &config.address);
+					}
+					0
+				},
+				Silence(t) => {
+					println!("Waiting for {:?}ms.", t);
+					// Note: won't receive packets in here...
+					let out = u64::from(*t);
+					out.min(config.max_silence.unwrap_or(out))
 				}
-				0
-			},
-			Silence(t) => {
-				println!("Waiting for {:?}ms.", t);
-				// Note: won't receive packets in here...
-				let out = u64::from(*t);
-				out.min(config.max_silence.unwrap_or(out))
+			};
+
+			while sleep_time > 0 {
+				thread::sleep(Duration::from_millis(sleep_time.min(20)));
+				sleep_time -= 20;
 			}
-		};
 
-		while sleep_time > 0 {
-			thread::sleep(Duration::from_millis(sleep_time.min(20)));
-			sleep_time -= 20;
-		}
+			// keep alive
+			if ka_time.map(|t: Instant| t.elapsed() >= ka_freq).unwrap_or(true) {
+				(&mut ka_buf[..]).write_u64::<LittleEndian>(ka_count);
+				socket.send_to(&ka_buf[..], &config.address);
+				ka_count += 1;
+				ka_time = Some(Instant::now());
+			}
 
-		while let Ok((sz, addr)) = socket.recv_from(&mut rxbuf) {
-			println!("Received {:?} bytes from {:?}", sz, addr);
+			while let Ok((sz, addr)) = socket.recv_from(&mut rxbuf) {
+				println!("Received {:?} bytes from {:?}", sz, addr);
+			}
+
+			// may need to exit early
+			if let Some(end) = end {
+				if start.elapsed() >= end {
+					return;
+				}
+			}
 		}
 	}
 }
 
-pub fn server (config: Config) {
+pub fn server(config: &Config) {
 	// Okay, figure out what I want to do.
 	// Simplification for now: cache IPs and ssrcs
 	// (src picks randomly).
 	// Just run it as one room, which everyone joins.
 	// FIXME: assign SSRC and send out-of-band.
-	// FIXME: assign clients to rooms so that it's not a massive 256-man call?
 	let socket = make_udp_socket(config.port, false).unwrap();
 
+	let mut rooms: Vec<Vec<SocketAddr>> = vec![vec![]];
 	let mut ip_map: HashMap<u32, SocketAddr> = Default::default();
+	let mut room_map: HashMap<SocketAddr, usize> = Default::default();
 	let mut buf = [0u8; 1560];
+	let mut rng = thread_rng();
+	let room_size_distrib = Uniform::new(
+		config.min_room_size,
+		config.max_room_size,
+	);
+	let mut room_cap = room_size_distrib.sample(&mut rng);
 
 	loop {
 		if let Ok((sz, addr)) = socket.recv_from(&mut buf) {
-			println!("Packet!");
-			let ssrc = (&buf[8..12]).read_u32::<NetworkEndian>().unwrap();
+			// println!("packet!");
+			match classify(&buf[..sz]) {
+				PacketType::KeepAlive => {
+					// println!("ka!");
+					// Bounce the message back to them.
+					socket.send_to(&buf[..sz], addr);
+				},
+				PacketType::Rtp => {
+					// println!("rtp!");
+					// Find the room, send to everyone else in the room.
+					let ssrc = (&buf[8..12]).read_u32::<NetworkEndian>().unwrap();
 
-			let _ = ip_map.insert(ssrc, addr);
+					let found_room = room_map.entry(addr)
+						.or_insert_with(|| {
+							rooms.last_mut()
+								.and_then(|r| Some(r.push(addr)));
+							rooms.len() - 1
+						});
 
-			for (o_ssrc, o_addr) in ip_map.iter() {
-				if *o_ssrc != ssrc {
-					socket.send_to(&buf[..sz], o_addr);
-					println!("Sent {} bytes to {:?}", sz, o_addr);
+					// println!("host {:?} in room {:?}", addr, found_room);
+
+					if let Some(room) = rooms.last() {
+						if config.split_rooms && room.len() >= room_cap {
+							room_cap = room_size_distrib.sample(&mut rng);
+							rooms.push(vec![]);
+						}
+					}
+
+					let _ = ip_map.insert(ssrc, addr);
+
+					for o_addr in rooms[*found_room].iter() {
+						if *o_addr != addr {
+							socket.send_to(&buf[..sz], o_addr);
+							println!("Sent {} bytes to {:?}", sz, o_addr);
+						}
+					}
 				}
 			}
 		}
+	}
+}
+
+enum PacketType {
+	KeepAlive,
+	Rtp,
+}
+
+fn classify(bytes: &[u8]) -> PacketType {
+	match bytes.len() {
+		8 => PacketType::KeepAlive,
+		_ => PacketType::Rtp,
 	}
 }

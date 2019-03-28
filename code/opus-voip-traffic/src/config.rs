@@ -17,4 +17,9 @@ pub struct Config {
 
 	// Concurrent execution strains.
 	pub thread_count: usize,
+
+	// Server config stuff
+	pub min_room_size: usize,
+	pub max_room_size: usize,
+	pub split_rooms: bool,
 }

@@ -68,6 +68,23 @@ fn main() {
 				.takes_value(true)
 				.default_value("1"))
 
+			// Server configs.
+			.arg(Arg::with_name("min-room-size")
+				.long("min-room-size")
+				.value_name("N")
+				.help("Minimum amount of callers to place into a room.")
+				.takes_value(true)
+				.default_value("2"))
+			.arg(Arg::with_name("max-room-size")
+				.long("max-room-size")
+				.value_name("N")
+				.help("Maximum amount of callers to place into a room.")
+				.takes_value(true)
+				.default_value("8"))
+			.arg(Arg::with_name("single-room")
+				.long("single-room")
+				.help("Place all callers into a single room."))
+
 			.get_matches();
 
 	let ip = matches.value_of_lossy("ip")
@@ -108,6 +125,18 @@ fn main() {
 		.parse::<usize>()
 		.expect("Thread count must be an integer.");
 
+	let min_room_size = matches.value_of_lossy("min-room-size")
+		.expect("Room minimum always guaranteed to exist.")
+		.parse::<usize>()
+		.expect("Room minimum must be an integer.");
+
+	let max_room_size = matches.value_of_lossy("max-room-size")
+		.expect("Room maximum always guaranteed to exist.")
+		.parse::<usize>()
+		.expect("Room maximum must be an integer.");
+
+	let split_rooms = !matches.is_present("single-room");
+
 	let config = Config {
 		address,
 		port,
@@ -118,11 +147,15 @@ fn main() {
 		randomise_duration,
 
 		thread_count,
+
+		min_room_size,
+		max_room_size,
+		split_rooms,
 	};
 
 	if matches.is_present("server") {
-		opus_voip_traffic::server(config);
+		opus_voip_traffic::server(&config);
 	} else {
-		opus_voip_traffic::client(config);
+		opus_voip_traffic::client(&config);
 	}
 }
