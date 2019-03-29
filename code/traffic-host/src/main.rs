@@ -12,9 +12,9 @@ static BITS_IN_BYTE: f64 = 8.0;
 
 fn parse_dl_rate(matches: &ArgMatches, param_name: &str) -> u64 {
 	let val = matches.value_of(param_name)
-		.expect(&format!("Must have a value for parameter {}.", param_name))
+		.unwrap_or_else(|| panic!("Must have a value for parameter {}.", param_name))
 		.parse::<f64>()
-		.expect(&format!("Bandwidth value {} must be numeric.", param_name));
+		.unwrap_or_else(|_| panic!("Bandwidth value {} must be numeric.", param_name));
 
 	match val {
 		r if r > 0.0 => (BYTES_IN_MEGABYTE * r / BITS_IN_BYTE) as u64,

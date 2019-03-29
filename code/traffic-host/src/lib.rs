@@ -88,7 +88,7 @@ enum CliCommand {
 fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 	let mut easy = Easy::new();
 	let url_path = Url::parse(&options.url)
-			.expect(&format!("Not given a valid url! Saw: {:?}", &options.url))
+			.unwrap_or_else(|_| panic!("Not given a valid url! Saw: {:?}", &options.url))
 			.path()[1..]
 			.to_string();
 
@@ -142,7 +142,7 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 		}
 	}
 
-	let tracker = options.requests.clone();
+	let tracker = options.requests;
 
 	enqueue(
 		available_targets.get(draw.sample(&mut rng_local))
@@ -160,17 +160,18 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 			Err(TryRecvError::Empty) => {
 				// Make a request. It's our time!
 				let req = work_queue.pop().unwrap();
-				let target_url = file_urls.get(&req.path).unwrap();
+				let target_url = &file_urls[&req.path];
 
 				// May want to bind write function handlers, idk.
 				// Also, bind to append the document needed I guess...
 				easy.url(&target_url).unwrap();
 				easy.max_send_speed(options.max_up).unwrap();
 				easy.max_recv_speed(options.max_down).unwrap();
+				// 3 min timeout, just in case a DL gets utterly starved.
+				easy.timeout(Duration::from_secs(180)).unwrap();
 
-				match easy.perform() {
-					Err(e) => {},//eprintln!("error making download: {:?}", e),
-					_ => {},
+				if let Err(e) = easy.perform() {
+					eprintln!("error making download: {:?}", e);
 				}
 
 				// Go over deps, add them.
@@ -193,8 +194,8 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 						break;
 					}
 
-					for i in 0..visited.len() {
-						visited[i] = false;
+					for item in &mut visited {
+						*item = false;
 					}
 
 					if options.wait_ms > empty_dur {
