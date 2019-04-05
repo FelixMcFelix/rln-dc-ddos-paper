@@ -5,6 +5,9 @@ use std::{
 
 #[derive(Debug)]
 pub struct Config {
+	// Base directory
+	pub base_dir: String,
+
 	// Connectivity
 	pub address: SocketAddr,
 	pub port: u16,

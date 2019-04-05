@@ -16,8 +16,8 @@ const TRACE_DIR: &str = "traces/";
 
 pub type Trace = Vec<PacketChainLink>;
 
-pub fn read_traces() -> Vec<Trace> {
-	let file_entries: Vec<PathBuf> = fs::read_dir(TRACE_DIR)
+pub fn read_traces(base_dir: &String) -> Vec<Trace> {
+	let file_entries: Vec<PathBuf> = fs::read_dir(&format!("{}/{}", base_dir, TRACE_DIR))
 		.expect("Couldn't read files in trace directory...")
 		.filter_map(|x| if let Ok(x) = x {
 			Some(x.path())

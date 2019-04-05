@@ -58,7 +58,7 @@ fn make_udp_socket(port: u16, non_block: bool) -> IoResult<UdpSocket> {
 }
 
 pub fn client(config: &Config) {
-	let ts = trace::read_traces();
+	let ts = trace::read_traces(&config.base_dir);
 
 	crossbeam::scope(|s| {
 		for i in 0..config.thread_count {

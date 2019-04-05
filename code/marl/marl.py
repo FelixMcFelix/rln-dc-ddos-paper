@@ -250,6 +250,19 @@ def marlExperiment(
 		) + (
 			[] if randomise_count is None else ["-c", str(randomise_count)]
 		)
+	def opus_cmd(bw):
+		# Do we want multiple calls?
+		# assume bw is constant, average packet size is 269 bytes...
+		# We send 50 packets/sec on discord.
+		flow_bw = ((269.0 / 8.0) * 50.0) / (1048576.0)
+		return [
+			"../opus-voip-traffic/target/release/opus-voip-traffic",
+			"-i", "10.0.0.1",
+			"-m", "5000",
+			"-c", str(max(1, int(bw / flow_bw))),
+                        "-b", "../opus-voip-traffic",
+		]
+
 	break_equal = (spiffy_mode) if break_equal is None else break_equal
 
 	sarsaParams = {
@@ -1339,11 +1352,17 @@ def marlExperiment(
 		server_proc = None
 
 		if model == "nginx":
-			cmd = [
-				"nginx",
-				"-p", "../traffic-host",
-				"-c", "h1.conf",
-			]
+			if submodel is None:
+				cmd = [
+					"nginx",
+					"-p", "../traffic-host",
+					"-c", "h1.conf",
+				]
+			elif submodel == "opus-voip":
+				cmd = [
+					"../opus-voip-traffic/target/release/opus-voip-traffic",
+					"--server",
+				]
 
 			server_proc = server.popen(
 				cmd, stdin=PIPE, stderr=sys.stderr
@@ -1378,6 +1397,8 @@ def marlExperiment(
 				elif model == "nginx":
 					if submodel == "http" or (submodel is None and good):
 						cmd = th_cmd(bw)
+					if submodel == "opus-voip" or (submodel is None and good):
+						cmd = opus_cmd(bw)
 					elif submodel == "udp-flood" or (submodel is None and not good):
 						#rate_const = 3.0 if not good else 4.0
 						udp_h_size = 28.0
@@ -1523,9 +1544,13 @@ def marlExperiment(
 								switch_cmd(parent, [], ip_masker_message(newIP[0], ip), False)
 								# TODO: think about changing bw/goodness?
 
+							if submodel is None:
+								cmd = th_cmd(bw)
+							elif submodel == "opus-voip":
+								cmd = opus_cmd(bw)
 							# restart traffic-host
 							host_procs[counter] = host.popen(
-								th_cmd(bw), stdin=sys.stdout, stderr=sys.stderr
+								cmd, stdin=sys.stdout, stderr=sys.stderr
 							)
 						counter += 1
 
