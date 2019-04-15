@@ -13,6 +13,14 @@ fn main() {
 			.version("0.1.0")
 			.author("Kyle Simpson <k.simpson.1@research.gla.ac.uk>")
 			.about("Generate UDP traffic matching the distribution of Opus VOIP traffic")
+			// Base dir.
+			.arg(Arg::with_name("base-dir")
+				.short("b")
+				.long("base-dir")
+				.value_name("DIR")
+				.help("Path to this program's base folder.")
+				.takes_value(true)
+				.default_value("."))
 
 			// Connectivity / main operation.
 			.arg(Arg::with_name("ip")
@@ -30,7 +38,7 @@ fn main() {
 				.takes_value(true)
 				.default_value("50864"))
 			.arg(Arg::with_name("server")
-				.short("b")
+				.short("s")
 				.long("server")
 				.help("Run in server mode."))
 
@@ -135,9 +143,15 @@ fn main() {
 		.parse::<usize>()
 		.expect("Room maximum must be an integer.");
 
+	let base_dir = matches.value_of_lossy("base-dir")
+		.expect("Base directory always guaranteed to exist.")
+		.to_string();
+
 	let split_rooms = !matches.is_present("single-room");
 
 	let config = Config {
+		base_dir,
+
 		address,
 		port,
 

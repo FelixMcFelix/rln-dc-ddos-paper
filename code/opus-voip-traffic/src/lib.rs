@@ -59,7 +59,7 @@ fn make_udp_socket(_port: u16, non_block: bool) -> IoResult<UdpSocket> {
 }
 
 pub fn client(config: &Config) {
-	let ts = trace::read_traces();
+	let ts = trace::read_traces(&config.base_dir);
 
 	crossbeam::scope(|s| {
 		for i in 0..config.thread_count {
@@ -109,7 +109,9 @@ fn inner_client(config: &Config, ts: &Vec<Trace>) {
 
 	// IDEA: if we haven't passed the LB then draw another entry.
 	// BUT if there's a RANDOM UB defined, we need to keep drawing to hit that.
-	while start.elapsed() < config.duration_lb || (config.randomise_duration && start.elapsed() < end.unwrap()) {
+	let mut not_gone = true;
+	while not_gone || start.elapsed() < config.duration_lb || (config.randomise_duration && start.elapsed() < end.unwrap()) {
+		not_gone = false;
 		let el = &ts[draw.sample(&mut rng)];
 
 		// FIXME: need to draw more sessions if we hit end prematurely...
