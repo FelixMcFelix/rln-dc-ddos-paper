@@ -42,7 +42,7 @@ use std::{
 };
 use trace::*;
 
-fn make_udp_socket(port: u16, non_block: bool) -> IoResult<UdpSocket> {
+fn make_udp_socket(_port: u16, non_block: bool) -> IoResult<UdpSocket> {
 	let out = UdpBuilder::new_v4()?;
 	
 	out.reuse_address(true)?;
@@ -51,7 +51,8 @@ fn make_udp_socket(port: u16, non_block: bool) -> IoResult<UdpSocket> {
 		out.reuse_port(true)?;
 	}
 
-	let out = out.bind(("127.0.0.1", port))?;
+	//let out = out.bind(("127.0.0.1", port))?;
+	let out = out.bind("0.0.0.0:0")?;
 	out.set_nonblocking(non_block)?;
 
 	Ok(out)
