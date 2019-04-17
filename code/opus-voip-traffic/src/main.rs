@@ -6,7 +6,7 @@ use std::{
 };
 
 fn main() {
-	env_logger::init();
+	//env_logger::init();
 
 	let matches =
 		App::new("Opus VOIP traffic Generator")

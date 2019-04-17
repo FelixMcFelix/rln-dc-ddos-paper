@@ -27,12 +27,17 @@ algos = [
 ]
 
 # host_p, dt
-host_ps = [(16, 0.05)]
+host_ps = [
+	(16, 0.05),
+#	(2, 0.05),
+#	(1, 0.05),
+]
 
 # prefix, tcp?
 traffic_types = [
-#	("udp", False),
-	("tcp", True),
+#	"udp",
+	"tcp",
+#	"opus",
 ]
 
 # prefix, single_learner
@@ -78,8 +83,8 @@ if __name__ == "__main__":
 		"explore_episodes": 0.8,
 		"episodes": 10,
 		#"episodes": 2,
-		"episode_length": 30000,
-		#"episode_length": 30,
+		#"episode_length": 30000,
+		"episode_length": 10000,
 		"separate_episodes": True,
 
 		"rf": "ctl",
@@ -109,8 +114,8 @@ if __name__ == "__main__":
 	deps.append(host_ps)
 
 	# Traffic model stuff
-	(traffic_prefix, is_tcp) = expt_part(traffic_types, deps)
-	if is_tcp:
+	traffic_prefix = expt_part(traffic_types, deps)
+	if traffic_prefix == "tcp":
 		params["model"] = "nginx"
 		params["randomise"] = True
 		params["randomise_count"] = 1
@@ -118,11 +123,15 @@ if __name__ == "__main__":
 		params["reward_direction"] = "out"
 		params["evil_range"] = [4, 7]
 		#params["use_controller"] = True
-	else:
+	elif traffic_prefix == "udp":
 		params["model"] = "nginx"
 		params["submodel"] = "udp-flood"
 		#params["use_controller"] = False
-		pass
+	elif traffic_prefix == "opus":
+		params["model"] = "nginx"
+		params["submodel"] = "opus-voip"
+		params["randomise"] = True
+		params["randomise_new_ip"] = True
 	deps.append(traffic_types)
 
 	broken_math = expt_part(maths, deps)

@@ -253,10 +253,12 @@ def marlExperiment(
 	def opus_cmd(bw):
 		# Do we want multiple calls?
 		# assume bw is constant, average packet size is 269 bytes...
-		# We send 50 packets/sec on discord.
-		flow_bw = ((269.0 / 8.0) * 50.0) / (1048576.0)
+		# We send 50 packets/sec on discord, convert to bps.
+		flow_bw = ((269.0 * 8.0) * 50.0) / (1048576.0)
+		#print str(max(1, int(bw / flow_bw)))
 		return [
 			"../opus-voip-traffic/target/release/opus-voip-traffic",
+			#"../opus-voip-traffic/target/debug/opus-voip-traffic",
 			"-i", "10.0.0.1",
 			"-m", "5000",
 			"-c", str(max(1, int(bw / flow_bw))),
@@ -1395,11 +1397,12 @@ def marlExperiment(
 						[] if old_style else ["-M", str(bw)]
 					) + [(good_file if good else bad_file)]
 				elif model == "nginx":
+					# TODO: split into good_model and bad_model choices
 					if submodel == "http" or (submodel is None and good):
 						cmd = th_cmd(bw)
-					if submodel == "opus-voip" or (submodel is None and good):
+					elif submodel == "opus-voip" and good:
 						cmd = opus_cmd(bw)
-					elif submodel == "udp-flood" or (submodel is None and not good):
+					elif submodel == "udp-flood" or ((submodel is None or submodel == "opus-voip") and not good):
 						#rate_const = 3.0 if not good else 4.0
 						udp_h_size = 28.0
 						bw_MB = (bw / 8.0) * (10.0**6.0)
@@ -1425,8 +1428,11 @@ def marlExperiment(
 					cmd = []
 
 				if len(cmd) > 0:
+					env_new = os.environ.copy()
+					env_new["RUST_BACKTRACE"] = "1"
 					host_procs.append(host.popen(
 						cmd, stdin=PIPE, stderr=sys.stdout,
+						env=env_new
 					))
 
 		# Let the pcaps come to life.
@@ -1530,7 +1536,8 @@ def marlExperiment(
 				counter = 0
 				for (_, _, _, _, hosts, _) in teams:
 					for (host, good, bw, link, ip) in hosts:
-						finished = host_procs[counter].poll() is not None
+						curr_proc = host_procs[counter]
+						finished = curr_proc.poll() is not None
 						if good and finished:
 							my_if = host.intf()
 							if randomise_new_ip:

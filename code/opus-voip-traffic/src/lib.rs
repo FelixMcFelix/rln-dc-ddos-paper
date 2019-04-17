@@ -42,7 +42,7 @@ use std::{
 };
 use trace::*;
 
-fn make_udp_socket(_port: u16, non_block: bool) -> IoResult<UdpSocket> {
+fn make_udp_socket(port: u16, non_block: bool) -> IoResult<UdpSocket> {
 	let out = UdpBuilder::new_v4()?;
 	
 	out.reuse_address(true)?;
@@ -52,14 +52,15 @@ fn make_udp_socket(_port: u16, non_block: bool) -> IoResult<UdpSocket> {
 	}
 
 	//let out = out.bind(("127.0.0.1", port))?;
-	let out = out.bind("0.0.0.0:0")?;
+	let out = out.bind(("0.0.0.0", port))?;
 	out.set_nonblocking(non_block)?;
 
 	Ok(out)
 }
 
 pub fn client(config: &Config) {
-	let ts = trace::read_traces(&config.base_dir);
+	//let ts = trace::read_traces(&config.base_dir);
+	let ts = trace::read_traces_memo(&config.base_dir);
 
 	crossbeam::scope(|s| {
 		for i in 0..config.thread_count {
@@ -73,7 +74,7 @@ pub fn client(config: &Config) {
 const CMAC_BYTES: usize = 16;
 const RTP_BYTES: usize = 12;
 
-fn inner_client(config: &Config, ts: &Vec<Trace>) {
+fn inner_client(config: &Config, ts: &TraceHolder) {//&Vec<Trace>) {
 	let mut rng = thread_rng();
 
 	let draw = Uniform::new(0, ts.len());
@@ -101,9 +102,10 @@ fn inner_client(config: &Config, ts: &Vec<Trace>) {
 		config.duration_ub
 	};
 
+    let port = 0;
 	let socket = make_udp_socket(port, true).unwrap();
 
-	println!("Listening on port {:?}", port);
+	//println!("Listening on port {:?}", port);
 	let ssrc = rng.gen::<u32>();
 	(&mut buf[8..12]).write_u32::<NetworkEndian>(ssrc);
 
@@ -112,7 +114,11 @@ fn inner_client(config: &Config, ts: &Vec<Trace>) {
 	let mut not_gone = true;
 	while not_gone || start.elapsed() < config.duration_lb || (config.randomise_duration && start.elapsed() < end.unwrap()) {
 		not_gone = false;
-		let el = &ts[draw.sample(&mut rng)];
+		let el_lock = ts.get_trace(draw.sample(&mut rng));
+		let el_guard = el_lock.read();
+
+		let el = el_guard.as_ref()
+			.expect("File should have been filled in if a read lock was fulfilled...");
 
 		// FIXME: need to draw more sessions if we hit end prematurely...
 		let mut last_size = None;
@@ -122,19 +128,19 @@ fn inner_client(config: &Config, ts: &Vec<Trace>) {
 				Packet(p) => {
 					let p = usize::from(p.get());
 					last_size = Some(p);
-					println!("Sending packet of size {:?} (before CMAC, RTP, ... )", p);
+					//println!("Sending packet of size {:?} (before CMAC, RTP, ... )", p);
 					socket.send_to(&buf[..p + CMAC_BYTES + RTP_BYTES], &config.address);
 					0
 				},
 				Missing(t) => {
 					if let Some(p) = last_size {
-						println!("Sending packet of size {:?} (before CMAC, RTP, ... )", p);
+						//println!("Sending packet of size {:?} (before CMAC, RTP, ... )", p);
 						socket.send_to(&buf[..p + CMAC_BYTES + RTP_BYTES], &config.address);
 					}
 					0
 				},
 				Silence(t) => {
-					println!("Waiting for {:?}ms.", t);
+					//println!("Waiting for {:?}ms.", t);
 					// Note: won't receive packets in here...
 					let out = u64::from(*t);
 					out.min(config.max_silence.unwrap_or(out))
@@ -155,7 +161,7 @@ fn inner_client(config: &Config, ts: &Vec<Trace>) {
 			}
 
 			while let Ok((sz, addr)) = socket.recv_from(&mut rxbuf) {
-				println!("Received {:?} bytes from {:?}", sz, addr);
+				//println!("Received {:?} bytes from {:?}", sz, addr);
 			}
 
 			// may need to exit early
@@ -222,7 +228,7 @@ pub fn server(config: &Config) {
 					for o_addr in rooms[*found_room].iter() {
 						if *o_addr != addr {
 							socket.send_to(&buf[..sz], o_addr);
-							println!("Sent {} bytes to {:?}", sz, o_addr);
+							//println!("Sent {} bytes to {:?}", sz, o_addr);
 						}
 					}
 				}
