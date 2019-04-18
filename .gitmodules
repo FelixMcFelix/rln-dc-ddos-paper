@@ -10,3 +10,6 @@
 [submodule "code/caida-stats"]
 	path = code/caida-stats
 	url = https://github.com/FelixMcFelix/caida-stats.git
+[submodule "code/opus-voip-traffic"]
+	path = code/opus-voip-traffic
+	url = https://github.com/FelixMcFelix/opus-voip-traffic.git
