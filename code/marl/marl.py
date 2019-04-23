@@ -252,17 +252,18 @@ def marlExperiment(
 		)
 	def opus_cmd(bw):
 		# Do we want multiple calls?
-		# assume bw is constant, average packet size is 269 bytes...
-		# We send 50 packets/sec on discord, convert to bps.
-		flow_bw = ((269.0 * 8.0) * 50.0) / (1048576.0)
-		#print str(max(1, int(bw / flow_bw)))
+		# The stats observed show that flows occupy (in expectation)
+		# ~52kbps (median 49.906) with the below settings. If flows were constantly submitting,
+		# we'd see ~85kbps (median 97) accounting for a target 96kbps (w/ some per-server deviation)
+		flow_bw = 52.39456 * 1024.0 # to mbps.
+		
 		return [
 			"../opus-voip-traffic/target/release/opus-voip-traffic",
 			#"../opus-voip-traffic/target/debug/opus-voip-traffic",
 			"-i", "10.0.0.1",
 			"-m", "5000",
 			"-c", str(max(1, int(bw / flow_bw))),
-                        "-b", "../opus-voip-traffic",
+			"-b", "../opus-voip-traffic",
 		]
 
 	break_equal = (spiffy_mode) if break_equal is None else break_equal
@@ -1372,7 +1373,7 @@ def marlExperiment(
 
 		if model == "nginx":
 			#net.interact()
-                        pass
+						pass
 
 		server_ip = server.IP()
 
