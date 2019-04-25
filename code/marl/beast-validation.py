@@ -28,16 +28,16 @@ algos = [
 
 # host_p, dt
 host_ps = [
-	(16, 0.05),
-#	(2, 0.05),
+#	(16, 0.05),
+	(2, 0.05),
 #	(1, 0.05),
 ]
 
 # prefix, tcp?
 traffic_types = [
 #	"udp",
-	"tcp",
-#	"opus",
+#	"tcp",
+	"opus",
 ]
 
 # prefix, single_learner
@@ -78,7 +78,7 @@ if __name__ == "__main__":
 		"alpha": 0.05,
 		"epsilon": 0.2,
 		"discount": 0.0,
-		"dt": 0.05,
+                "dt": 0.05,
 
 		"explore_episodes": 0.8,
 		"episodes": 10,

@@ -71,6 +71,7 @@ def marlExperiment(
 
 		model = "tcpreplay",
 		submodel = None,
+                rescale_opus = False,
 
 		use_controller = False,
 		moralise_ips = True,
@@ -110,6 +111,8 @@ def marlExperiment(
 		bw_mon_socketed = False,
 		unix_sock = True,
 		print_times = False,
+                # Can set to "no", "udp", "always"
+		prevent_smart_switch_recording = "udp",
 		# FIXME: these two flags ae incompatible
 		record_times = False,
 		record_deltas_in_times = False,
@@ -250,20 +253,33 @@ def marlExperiment(
 		) + (
 			[] if randomise_count is None else ["-c", str(randomise_count)]
 		)
-	def opus_cmd(bw):
+	def opus_cmd(bw, host):
 		# Do we want multiple calls?
 		# The stats observed show that flows occupy (in expectation)
 		# ~52kbps (median 49.906) with the below settings. If flows were constantly submitting,
 		# we'd see ~85kbps (median 97) accounting for a target 96kbps (w/ some per-server deviation)
-		flow_bw = 52.39456 * 1024.0 # to mbps.
+                divisor = 1.0
+                if rescale_opus:
+                    ub = host_range[1]
+                    # lerp between some observations at differing n
+                    pt = float(max(0, ub - 2)) / 14.0
+                    divisor = 0.6 + pt * (0.45 - 0.6)
+                    print "rescaled to", divisor
+		flow_bw = 52.39456 / (divisor * 1024.0) # to mbps.
+		subclient_count = int(math.ceil(max(1.0, bw / flow_bw)))
+		print subclient_count
 		
 		return [
 			"../opus-voip-traffic/target/release/opus-voip-traffic",
 			#"../opus-voip-traffic/target/debug/opus-voip-traffic",
 			"-i", "10.0.0.1",
 			"-m", "5000",
-			"-c", str(max(1, int(bw / flow_bw))),
+			"-c", str(subclient_count),
 			"-b", "../opus-voip-traffic",
+			"--ip-strategy", "even",
+			"--iface", "{}-eth0".format(host.name),
+                        "--constant",
+                        "--refresh",
 		]
 
 	break_equal = (spiffy_mode) if break_equal is None else break_equal
@@ -858,11 +874,15 @@ def marlExperiment(
 			ss_label=None, port_dict=None):
 		leader = routedSwitch(parent, 0, port_dict=port_dict)
 
-		def add_to_graph(parent, new_child):
-			label = (None, new_child.dpid)
+		def add_to_graph(parent, new_child, label=None):
+			if label is None:
+				label = (None, new_child.dpid)
 			if graph is not None and parent is not None:
 				graph.add_edge(parent, label)
 			return label
+
+		def link_to_outside(parent):
+			return add_to_graph(parent, None, label=(("0.0.0.0", None), None))
 
 		leader_label = add_to_graph(ss_label, leader)
 
@@ -880,7 +900,8 @@ def marlExperiment(
 
 			for j in xrange(learners_per_inter):
 				new_learn = routedSwitch(new_interm, 1, port_dict=port_dict)
-				_ = add_to_graph(inter_label, new_learn)
+				nll = add_to_graph(inter_label, new_learn)
+				_ = link_to_outside(nll)
 
 				# Init and pair the actual learning agent here, too!
 				# Bootstrapping happens later -- per-episode, in the 0-load state.
@@ -1024,8 +1045,9 @@ def marlExperiment(
 				(maybe_ip, maybe_dpid) = node
 				if maybe_ip is not None:
 					(ip, mac) = maybe_ip
-					ips.append(node)
-					inner_host_macs[ip] = mac
+					if mac is not None:
+						ips.append(node)
+						inner_host_macs[ip] = mac
 				if maybe_dpid is not None:
 					dpids.append(node)
 
@@ -1035,15 +1057,27 @@ def marlExperiment(
 
 			# for each dpid, find the port which is closest to each IP
 			entry_map = {}
+			escape_map = {}
 			for dnode in dpids:
 				(_, dpid) = dnode
 				entry_map[dpid] = {}
+				escape_map[dpid] = set()
+				# FIXME: adapt for ECMP networks
 				for inode in ips:
 					((ip, _), _) = inode
 					path = apsp[dnode][inode]
 					port = port_dict[dpid][hard_label(path[1])]
 					# (port_no, adjacent?)
 					entry_map[dpid][ip] = (port, len(path)==2)
+				# Now, compute the list of escape paths for each node
+				# don't really care about how slow this is.
+				escape_paths = nx.all_shortest_paths(graph, dnode, (("0.0.0.0", None), None))
+				for path in escape_paths:
+					target = hard_label(path[1])
+					if target == "0.0.0.0":
+						continue
+					port = port_dict[dpid][target]
+					escape_map[dpid].add(port)
 
 			# handle those conns
 			# now send computed stuff to ctl...
@@ -1062,7 +1096,7 @@ def marlExperiment(
 				data_sock = sock.accept()[0]
 				try:
 					# pickle, send its length, send the pickle...
-					pickle_str = pickle.dumps((entry_map, inner_host_macs))
+					pickle_str = pickle.dumps((entry_map, escape_map, inner_host_macs, prevent_smart_switch_recording))
 					data_sock.sendall(struct.pack("!Q", len(pickle_str)))
 					data_sock.sendall(pickle_str)
 				finally:
@@ -1402,7 +1436,7 @@ def marlExperiment(
 					if submodel == "http" or (submodel is None and good):
 						cmd = th_cmd(bw)
 					elif submodel == "opus-voip" and good:
-						cmd = opus_cmd(bw)
+						cmd = opus_cmd(bw, host)
 					elif submodel == "udp-flood" or ((submodel is None or submodel == "opus-voip") and not good):
 						#rate_const = 3.0 if not good else 4.0
 						udp_h_size = 28.0
@@ -1555,7 +1589,7 @@ def marlExperiment(
 							if submodel is None:
 								cmd = th_cmd(bw)
 							elif submodel == "opus-voip":
-								cmd = opus_cmd(bw)
+								cmd = opus_cmd(bw, host)
 							# restart traffic-host
 							host_procs[counter] = host.popen(
 								cmd, stdin=sys.stdout, stderr=sys.stderr

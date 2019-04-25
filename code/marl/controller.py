@@ -9,7 +9,7 @@ from ryu.controller import ofp_event
 from ryu.controller.handler import CONFIG_DISPATCHER, MAIN_DISPATCHER
 from ryu.controller.handler import set_ev_cls
 from ryu.ofproto import ofproto_v1_4
-from ryu.lib.packet import packet, ipv4, ethernet, arp, ether_types
+from ryu.lib.packet import packet, ipv4, ethernet, arp, ether_types, in_proto
 
 ipv4_eth = 0x0800
 
@@ -49,11 +49,14 @@ class SmartishRouter(app_manager.RyuApp):
 			while len(buf) < pickle_len:
 				buf += data_sock.recv(4096)
 
-			(routes, macs) = pickle.loads(buf)
+			(routes, ways_out, macs, not_clever) = pickle.loads(buf)
 			print(pickle_len)
 			print(routes, macs)
+			print(ways_out)
 			self.entry_map = routes
+			self.escape_map = ways_out
 			self.macs = macs
+			self.no_record_escape = not_clever
 		#print "I am now alive, controlling all...!"
 
 	def local_ip(self):
@@ -124,17 +127,46 @@ class SmartishRouter(app_manager.RyuApp):
 		#	miss -> controller
 
 		t = 1
-		self.table_miss(datapath,
-			actions=[parser.OFPActionOutput(ofp.OFPP_CONTROLLER)],
-			table_id=t)
+		if self.no_record_escape == "always":
+			self.table_miss(datapath,
+				next_table=3,
+				table_id=t)
+		else:
+			self.table_miss(datapath,
+				actions=[parser.OFPActionOutput(ofp.OFPP_CONTROLLER)],
+				table_id=t)
+		# if we don't record waybacks for UDP, just forward them to the dst table (hi-prio)
+		if self.no_record_escape == "udp":
+			self.add_flow(datapath, 2,
+				parser.OFPMatch(
+					eth_type=ipv4_eth,
+					ip_proto=in_proto.IPPROTO_UDP,
+				),
+				next_table=3,
+				table_id=t)
 
 		# Table 2: (external dest routing)
 		#	((dest ip -> output route))
 		#	miss -> flood
 
 		t = 2
+		# Set up a group according to ways out.
+		# Mode: select (i.e. ECMP hashed)
+		# Each bucket corresponds to an identified "way out".
+		# On miss, use this group action.
+		# For this network, only one "outside" so only one group, 0.
+		buckets = []
+		for port in self.escape_map[dpid]:
+			bucket = parser.OFPBucket(1, actions=[
+				parser.OFPActionOutput(port)
+			])
+			buckets.append(bucket)
+
+			self.add_group(datapath, buckets)
+
 		self.table_miss(datapath,
-			actions=[parser.OFPActionOutput(ofp.OFPP_FLOOD)],
+#			actions=[parser.OFPActionOutput(ofp.OFPP_FLOOD)],
+			actions=[parser.OFPActionGroup(0)],
 			table_id=t)
 
 		# Table 3: (internal dest routing)
@@ -174,6 +206,20 @@ class SmartishRouter(app_manager.RyuApp):
 		#	)
 		print("done setting up switch")
 			
+	def add_group(self, datapath, buckets=[], command=None, type_=None, group_id=0):
+		ofproto = datapath.ofproto
+		parser = datapath.ofproto_parser
+
+                if command is None:
+                    command = ofproto.OFPGC_ADD
+                if type_ is None:
+                    type_ = ofproto.OFPGT_SELECT
+
+		mod = parser.OFPGroupMod(datapath, command,
+			type_, group_id, buckets)
+
+		datapath.send_msg(mod)
+
 	def add_flow(self, datapath, priority, match, actions=None, table_id=0, next_table=None, importance=1):
 		ofproto = datapath.ofproto
 		parser = datapath.ofproto_parser
