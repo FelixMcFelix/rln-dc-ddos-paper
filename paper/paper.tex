@@ -839,6 +839,8 @@ for the \emph{maximum segment size} (MSS), \emph{round trip time} (RTT), a choic
 ?? Does Mathis still hold? We observed similar trends empirically, but perhaps not the \emph{exact} curve or falloff behaviour...
 Accordingly, benign TCP flows are severely harmed by \emph{any} packet drop, so collateral damage to these hosts is more significant; good-faith TCP congestion avoidance causes these flows to attempt to back off very quickly.
 
+TCP-Cubic still has a dependence on the $1/p^{0.75}$ -- slightly slower falloff, but still significant \cite{rfc8312}.
+
 TCP traffic as it appears here is generated according to \Cref{sec:a-new-normal}.
 \Cref{fig:nginx-coffin-nail} shows that this model performs poorly when attempting to safeguard TCP traffic, though it remains better than leaving the network unprotected.
 %?? Talk about the same major points you made in the presentation here (i.e. TCP interactions) w/ pushback. Or in the evaluation...

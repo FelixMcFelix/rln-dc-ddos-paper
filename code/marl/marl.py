@@ -68,10 +68,11 @@ def marlExperiment(
 		algo = "sarsa",
 		trace_decay = 0.0,
 		trace_threshold = 0.0001,
+		use_path_measurements = True,
 
 		model = "tcpreplay",
 		submodel = None,
-                rescale_opus = False,
+		rescale_opus = False,
 
 		use_controller = False,
 		moralise_ips = True,
@@ -111,7 +112,7 @@ def marlExperiment(
 		bw_mon_socketed = False,
 		unix_sock = True,
 		print_times = False,
-                # Can set to "no", "udp", "always"
+		# Can set to "no", "udp", "always"
 		prevent_smart_switch_recording = "udp",
 		# FIXME: these two flags ae incompatible
 		record_times = False,
@@ -132,6 +133,10 @@ def marlExperiment(
 		split_codings = False,
 		extra_codings = [],
 		feature_max = 12,
+		combine_with_last_action = [12, 13, 14, 15, 16, 17, 18, 19],
+		strip_last_action = True,
+		explore_feature_isolation_modifier = 1.0,
+		explore_feature_isloation_duration = 5,
 
 		trs_maxtime = None,
 		reward_band = 1.0,
@@ -258,13 +263,13 @@ def marlExperiment(
 		# The stats observed show that flows occupy (in expectation)
 		# ~52kbps (median 49.906) with the below settings. If flows were constantly submitting,
 		# we'd see ~85kbps (median 97) accounting for a target 96kbps (w/ some per-server deviation)
-                divisor = 1.0
-                if rescale_opus:
-                    ub = host_range[1]
-                    # lerp between some observations at differing n
-                    pt = float(max(0, ub - 2)) / 14.0
-                    divisor = 0.6 + pt * (0.45 - 0.6)
-                    print "rescaled to", divisor
+		divisor = 1.0
+		if rescale_opus:
+			ub = host_range[1]
+			# lerp between some observations at differing n
+			pt = float(max(0, ub - 2)) / 14.0
+			divisor = 0.6 + pt * (0.45 - 0.6)
+			print "rescaled to", divisor
 		flow_bw = 52.39456 / (divisor * 1024.0) # to mbps.
 		subclient_count = int(math.ceil(max(1.0, bw / flow_bw)))
 		print subclient_count
@@ -278,8 +283,8 @@ def marlExperiment(
 			"-b", "../opus-voip-traffic",
 			"--ip-strategy", "even",
 			"--iface", "{}-eth0".format(host.name),
-                        "--constant",
-                        "--refresh",
+			"--constant",
+			"--refresh",
 		]
 
 	break_equal = (spiffy_mode) if break_equal is None else break_equal
@@ -309,12 +314,14 @@ def marlExperiment(
 		#  pkt_in_count, pkt_out_count,
 		#  pkt_in_wnd_count, pkt_out_wnd_count,
 		#  mean_bpp_in, mean_bpp_out,
+		#  delta_in_wnd, delta_out_wnd,
 		sarsaParams["extended_mins"] = [
 			0.0, 0.0, 0.0, 0.0, 0.0,
 			0.0, -50.0, -50.0,
 			0.0, 0.0,
 			0.0, 0.0,
 			0.0, 0.0,
+			-50.0, -50.0,
 		][0:feature_max-4]
 
 		sarsaParams["extended_maxes"] = [
@@ -323,6 +330,7 @@ def marlExperiment(
 			7000.0, 7000.0,
 			2000.0, 2000.0,
 			1560.0, 1560.0,
+			50.0, 50.0,
 		][0:feature_max-4]
 
 		if restrict is not None:
@@ -338,6 +346,19 @@ def marlExperiment(
 			sarsaParams["tc_indices"] = [np.arange(sarsaParams["vec_size"])]
 		else:
 			sarsaParams["tc_indices"] = [np.arange(4)] + [[i] for i in xrange(4, sarsaParams["vec_size"])]
+
+			# Okay, index of last_action is 2 after the last global datum in the feature vector.
+			# combine_with_last_action, strip_last_action, use_path_measurements
+			# Note: its index in the feature vector is 5, its position in the list of tc indices is 2.
+			if combine_with_last_action is not None:
+				for index in combine_with_last_action:
+					# subtract (global_actions - 1) to move to correct position
+					f_index = index - 3
+					if f_index < len(sarsaParams["tc_indices"]):
+						sarsaParams["tc_indices"][f_index] += [5]
+
+			if strip_last_action:
+				del sarsaParams["tc_indices"][2]
 
 		sarsaParams["tc_indices"] += extra_codings
 
@@ -361,6 +382,8 @@ def marlExperiment(
 			flow_set["pkt_out_wnd_count"],
 			flow_set["mean_bpp_in"],
 			flow_set["mean_bpp_out"],
+			flow_set["delta_in"],
+			flow_set["delta_out"],
 		]
 
 	def combine_flow_vecs(fv1, fv2):
@@ -392,6 +415,9 @@ def marlExperiment(
 			#rescale IATs (in)
 			fv2[9] if in_count == 0.0 else (fv1_in_weight * fv1[9] + fv2_in_weight * fv2[9]) / in_count,
 			# sum deltas
+			# FIXME: this makes no sense. Why am I summing these? These seem to have predictive power, tho.
+			# NOTE: just use deltas in set mode as another 2 entries to the feature vec?
+			# I realise now that this is computing the current delta from the INITIAL MEASUREMENNT.
 			fv1[10] + fv2[10],
 			fv1[11] + fv2[11],
 			# take newest on all counts - don't fuse window pkt counts
@@ -402,6 +428,9 @@ def marlExperiment(
 			# rescale mean bpps
 			fv2[16] if in_count == 0.0 else (fv1_in_weight * fv1[16] + fv2_in_weight * fv2[16]) / in_count,
 			fv2[17] if out_count == 0.0 else (fv1_out_weight * fv1[17] + fv2_out_weight * fv2[17]) / out_count,
+			# per-window rate deltas
+			fv2[18],
+			fv2[19],
 		]
 
 	initd_host_count = [1]
@@ -1809,6 +1838,37 @@ def marlExperiment(
 									dat = flow_traces[ip]
 									(st, z) = dat[0][s_ac_num]
 									machine = dat[2]
+
+									# narrowing is on flow_trace[4]
+									# Explore (by fixating on idividual features) as a function of
+									# the agent's current epsilon...
+									narrowing_in_use = dat[4]
+
+									# handful of steps:
+									#  only draw new if none
+									#  decrement uses
+									#  don't use in update step if just generated
+									#  don't use in action step if about to expire
+									new_narrowing = False
+									allow_update_narrowing = False
+									allow_action_narrowing = False
+
+									# narrowing removal---opens up flow for other state exam again
+									if narrowing_in_use is not None and narrowing_in_use[0] <= 0:
+										narrowing_in_use = None
+
+									if narrowing_in_use is None and (np.random.uniform() < s.epsilon() * explore_feature_isolation_modifier):
+											# remaining updates, narrowing itself.
+											narrowing_in_use = [
+												explore_feature_isolation_duration,
+												np.random.choice(s.tiling_set_count),
+											]
+											new_narrowing = True
+											allow_action_narrowing = True
+									else:
+										narrowing_in_use[0] -= 1
+										allow_update_narrowing = True
+										allow_action_narrowing = narrowing_in_use[0] > 0
 									
 									(would_choose, new_vals, z_vec) = s.update(
 										state,
@@ -1816,6 +1876,8 @@ def marlExperiment(
 										(st, dat[1], z),
 										decay=False,
 										delta_space=dm,
+										action_narrowing=None if not allow_action_narrowing else narrowing_in_use[1]:
+										update_narrowing=None if not allow_update_narrowing else narrowing_in_use[1]:
 									)
 
 									if record_deltas_in_times:
@@ -1824,6 +1886,7 @@ def marlExperiment(
 									(would_choose, new_vals, z_vec) = s.bootstrap(state)
 									need_decay = False
 									machine = AcTrans()
+									narrowing_in_use = None
 
 								ac_vals += new_vals
 								substates.append((state, z_vec))
@@ -1832,7 +1895,7 @@ def marlExperiment(
 
 							l_action = last_sarsa.select_action_from_vals(ac_vals)
 							machine.move(l_action)
-							flow_traces[ip] = (substates, l_action, machine, z_vec)
+							flow_traces[ip] = (substates, l_action, machine, z_vec, narrowing_in_use)
 
 							if need_decay:
 								for (s, _) in subactors:

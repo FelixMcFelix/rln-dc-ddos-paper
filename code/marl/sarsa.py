@@ -21,6 +21,7 @@ class SarsaLearner:
 				trace_decay=0.0, trace_threshold=0.0001,
 				broken_math=False,
 				rescale_alpha=1.0,
+				increase_fixed_math_alpha_if_narrowed=True,
 				AcTrans=MarlMachine):
 		state_range = [
 			[0 for i in xrange(vec_size)] + extended_mins,
@@ -30,6 +31,8 @@ class SarsaLearner:
 		tc_indices = tc_indices if tc_indices is not None else [np.arange(vec_size)]
 		ntiles = [tile_c for _ in tc_indices]
 		ntilings = [tilings_c for _ in tc_indices]
+		self.ntilings = ntilings
+		self.tiling_set_count = len(tc_indices)
 
 		#print "tc has been configured with indices", tc_indices, "tiles", ntiles, "tilings", ntilings
 
@@ -42,6 +45,8 @@ class SarsaLearner:
 			state_range = state_range,
 			rnd_stream = np.random.RandomState(),
 		)
+		# We need access to this again if we perform feature fixation.
+		self.single_learn_rate = learn_rate
 
 		if rescale_alpha is not None and not broken_math:
 			learn_rate = (learn_rate * rescale_alpha) / float(sum(ntilings))
@@ -60,6 +65,7 @@ class SarsaLearner:
 
 		self._argmax_in_dt = False
 		self._wipe_trace_if_not_argmax = False
+		self.alpha_mod_fixed_math = increase_fixed_math_alpha_if_narrowed
 
 		self.trace_decay = trace_decay
 		self.trace_threshold = trace_threshold
@@ -78,19 +84,48 @@ class SarsaLearner:
 		self._ensure_state_vals_exist(state)
 		return [self.values[tile] for tile in state]
 
-	def _update_state_values(self, state, action, values):
+	def _update_state_values(self, state, action, values, narrowing):
 		self._ensure_state_vals_exist(state)
-		for tile, value in zip(state, values):
+
+		if narrowing is None:
+			narrowing = xrange(len(state))
+
+		# Why does this work?
+		# Action computed using only these values, we then compute the delta
+		# (using ALL values) and only propagate forward changes on the relevant tiles.
+		for i in narrowing:
+			tile = state[i]
+			value = value[i]
 			self.values[tile][action] = value
 
-	def select_action(self, state):
+	def _compute_relevant_narrowed_tilings(self, narrowing):
+		# Go from list of feature indices to list of the tilings connected
+		out = []
+		total = 0
+
+		# assume, for all our sakes, that the narrowing is sorted...
+		n_i = 0
+		for i, length in enumerate(self.ntilings):
+			if i == narrowing[n_i]:
+				# hit an included element
+				out += np.arange(total, total+length)
+				n_i += 1
+			total += length
+
+		return np.hstack(out) 
+
+	def select_action(self, state, narrowing=None):
+		# returns the action value estimate *from each tiling* as a list.
 		all_tile_action_vals = self._get_state_values(state)
 
-		# The value of each action iondividually
-		action_vals = np.zeros(len(self.actions))
-		for tile_av in all_tile_action_vals:
-			action_vals += tile_av
+		if narrowing is None:
+			narrowing = xrange(len(all_tile_action_vals))
 
+		# The value of each action individually -- sum of tilings' estimates.
+		action_vals = np.zeros(len(self.actions))
+		for tile_index in narrowing:
+			action_vals += all_tile_action_vals[tile_index]
+		
 		a_index = self.select_action_from_vals(action_vals)
 		
 		action = self.actions[a_index]
@@ -114,6 +149,9 @@ class SarsaLearner:
 		
 		return a_index
 
+	def epsilon(self):
+		return self._cur_epsilon
+
 	# Need to convert state with self.tc(...) first
 	def bootstrap(self, state):
 		# Select an action:
@@ -125,7 +163,20 @@ class SarsaLearner:
 		return (action, ac_values, z)
 
 	# Ditto. run self.tc(...) on state observation
-	def update(self, state, reward, subs_last_act=None, decay=True, delta_space=None):
+	def update(
+		self,
+		state,
+		reward,
+		subs_last_act=None,
+		decay=True,
+		delta_space=None,
+		# Narrowings are arrays of indices...
+		# Note: this will spill out as an effect upon the value of alpha
+		# if using the traditional RL math. Ignore this for now.
+		# FIXME: reconcile effect of narrowings upon learning rate when using 'intended' maths.
+		action_narrowing=None,
+		update_narrowing=None,
+	):
 		(last_state, last_action, last_z) = (self.last_act if subs_last_act is None else subs_last_act)
 
 		# because of updates in parallel, we need to grab the current values.
@@ -134,8 +185,19 @@ class SarsaLearner:
 		all_tile_action_vals = self._get_state_values(last_state)
 		last_values = np.array([av[last_action] for av in all_tile_action_vals])
 
+		## slight complication -- interaction between last & next?
+		# i.e. full -> reduced -> reduced -> full
+		# Also, each part of the vector maps to several tiles
+		if action_narrowing is not None:
+			action_narrowing = self._compute_relevant_narrowed_tilings(action_narrowing)
+		if update_narrowing is not None:
+			update_narrowing = self._compute_relevant_narrowed_tilings(update_narrowing)
+
 		# First, what is the value of the action would we choose in the new state w/ old model
-		(new_action, new_values, argmax_values, ac_values) = self.select_action(state)
+		# NOTE: we need to compute action using the possibly narrowed set of values,
+		# but we need ALL values to be made available when we are handling "transitions"
+		# between narrowed/unnarrowed regions of the markov chain.
+		(new_action, new_values, argmax_values, ac_values) = self.select_action(state, action_narrowing)
 
 		next_vals = argmax_values if self._argmax_in_dt else new_values
 		argmax_chosen = np.all(new_values == argmax_values)
@@ -153,11 +215,18 @@ class SarsaLearner:
 			delta_space.append(scalar_d_t)
 			delta_space += list(vec_d_t)
 
-		ad_t = self.learn_rate * d_t
+		# In fixed math mode, we want to *concentrate* the learned update among the fewer
+		# tiles who were responsible.
+		alpha = self.learn_rate
+		if not broken_math and self.alpha_mod_fixed_math and update_narrowing is not None:
+			# May or may not be numerically stable, needs testing...
+			alpha *= len(update_narrowing)
+
+		ad_t = alpha * d_t
 
 		if last_z is None:
 			updated_vals = last_values + ad_t
-			self._update_state_values(last_state, last_action, updated_vals)
+			self._update_state_values(last_state, last_action, updated_vals, update_narrowing)
 
 			# Update value accordingly
 			new_z = None
@@ -176,7 +245,7 @@ class SarsaLearner:
 			state_tiles_to_mutate = self._get_state_values(new_z[0])
 			action_tile_vals = np.array([av[last_action] for av in state_tiles_to_mutate])
 			updated_vals = action_tile_vals + ad_t * new_z[1]
-			self._update_state_values(new_z[0], last_action, updated_vals)
+			self._update_state_values(new_z[0], last_action, updated_vals, update_narrowing)
 			print "vals are:", updated_values, "from:", action_tile_vals, "by:", d_t
 
 		# Reduce epsilon somehow

@@ -78,7 +78,7 @@ if __name__ == "__main__":
 		"alpha": 0.05,
 		"epsilon": 0.2,
 		"discount": 0.0,
-                "dt": 0.05,
+		"dt": 0.05,
 
 		"explore_episodes": 0.8,
 		"episodes": 10,
@@ -93,7 +93,8 @@ if __name__ == "__main__":
 		"trs_maxtime": 0.001,
 
 		"split_codings": True,
-		"feature_max": 18,
+		# "feature_max": 18,
+		"feature_max": 20,
 
 	}
 
