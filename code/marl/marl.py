@@ -1836,20 +1836,14 @@ def marlExperiment(
 									dm = [i] if record_deltas_in_times else None
 										
 									dat = flow_traces[ip]
-									(st, z) = dat[0][s_ac_num]
+									(st, z, narrowing_in_use) = dat[0][s_ac_num]
 									machine = dat[2]
-
-									# narrowing is on flow_trace[4]
-									# Explore (by fixating on idividual features) as a function of
-									# the agent's current epsilon...
-									narrowing_in_use = dat[4]
 
 									# handful of steps:
 									#  only draw new if none
 									#  decrement uses
 									#  don't use in update step if just generated
 									#  don't use in action step if about to expire
-									new_narrowing = False
 									allow_update_narrowing = False
 									allow_action_narrowing = False
 
@@ -1863,7 +1857,6 @@ def marlExperiment(
 												explore_feature_isolation_duration,
 												np.random.choice(s.tiling_set_count),
 											]
-											new_narrowing = True
 											allow_action_narrowing = True
 									else:
 										narrowing_in_use[0] -= 1
@@ -1889,13 +1882,13 @@ def marlExperiment(
 									narrowing_in_use = None
 
 								ac_vals += new_vals
-								substates.append((state, z_vec))
+								substates.append((state, z_vec, narrowing_in_use))
 
 								last_sarsa = s
 
 							l_action = last_sarsa.select_action_from_vals(ac_vals)
 							machine.move(l_action)
-							flow_traces[ip] = (substates, l_action, machine, z_vec, narrowing_in_use)
+							flow_traces[ip] = (substates, l_action, machine, z_vec)
 
 							if need_decay:
 								for (s, _) in subactors:
