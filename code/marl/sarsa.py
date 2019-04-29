@@ -95,7 +95,7 @@ class SarsaLearner:
 		# (using ALL values) and only propagate forward changes on the relevant tiles.
 		for i in narrowing:
 			tile = state[i]
-			value = value[i]
+			value = values[i]
 			self.values[tile][action] = value
 
 	def _compute_relevant_narrowed_tilings(self, narrowing):
@@ -108,9 +108,11 @@ class SarsaLearner:
 		for i, length in enumerate(self.ntilings):
 			if i == narrowing[n_i]:
 				# hit an included element
-				out += np.arange(total, total+length)
+				out.append(np.arange(total, total+length))
 				n_i += 1
 			total += length
+			if n_i >= len(narrowing):
+				break
 
 		return np.hstack(out) 
 
@@ -149,8 +151,8 @@ class SarsaLearner:
 		
 		return a_index
 
-	def epsilon(self):
-		return self._cur_epsilon
+	def get_epsilon(self):
+		return self._curr_epsilon
 
 	# Need to convert state with self.tc(...) first
 	def bootstrap(self, state):
@@ -218,7 +220,7 @@ class SarsaLearner:
 		# In fixed math mode, we want to *concentrate* the learned update among the fewer
 		# tiles who were responsible.
 		alpha = self.learn_rate
-		if not broken_math and self.alpha_mod_fixed_math and update_narrowing is not None:
+		if not self.broken_math and self.alpha_mod_fixed_math and update_narrowing is not None:
 			# May or may not be numerically stable, needs testing...
 			alpha *= len(update_narrowing)
 

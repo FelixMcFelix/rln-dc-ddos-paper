@@ -136,7 +136,7 @@ def marlExperiment(
 		combine_with_last_action = [12, 13, 14, 15, 16, 17, 18, 19],
 		strip_last_action = True,
 		explore_feature_isolation_modifier = 1.0,
-		explore_feature_isloation_duration = 5,
+		explore_feature_isolation_duration = 5,
 
 		trs_maxtime = None,
 		reward_band = 1.0,
@@ -1717,6 +1717,9 @@ def marlExperiment(
 						queue_holder = learner_queues[l_index]
 						fvec_holder = learner_fvecs[l_index]
 
+						#if i%10 == 0:
+						#	print "laerner {} occupying:".format(l_index), len(flow_space), len(flow_traces), len(flows_to_query)
+
 						total_spent = 0.0
 						def can_act():
 							return trs_maxtime is None or total_spent <= trs_maxtime
@@ -1851,14 +1854,14 @@ def marlExperiment(
 									if narrowing_in_use is not None and narrowing_in_use[0] <= 0:
 										narrowing_in_use = None
 
-									if narrowing_in_use is None and (np.random.uniform() < s.epsilon() * explore_feature_isolation_modifier):
-											# remaining updates, narrowing itself.
-											narrowing_in_use = [
-												explore_feature_isolation_duration,
-												np.random.choice(s.tiling_set_count),
-											]
-											allow_action_narrowing = True
-									else:
+									if narrowing_in_use is None and (np.random.uniform() < s.get_epsilon() * explore_feature_isolation_modifier):
+										# remaining updates, narrowing itself.
+										narrowing_in_use = [
+											explore_feature_isolation_duration,
+											[np.random.choice(s.tiling_set_count)],
+										]
+										allow_action_narrowing = True
+									elif narrowing_in_use is not None:
 										narrowing_in_use[0] -= 1
 										allow_update_narrowing = True
 										allow_action_narrowing = narrowing_in_use[0] > 0
@@ -1869,8 +1872,8 @@ def marlExperiment(
 										(st, dat[1], z),
 										decay=False,
 										delta_space=dm,
-										action_narrowing=None if not allow_action_narrowing else narrowing_in_use[1]:
-										update_narrowing=None if not allow_update_narrowing else narrowing_in_use[1]:
+										action_narrowing=None if not allow_action_narrowing else narrowing_in_use[1],
+										update_narrowing=None if not allow_update_narrowing else narrowing_in_use[1],
 									)
 
 									if record_deltas_in_times:

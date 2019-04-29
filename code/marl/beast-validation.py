@@ -36,8 +36,8 @@ host_ps = [
 # prefix, tcp?
 traffic_types = [
 #	"udp",
-#	"tcp",
-	"opus",
+	"tcp",
+#	"opus",
 ]
 
 # prefix, single_learner
@@ -96,6 +96,7 @@ if __name__ == "__main__":
 		# "feature_max": 18,
 		"feature_max": 20,
 
+		"explore_feature_isolation_modifier": 0.0,
 	}
 
 	deps = []
