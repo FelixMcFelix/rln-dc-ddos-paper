@@ -135,8 +135,11 @@ def marlExperiment(
 		feature_max = 12,
 		combine_with_last_action = [12, 13, 14, 15, 16, 17, 18, 19],
 		strip_last_action = True,
+
 		explore_feature_isolation_modifier = 1.0,
 		explore_feature_isolation_duration = 5,
+		always_include_global = True,
+		always_include_bias = True,
 
 		trs_maxtime = None,
 		reward_band = 1.0,
@@ -305,6 +308,7 @@ def marlExperiment(
 		"trace_decay": trace_decay,
 		"trace_threshold": trace_threshold,
 		"broken_math": broken_math,
+		"always_include_bias": always_include_bias,
 	}
 
 	if actions_target_flows:
@@ -831,6 +835,7 @@ def marlExperiment(
 					a = action if override_action is None else override_action
 					# tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 					tx_ac = machine.action() if isinstance(a, (int, long)) else a
+					#tx_ac = 0.0
 					updateUpstreamRoute(node, ac_prob=tx_ac, target_ip=ip)
 			outtime = time.time()
 			if print_times:
@@ -1856,9 +1861,12 @@ def marlExperiment(
 
 									if narrowing_in_use is None and (np.random.uniform() < s.get_epsilon() * explore_feature_isolation_modifier):
 										# remaining updates, narrowing itself.
-										narrowing_in_use = [
+
+										# If always global, play about with the selection (raise LB).
+										mod = 1 if always_include_global else 0
+										narrowing_in_use = [ 
 											explore_feature_isolation_duration,
-											[np.random.choice(s.tiling_set_count)],
+											([0] if always_include_global else []) + [np.random.choice(s.tiling_set_count-mod)+mod],
 										]
 										allow_action_narrowing = True
 									elif narrowing_in_use is not None:

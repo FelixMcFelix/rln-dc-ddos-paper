@@ -28,8 +28,8 @@ algos = [
 
 # host_p, dt
 host_ps = [
-#	(16, 0.05),
-	(2, 0.05),
+	(16, 0.05),
+#	(2, 0.05),
 #	(1, 0.05),
 ]
 
@@ -96,7 +96,7 @@ if __name__ == "__main__":
 		# "feature_max": 18,
 		"feature_max": 20,
 
-		"explore_feature_isolation_modifier": 0.0,
+		#"explore_feature_isolation_modifier": 0.0,
 	}
 
 	deps = []

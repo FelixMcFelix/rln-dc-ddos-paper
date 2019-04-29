@@ -22,6 +22,7 @@ class SarsaLearner:
 				broken_math=False,
 				rescale_alpha=1.0,
 				increase_fixed_math_alpha_if_narrowed=True,
+				always_include_bias=True,
 				AcTrans=MarlMachine):
 		state_range = [
 			[0 for i in xrange(vec_size)] + extended_mins,
@@ -49,7 +50,8 @@ class SarsaLearner:
 		self.single_learn_rate = learn_rate
 
 		if rescale_alpha is not None and not broken_math:
-			learn_rate = (learn_rate * rescale_alpha) / float(sum(ntilings))
+			# bias tile always exists.
+			learn_rate = (learn_rate * rescale_alpha) / float(sum(ntilings) + 1)
 
 		self.epsilon = epsilon
 		self._curr_epsilon = epsilon
@@ -66,6 +68,7 @@ class SarsaLearner:
 		self._argmax_in_dt = False
 		self._wipe_trace_if_not_argmax = False
 		self.alpha_mod_fixed_math = increase_fixed_math_alpha_if_narrowed
+		self.always_include_bias = always_include_bias
 
 		self.trace_decay = trace_decay
 		self.trace_threshold = trace_threshold
@@ -106,13 +109,14 @@ class SarsaLearner:
 		# assume, for all our sakes, that the narrowing is sorted...
 		n_i = 0
 		for i, length in enumerate(self.ntilings):
-			if i == narrowing[n_i]:
+			if n_i < len(narrowing) and i == narrowing[n_i]:
 				# hit an included element
 				out.append(np.arange(total, total+length))
 				n_i += 1
 			total += length
-			if n_i >= len(narrowing):
-				break
+
+		if self.always_include_bias:
+			out.append(np.array([total]))
 
 		return np.hstack(out) 
 
@@ -222,7 +226,7 @@ class SarsaLearner:
 		alpha = self.learn_rate
 		if not self.broken_math and self.alpha_mod_fixed_math and update_narrowing is not None:
 			# May or may not be numerically stable, needs testing...
-			alpha *= len(update_narrowing)
+			alpha = self.single_learn_rate / float(len(update_narrowing))
 
 		ad_t = alpha * d_t
 
