@@ -87,7 +87,7 @@ if __name__ == "__main__":
 		"episode_length": 10000,
 		"separate_episodes": True,
 
-		"rf": "std_marl",
+		"rf": "marl",
 		"use_controller": True,
 		"actions_target_flows": True,
 		"trs_maxtime": 0.001,

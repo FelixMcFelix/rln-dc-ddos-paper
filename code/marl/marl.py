@@ -845,7 +845,7 @@ def marlExperiment(
 				if len(state) == 0:
 					action = default_machine_state
 				else:
-					((_svec, action), machine) = state
+					((_svec, action, _), machine) = state
 					action = machine.action()
 				a = action if override_action is None else override_action
 				tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
