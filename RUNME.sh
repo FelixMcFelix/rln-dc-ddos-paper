@@ -12,3 +12,4 @@ cd ../traffic-host
 
 cd ../opus-voip-traffic
 cargo build --release
+cargo run --release -- --trace-process
