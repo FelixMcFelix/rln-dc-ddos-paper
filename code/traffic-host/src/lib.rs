@@ -171,7 +171,7 @@ fn request_loop(rx: Receiver<CliCommand>, options: Config) {
 				easy.timeout(Duration::from_secs(180)).unwrap();
 
 				if let Err(e) = easy.perform() {
-					eprintln!("error making download: {:?}", e);
+					//eprintln!("error making download: {:?}", e);
 				}
 
 				// Go over deps, add them.

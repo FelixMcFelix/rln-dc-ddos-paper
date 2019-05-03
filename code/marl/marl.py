@@ -261,6 +261,7 @@ def marlExperiment(
 		) + (
 			[] if randomise_count is None else ["-c", str(randomise_count)]
 		)
+	total_thing = [0.0]
 	def opus_cmd(bw, host):
 		# Do we want multiple calls?
 		# The stats observed show that flows occupy (in expectation)
@@ -275,7 +276,8 @@ def marlExperiment(
 			print "rescaled to", divisor
 		flow_bw = 52.39456 / (divisor * 1024.0) # to mbps.
 		subclient_count = int(math.ceil(max(1.0, bw / flow_bw)))
-		print subclient_count
+		total_thing[0] += flow_bw * subclient_count
+		print subclient_count, total_thing
 		
 		return [
 			"../opus-voip-traffic/target/release/opus-voip-traffic",
@@ -849,6 +851,8 @@ def marlExperiment(
 					action = machine.action()
 				a = action if override_action is None else override_action
 				tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
+				#print "chose {}".format(tx_ac)
+				#tx_ac = 0.9
 				updateUpstreamRoute(node, ac_prob=tx_ac)
 
 	def moralise(value, good, max_val=255, no_goods=[0, 255]):

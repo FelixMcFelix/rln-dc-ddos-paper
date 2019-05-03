@@ -107,7 +107,6 @@ if __name__ == "__main__":
 	if model_prefix == "m":
 		# Old, original marl.
 		old_marl = True
-		params["reward_direction"] = "out"
 		params["rf"] = "ctl"
 		params["epsilon"] = 0.2
 		params["explore_episodes"] = 0.3
@@ -136,16 +135,16 @@ if __name__ == "__main__":
 		params["randomise_new_ip"] = True
 		params["reward_direction"] = "out"
 		params["evil_range"] = [4, 7]
-		#params["use_controller"] = True
 	elif traffic_prefix == "udp":
 		params["model"] = "nginx"
 		params["submodel"] = "udp-flood"
-		#params["use_controller"] = False
+		params["reward_direction"] = "in"
 	elif traffic_prefix == "opus":
 		params["model"] = "nginx"
 		params["submodel"] = "opus-voip"
 		params["randomise"] = True
 		params["randomise_new_ip"] = True
+		params["reward_direction"] = "in"
 	deps.append(traffic_types)
 
 	broken_math = expt_part(maths, deps)
@@ -156,10 +155,10 @@ if __name__ == "__main__":
 	params["algo"] = algo
 	deps.append(algos)
 
+	params["estimate_const_limit"] = True
 	if not old_marl:
 		(indiv_prefix, single_learner) = expt_part(single_learners, deps)
 		params["single_learner"] = single_learner
-		params["estimate_const_limit"] = True
 		deps.append(single_learners)
 	else:
 		indiv_prefix = "separate"
@@ -187,4 +186,4 @@ if __name__ == "__main__":
 	dumbWriter(deltas_dir, action_comps)
 	with open(sarsas_dir, "wb") as f:
 		cPickle.dump(store_sarsas, f)
-	#print "{} would write to: {}".format(experiment, csv_dir)
+	print "{} would write to: {}".format(experiment, csv_dir)
