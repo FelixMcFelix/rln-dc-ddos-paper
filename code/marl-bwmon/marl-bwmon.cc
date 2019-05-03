@@ -105,7 +105,7 @@ struct FlowMeasurement {
 	uint32_t ip;
 };
 
-struct FlowStats
+struct InnerFlowStats
 {
 	// flow size
 	uint64_t flow_size_in = 0;
@@ -132,7 +132,7 @@ struct FlowStats
 	// unseen?
 	bool unseen = true;
 
-	FlowStats() {
+	InnerFlowStats() {
 		//interarrivals.report_update = true;
 	};
 
@@ -172,7 +172,6 @@ struct FlowStats
 		}
 
 		std::cout
-			<< "(" << ip_str << ","
 			<< ch::nanoseconds(duration).count() << ","
 			<< flow_size_in << ","
 			<< flow_size_out << ","
@@ -185,8 +184,7 @@ struct FlowStats
 			<< out_packets_window.variance() << ","
 			<< out_packets_window.k << ","
 			<< interarrivals_window.mean << ","
-			<< interarrivals_window.variance()
-			<< ")";
+			<< interarrivals_window.variance();
 		clear();
 
 		flow_size_in_prev = flow_size_in;
@@ -227,8 +225,6 @@ struct FlowStats
 			ip,
 		};
 
-		clear();
-
 		flow_size_in_prev = flow_size_in;
 		flow_size_out_prev = flow_size_out;
 
@@ -246,6 +242,110 @@ struct FlowStats
 
 	void clear_full() {
 		clear();
+	}
+};
+
+struct FlowStats
+{
+	std::unordered_map<uint32_t, InnerFlowStats> per_dest_stats_;
+
+	FlowStats() {
+		//interarrivals.report_update = true;
+	};
+
+	void update(ch::high_resolution_clock::time_point arr_time, uint64_t size, bool inbound, uint32_t internal_ip) {		// get the entry using internal_ip, then update IT.
+		auto it = per_dest_stats_.find(internal_ip);
+
+		if (it != per_dest_stats_.end()) {
+			it->second.update(arr_time, size, inbound);
+		} else {
+			InnerFlowStats new_stat;
+			new_stat.update(arr_time, size, inbound);
+			per_dest_stats_[internal_ip] = new_stat;
+		}
+	}
+
+	bool clearAndPrintStats(char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
+		if (per_dest_stats_.empty()) {
+			return false;
+		}
+
+		// Note: we'll be told whether we need to prune each internal.
+		// If we ever prune everything, then allow self to be pruned.
+
+		std::cout << "(" << ip_str;
+
+		std::vector<uint32_t> to_prune;
+
+		for (auto &it : per_dest_stats_) {
+			auto internal = it.first;
+
+			char internal_ip_str[INET_ADDRSTRLEN];
+			auto c_ip = reinterpret_cast<const in_addr *>(&internal);
+			inet_ntop(AF_INET, c_ip, internal_ip_str, INET_ADDRSTRLEN);
+
+			std::cout << "|" << internal_ip_str << ",";
+
+			auto active =
+				it.second.clearAndPrintStats(ip_str, startTime, endTime);
+
+			if (!active) {
+				to_prune.push_back(internal);
+			}
+		}
+
+		std::cout << ")";
+
+		for (auto &el : to_prune) {
+			per_dest_stats_.erase(el);
+		}
+
+		return true;
+	}
+
+	std::optional<std::pair<bool, FlowMeasurement>> clearAndRetrieveStats(uint32_t ip, char *ip_str, ch::high_resolution_clock::time_point startTime, ch::high_resolution_clock::time_point endTime) {
+		// auto prune_age = ch::seconds(FLOW_PRUNE_AGE);
+
+		// // prune here if last packet rx'd was of a certain age,
+		// // AND there was no info gleaned in this window.
+		// // Don't print stats in that case.
+
+		// auto duration = endTime - flow_start;
+		// auto silent_duration = endTime - last_entry;
+
+		// if (silent_duration > prune_age && last_entry < startTime) {
+		// 	return std::nullopt;
+		// }
+
+		// auto fm = FlowMeasurement {
+		// 	ch::nanoseconds(duration).count(),
+		// 	flow_size_in,
+		// 	flow_size_out,
+		// 	flow_size_in - flow_size_in_prev,
+		// 	flow_size_out - flow_size_out_prev,
+		// 	in_packets_window.k,
+		// 	out_packets_window.k,
+		// 	(float) in_packets_window.mean,
+		// 	(float) in_packets_window.variance(),
+		// 	(float) out_packets_window.mean,
+		// 	(float) out_packets_window.variance(),
+		// 	(float) interarrivals_window.mean,
+		// 	(float) interarrivals_window.variance(),
+		// 	ip,
+		// };
+
+		// clear();
+
+		// flow_size_in_prev = flow_size_in;
+		// flow_size_out_prev = flow_size_out;
+
+		// auto new_data = unseen;
+		// unseen = false;
+
+		// return std::optional<std::pair<bool, FlowMeasurement>> {std::make_pair(new_data, fm)};
+
+		// FIXME
+		return std::nullopt;
 	}
 };
 
@@ -293,7 +393,7 @@ public:
 		return importants_.at(n);
 	}
 
-	void incrementStat(uint32_t ip, int interface, bool good, uint32_t packetSize, bool inbound, ch::high_resolution_clock::time_point arr_time) {
+	void incrementStat(uint32_t internal_ip, uint32_t external_ip, int interface, bool good, uint32_t packetSize, bool inbound, ch::high_resolution_clock::time_point arr_time) {
 		std::shared_lock<std::shared_mutex> lock(mutex_);
 
 		auto index = 2 * interface + (inbound ? 0 : 1);
@@ -308,14 +408,14 @@ public:
 		if (important) {
 			// first things first: check if the target IP has registered flowstats.
 			auto &stat_holder = flow_stats_.at(interface);
-			auto it = stat_holder.find(ip);
+			auto it = stat_holder.find(external_ip);
 
 			if (it != stat_holder.end()) {
-				it->second.update(arr_time, packetSize, inbound);
+				it->second.update(arr_time, packetSize, inbound, internal_ip);
 			} else {
 				FlowStats new_stat;
-				new_stat.update(arr_time, packetSize, inbound);
-				stat_holder[ip] = new_stat;
+				new_stat.update(arr_time, packetSize, inbound, internal_ip);
+				stat_holder[external_ip] = new_stat;
 			}
 		}
 	}
@@ -541,7 +641,8 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 	// Okay, we can read up to h->caplen bytes from data.
 	bool good = false;
 	bool outbound = true;
-	uint32_t ip = 0;
+	uint32_t external_ip = 0;
+	uint32_t internal_ip = 0;
 
 	switch (params->linkType) {
 		case DLT_NULL:
@@ -556,13 +657,16 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 
 			// If src is local, then assess based on dst.
 			outbound = params->is_ip_local(src_ip);
-			ip = outbound
+			external_ip = outbound
 				? dst_ip
 				: src_ip;
+			internal_ip = outbound
+				? src_ip
+				: dst_ip;
 
 			// Another assumption, we're little endian.
 			// this is only troublesome
-			good = !(((ip>>24)&0xff) % 2);
+			good = !(((external_ip>>24)&0xff) % 2);
 
 			break;
 		}
@@ -574,7 +678,7 @@ static void perPacketHandle(u_char *user, const struct pcap_pkthdr *h, const u_c
 				<< params->index << ": saw " << params->linkType << std::endl;
 	}
 
-	params->stats.incrementStat(ip, params->index, good, h->len, !outbound, arr_time);
+	params->stats.incrementStat(internal_ip, external_ip, params->index, good, h->len, !outbound, arr_time);
 }
 
 static void monitorInterface(pcap_t *iface, const int index, InterfaceStats &stats) {

@@ -1376,15 +1376,16 @@ def marlExperiment(
 				flow_stat_break = flow_stat_str.split("]")
 				split_stats = [s.strip().split("[")[-1] for s in flow_stat_break if len(s) > 0]
 				# now split into flow-keys. (ip, ...)(ip, ...)
+				# internal structure (ext_ip|int_ip,prop1,...|int_ip,prop2,...)
 				almost_subs = [s.split(")") if len(s) > 0 else "" for s in split_stats]
 				subs = []
 				for set_str in almost_subs:
 					#if len(set_str) == 0:
 						#continue
 					#	subs.append([])
-					subs.append([a.split("(")[-1].split(",") for a in set_str])
+					subs.append([a.split("(")[-1].split("|") for a in set_str])
 
-				# (ip, props)
+				# (ip, {int_ip: props})
 				# props: (len_ns, sz_in, sz_out, wnd_sz_in, wnd_sz_out, pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, wnd_iat_mean, wnd_iat_var)
 				parsed_flows = []
 
@@ -1392,17 +1393,28 @@ def marlExperiment(
 					#if len(l) == 0:
 					#	continue
 
+					# layer is all (ip, prop_holder) pairs per agent
 					layer = []
 					for e in l:
 						if len(e[0]) == 0:
 							continue
 
-						sublayer = []
-						for item in e[1:]:
-							sublayer.append(float(item))
+						# e is [ext_ip, flow_key_str, flow_key_str, ...]
+						prop_holder = {}
+						for flow_prop_str in e[1:]:
+							# sublayer is "props"
+							prop_str_parts = flow_prop_str.split(",")
+
+							props = []
+							for part in prop_str_parts[1:]:
+								props.append(float(item))
+
+							# Keep this as an IP string to aid node lookup later
+							prop_holder[prop_str_parts[0]] = props
+
 						if e[0] != "0.0.0.0":
 							ip_bytes = socket.inet_pton(socket.AF_INET, e[0])
-							layer.append((struct.unpack("I", ip_bytes)[0], sublayer))
+							layer.append((struct.unpack("I", ip_bytes)[0], prop_holder))
 							#if e[3] > 0:
 							#	print "culprit: {}, {}".format(e[0], e[3])
 						
@@ -1740,61 +1752,65 @@ def marlExperiment(
 
 						# TODO: strip old entries?
 						# PROCESS ALL NEW DATA.
-						for (ip, props) in flows_seen:
-							flows_to_query.append(ip)
+						for (src_ip, props_dict) in flows_seen:
+							for (dst_ip, props) in props_dict.iteritems():
+								flows_to_query.append(src_ip)
 
-							if ip not in flow_space:
-								flow_space[ip] = {
-									"ip": ip,
-									"last_act": 0.0 if not spiffy_mode else 0.05,
-									"last_rate_in": -1.0,
-									"last_rate_out": -1.0,
-									"pkt_in_count": 0,
-									"pkt_out_count": 0,
-								}
-							l = flow_space[ip]
+								ip_pair = (src_ip, dst_ip)
 
-							l["cx_ratio"] = min(*props[1:3]) / max(*props[1:3])
-							l["length"] = props[0]
-							l["size"] = props[1] + props[2]
-							l["mean_iat"] = props[11]
-							l["pkt_in_count"] += props[7]
-							l["pkt_out_count"] += props[10]
-							l["pkt_in_wnd_count"] = props[7]
-							l["pkt_out_wnd_count"] = props[10]
-							l["mean_bpp_in"] = props[5]
-							l["mean_bpp_out"] = props[8]
-							l["bytes_in"] = props[3]
-							l["bytes_out"] = props[4]
+								if ip_pair not in flow_space:
+									flow_space[ip_pair] = {
+										"ip": ip,
+										"last_act": 0.0 if not spiffy_mode else 0.05,
+										"last_rate_in": -1.0,
+										"last_rate_out": -1.0,
+										"pkt_in_count": 0,
+										"pkt_out_count": 0,
+									}
+								l = flow_space[ip_pair]
 
-							observed_rate_in = mbpsify(props[3])
-							observed_rate_out = mbpsify(props[4])
+								l["cx_ratio"] = min(*props[1:3]) / max(*props[1:3])
+								l["length"] = props[0]
+								l["size"] = props[1] + props[2]
+								l["mean_iat"] = props[11]
+								l["pkt_in_count"] += props[7]
+								l["pkt_out_count"] += props[10]
+								l["pkt_in_wnd_count"] = props[7]
+								l["pkt_out_wnd_count"] = props[10]
+								l["mean_bpp_in"] = props[5]
+								l["mean_bpp_out"] = props[8]
+								l["bytes_in"] = props[3]
+								l["bytes_out"] = props[4]
 
-							if l["last_rate_in"] < 0.0:
-								l["last_rate_in"] = observed_rate_in
-								l["last_rate_out"] = observed_rate_out
-							l["delta_in"] = observed_rate_in - l["last_rate_in"]
-							l["delta_out"] = observed_rate_out - l["last_rate_out"]
-							total_vec = state_vec + flow_to_state_vec(l)
-							flow_space[ip] = l
+								observed_rate_in = mbpsify(props[3])
+								observed_rate_out = mbpsify(props[4])
 
-							fvec = combine_flow_vecs(fvec_holder[ip], total_vec) if ip in fvec_holder else total_vec
-							fvec_holder[ip] = fvec
-							# maybe push this seen IP into the future set
-							# When? If it's not in the current work set,
-							# or it has been visited and is in the current set.
-							if ip not in local_work_set or ip in local_visited_set:
-								queue_holder["future"].add(ip)
+								if l["last_rate_in"] < 0.0:
+									l["last_rate_in"] = observed_rate_in
+									l["last_rate_out"] = observed_rate_out
+								l["delta_in"] = observed_rate_in - l["last_rate_in"]
+								l["delta_out"] = observed_rate_out - l["last_rate_out"]
+								total_vec = state_vec + flow_to_state_vec(l)
+								flow_space[ip_pair] = l
 
-							if spiffy_but_bad:
-								# if already under scrutiny or if there's enough space to add, then (maybe) act
-								# also, don't act if we already made a verdict...
-								total_s_bw = observed_rate_in + observed_rate_out
-								if ip in spiffy_measurements[0]:
-									spiffy_measurements[1][ip] = total_s_bw
-								elif ip not in spiffy_verdict and len(spiffy_measurements[0]) < spiffy_max_experiments and np.random.random() < spiffy_pick_prob:
-									spiffy_measurements[0][ip] = (total_s_bw, time.time(), False, node)
+								fvec = combine_flow_vecs(fvec_holder[ip], total_vec) if ip_pair in fvec_holder else total_vec
+								fvec_holder[ip_pair] = fvec
+								# maybe push this seen IP into the future set
+								# When? If it's not in the current work set,
+								# or it has been visited and is in the current set.
+								if ip_pair not in local_work_set or ip_pair in local_visited_set:
+									queue_holder["future"].add(ip_pair)
 
+								if spiffy_but_bad:
+									# if already under scrutiny or if there's enough space to add, then (maybe) act
+									# also, don't act if we already made a verdict...
+									total_s_bw = observed_rate_in + observed_rate_out
+									if ip_pair in spiffy_measurements[0]:
+										spiffy_measurements[1][ip_pair] = total_s_bw
+									elif ip_pair not in spiffy_verdict and len(spiffy_measurements[0]) < spiffy_max_experiments and np.random.random() < spiffy_pick_prob:
+										spiffy_measurements[0][ip_pair] = (total_s_bw, time.time(), False, node)
+
+						# FIXME: ensure that all the code if prepared to take ip_pair, NOT ip.
 						if local_pos >= len(local_work):
 							local_pos = 0
 							local_work_set = queue_holder["future"]
