@@ -796,7 +796,11 @@ def marlExperiment(
 			cmd_list = []
 			# remove if groups fixed
 			os = p_drop_num # = None
-			msg = internal_choose_group(int(ac_prob * 10), target_ip=target_ip, force_old=os)
+			if target_ip is not None:
+				(src, dst) = target_ip
+				msg = internal_choose_group(int(ac_prob * 10), ip=dst, target_ip=src, force_old=os, subnet="255.255.255.255")
+			else:
+				msg = internal_choose_group(int(ac_prob * 10), target_ip=target_ip, force_old=os)
 
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
@@ -831,14 +835,20 @@ def marlExperiment(
 		if actions_target_flows:
 			intime = time.time()
 			for i, (node, sarsa, maps) in enumerate(zip(learners, sarsas, flow_action_sets)):
-				for ip, state in maps.iteritems():
+				for ip_pair, state in maps.iteritems():
+					# FIXME: don't send if action already taken...
 					#print "{}: {}".format(i, ip)
-					(_, action, machine, _) = state
+					(_, action, machine, _, guard) = state
+
+					if not guard[0]:
+						continue
+
 					a = action if override_action is None else override_action
 					# tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 					tx_ac = machine.action() if isinstance(a, (int, long)) else a
 					#tx_ac = 0.0
 					updateUpstreamRoute(node, ac_prob=tx_ac, target_ip=ip)
+					guard[0] = False
 			outtime = time.time()
 			if print_times:
 				print "do_acs:", outtime-intime
@@ -1760,7 +1770,7 @@ def marlExperiment(
 
 								if ip_pair not in flow_space:
 									flow_space[ip_pair] = {
-										"ip": ip,
+										"ip": src_ip,
 										"last_act": 0.0 if not spiffy_mode else 0.05,
 										"last_rate_in": -1.0,
 										"last_rate_out": -1.0,
@@ -1829,18 +1839,18 @@ def marlExperiment(
 						flows_procd = 0
 						# ACT ON A SUBSET OF CURRENT
 						while can_act() and local_pos < len(local_work):
-							ip = local_work[local_pos]
-							local_visited_set.add(ip)
+							ip_pair = local_work[local_pos]
+							local_visited_set.add(ip_pair)
 
 							s_t = time.time()
-							l = flow_space[ip]
+							l = flow_space[ip_pair]
 
 							# Each needs its own view of the state...
 							# (and specifies its restriction thereof)
 							# Combine these to get a vector of likelihoods,
 							# get the highest-epsilon to calculate the action.
 							# Then update each model with the TRUE action chosen.
-							fvec = fvec_holder[ip]
+							fvec = fvec_holder[ip_pair]
 							total_vec = fvec[:feature_max]
 
 							# single_learner support: just take firstmost...
@@ -1860,10 +1870,10 @@ def marlExperiment(
 
 								# if there was an earlier decision made on this flow, then update the past state estimates associated.
 								# Compute and store the intended update for each flow.
-								if ip in flow_traces:
+								if ip_pair in flow_traces:
 									dm = [i] if record_deltas_in_times else None
 										
-									dat = flow_traces[ip]
+									dat = flow_traces[ip_pair]
 									(st, z, narrowing_in_use) = dat[0][s_ac_num]
 									machine = dat[2]
 
@@ -1919,7 +1929,7 @@ def marlExperiment(
 
 							l_action = last_sarsa.select_action_from_vals(ac_vals)
 							machine.move(l_action)
-							flow_traces[ip] = (substates, l_action, machine, z_vec)
+							flow_traces[ip_pair] = (substates, l_action, machine, z_vec, [True])
 
 							if need_decay:
 								for (s, _) in subactors:
@@ -1945,7 +1955,7 @@ def marlExperiment(
 							learner_traces[l_index] = flow_traces
 							local_pos += 1
 							flows_procd += 1
-							del fvec_holder[ip]
+							del fvec_holder[ip_pair]
 
 						#print "Managed: {}/{}-{} flows in under {}".format(flows_procd, local_pos-flows_procd, len(local_work_set), trs_maxtime)
 

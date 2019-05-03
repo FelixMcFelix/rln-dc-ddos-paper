@@ -973,6 +973,8 @@ Although this likely brings lower theoretical performance, there are more reason
 This aligns with our goal of quick online learning, and potentially faster adaptation to aggregate changes in traffic without necessarily introducing dedicated tensor processing hardware to networks.
 Simpler decision boundaries reduce the risk of overfitting and of unexpected behaviour, and we anticipate that the simplicity of policy computation in the chosen manner will also greatly aid interpretability of anomalous action choices.
 
+?? What other choices did we make? Taking actions with (and updating) fewer tiles according to probability $\epsilon$. Updating all tiles' action value estimates separately to produce different update targets.
+
 %?? Expand all this
 
 \subsection{SPF: SPIFFY Lite}
