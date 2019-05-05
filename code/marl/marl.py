@@ -152,6 +152,7 @@ def marlExperiment(
 		spiffy_drop_rate = 0.15,
 
 		broken_math = False,
+		num_drop_groups = 20,
 	):
 
 	agent_classes = {
@@ -658,9 +659,9 @@ def marlExperiment(
 
 		groups = []
 		
-		for i in xrange(10):
+		for i in xrange(num_drop_groups):
 			#calc pdrop number
-			prob = 1.0 - (i/10.0)
+			prob = 1.0 - (i/float(num_drop_groups))
 			p_drop_num = pdrop(prob)
 
 			# For select group, weight MUST be zero.
@@ -798,9 +799,10 @@ def marlExperiment(
 			os = p_drop_num # = None
 			if target_ip is not None:
 				(src, dst) = target_ip
-				msg = internal_choose_group(int(ac_prob * 10), ip=dst, target_ip=src, force_old=os, subnet="255.255.255.255")
+				#print int(ac_prob * 10)
+				msg = internal_choose_group(int(ac_prob * num_drop_groups), ip=dst, target_ip=src, force_old=os, subnet="255.255.255.255")
 			else:
-				msg = internal_choose_group(int(ac_prob * 10), target_ip=target_ip, force_old=os)
+				msg = internal_choose_group(int(ac_prob * num_drop_groups), target_ip=target_ip, force_old=os)
 
 		if alive:
 			updateOneRoute(switch, cmd_list, msg)
@@ -847,7 +849,8 @@ def marlExperiment(
 					# tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 					tx_ac = machine.action() if isinstance(a, (int, long)) else a
 					#tx_ac = 0.0
-					updateUpstreamRoute(node, ac_prob=tx_ac, target_ip=ip)
+					#print "placing {} in {}".format(tx_ac, ip_pair)
+					updateUpstreamRoute(node, ac_prob=tx_ac, target_ip=ip_pair)
 					guard[0] = False
 			outtime = time.time()
 			if print_times:
@@ -1416,8 +1419,13 @@ def marlExperiment(
 							prop_str_parts = flow_prop_str.split(",")
 
 							props = []
+
+							#print prop_str_parts
+							if prop_str_parts[1] == "":
+								continue
+
 							for part in prop_str_parts[1:]:
-								props.append(float(item))
+								props.append(float(part))
 
 							# Keep this as an IP string to aid node lookup later
 							prop_holder[prop_str_parts[0]] = props
@@ -1803,7 +1811,7 @@ def marlExperiment(
 								total_vec = state_vec + flow_to_state_vec(l)
 								flow_space[ip_pair] = l
 
-								fvec = combine_flow_vecs(fvec_holder[ip], total_vec) if ip_pair in fvec_holder else total_vec
+								fvec = combine_flow_vecs(fvec_holder[ip_pair], total_vec) if ip_pair in fvec_holder else total_vec
 								fvec_holder[ip_pair] = fvec
 								# maybe push this seen IP into the future set
 								# When? If it's not in the current work set,
