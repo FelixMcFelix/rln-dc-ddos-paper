@@ -171,7 +171,7 @@ class SmartishRouter(app_manager.RyuApp):
 		t = 3
 
 		g_dict = self.ecmp_routes[dpid]
-		for ip, ports in g_dict:
+		for ip, ports in g_dict.items():
 			g += 1
 			ps = []
 			p_actions = []
@@ -219,6 +219,8 @@ class SmartishRouter(app_manager.RyuApp):
 		datapath.send_msg(mod)
 
 	def add_port_split(self, datapath, ports, port_weights=None, bucket_prepend_actions=None, **kwargs):
+		ofproto = datapath.ofproto
+		parser = datapath.ofproto_parser
 		# THis SHOULD pass through group_id...
 		if port_weights is None:
 			port_weights = [1 for e in ports]
