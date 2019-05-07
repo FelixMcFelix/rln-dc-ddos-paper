@@ -925,15 +925,16 @@ def marlExperiment(
 	def makeTeam(parent, inter_count, learners_per_inter, new_topol_shape, sarsas=[], graph=None,
 			ss_label=None, port_dict=None):
 
-		# link_name = "{}-eth1".format(server_switch.name)
-
-		# vertex_map[server_label] = server
-		# vertex_map[switch_label] = server_switch
-		# monitored_links.append(link_name)
-		# link_map[(server_label, switch_label)] = link_name
-		# link_map[(switch_label, server_label)] = link_name
-
 		(monitored_links, dests, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
+
+		def link_in_new_topol(node1, node2, node1_label, node2_label):
+			link_name = "{}-eth1".format(node2.name)
+
+			vertex_map[node1_label] = node1
+			vertex_map[node2_label] = node2
+			monitored_links.append(link_name)
+			link_map[(node1_label, node2_label)] = link_name
+			link_map[(node2_label, node1_label)] = link_name
 
 		leader = routedSwitch(parent, 0, port_dict=port_dict)
 
@@ -948,6 +949,7 @@ def marlExperiment(
 			return add_to_graph(parent, None, label=(("0.0.0.0", None), None))
 
 		leader_label = add_to_graph(ss_label, leader)
+		link_in_new_topol(parent, leader, ss_label, leader_label)
 
 		intermediates = []
 		learners = []
@@ -961,22 +963,29 @@ def marlExperiment(
 			intermediates.append(new_interm)
 			inter_label = add_to_graph(leader_label, new_interm)
 
-			# FIXME: move to new topology tracking method...
+			# Laziest possible way of doing this. Bad software engineering 101...
+			link_in_new_topol(leader, new_interm, leader_label, inter_label)
 
 			for j in xrange(learners_per_inter):
 				new_learn = routedSwitch(new_interm, 1, port_dict=port_dict)
 				nll = add_to_graph(inter_label, new_learn)
+				link_in_new_topol(new_interm, new_learn, inter_label, nll)
 				_ = link_to_outside(nll)
 
 				# Init and pair the actual learning agent here, too!
 				# Bootstrapping happens later -- per-episode, in the 0-load state.
 				if newSarsas:
-					sarsas.append(AgentClass(**sarsaParams))
+					local_sarsa = AgentClass(**sarsaParams)
+					sarsas.append(local_sarsa)
+				else:
+					local_sarsa = sarsas[(i * inter_count) + j]
 				
 				learners.append(new_learn)
+				actors.append((nll, local_sarsa, leader_label))
 
 				new_extern = routedSwitch(new_learn, 2)
 				extern_switches.append(new_extern)
+				externals.append(new_extern)
 
 		new_topol_shape = (monitored_links, dests, core_links, actors, externals, vertex_map, link_map)
 		return ((leader, intermediates, learners, extern_switches, hosts, sarsas), new_topol_shape)
@@ -1005,7 +1014,7 @@ def marlExperiment(
 		dests = []
 		# link objects which need limits set.
 		core_links = []
-		# array of (graph node, sarsa, leader)
+		# array of (graph node, sarsa, leader node)
 		actors = []
 		# array of graph nodes (locations to attach hosts)
 		externals = []
