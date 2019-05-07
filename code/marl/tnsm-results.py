@@ -38,7 +38,7 @@ host_ps = [
 # prefix, tcp?
 traffic_types = [
 	"tcp",
-#	"opus",
+	"opus",
 #	"mix",
 ]
 
