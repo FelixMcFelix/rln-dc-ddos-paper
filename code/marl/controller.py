@@ -49,14 +49,16 @@ class SmartishRouter(app_manager.RyuApp):
 			while len(buf) < pickle_len:
 				buf += data_sock.recv(4096)
 
-			(routes, ways_out, macs, not_clever) = pickle.loads(buf)
+			(routes, ways_out, macs, not_clever, ecmp_routes) = pickle.loads(buf)
 			print(pickle_len)
 			print(routes, macs)
 			print(ways_out)
+			print(ecmp_routes)
 			self.entry_map = routes
 			self.escape_map = ways_out
 			self.macs = macs
 			self.no_record_escape = not_clever
+			self.ecmp_routes = ecmp_routes
 		#print "I am now alive, controlling all...!"
 
 	def local_ip(self):

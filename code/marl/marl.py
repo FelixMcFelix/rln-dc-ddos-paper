@@ -1118,12 +1118,14 @@ def marlExperiment(
 		for (node, _sarsa, _leader) in actors:
 			for dest in dests:
 				paths = nx.all_shortest_paths(graph, node, dest)
-				for path in escape_paths:
+				for path in paths:
 					for (n1, n2) in zip(path, path[1:]):
 						# when trying to reach dest from n1, go through n2
-						if (n1, dest) not in dest_map:
-							dest_map[(n1, dest)] = set()
-						dest_map[(n1, dest)].add(n2)
+						if n1 not in dest_map:
+							dest_map[n1] = {}
+						if dest not in dest_map[n1]:
+							dest_map[n1][dest] = set()
+						dest_map[n1][dest].add(n2)
 
 		print dest_map
 
@@ -1187,7 +1189,7 @@ def marlExperiment(
 			# for each dpid, find the port which is closest to each IP
 			entry_map = {}
 			escape_map = {}
-			dest_map = {}
+			port_dest_map = {}
 			for dnode in dpids:
 				(_, dpid) = dnode
 				entry_map[dpid] = {}
@@ -1208,6 +1210,16 @@ def marlExperiment(
 						continue
 					port = port_dict[dpid][target]
 					escape_map[dpid].add(port)
+				# convert dest_map to go between dpid and hard label...
+				if dnode in dest_map:
+					port_dest_map[dpid] = {}
+					for (dest, next_nodes) in dest_map[dnode].iteritems():
+						target = hard_label(dest) # an ip
+						port_dest_map[dpid][target] = set()
+						for next_node in next_nodes:
+							next_l = hard_label(next_node)
+							port = port_dict[dpid][next_l]
+							port_dest_map[dpid][target].add((port, target==next_l))
 
 			# handle those conns
 			# now send computed stuff to ctl...
@@ -1226,7 +1238,7 @@ def marlExperiment(
 				data_sock = sock.accept()[0]
 				try:
 					# pickle, send its length, send the pickle...
-					pickle_str = pickle.dumps((entry_map, escape_map, inner_host_macs, prevent_smart_switch_recording))
+					pickle_str = pickle.dumps((entry_map, escape_map, inner_host_macs, prevent_smart_switch_recording, port_dest_map))
 					data_sock.sendall(struct.pack("!Q", len(pickle_str)))
 					data_sock.sendall(pickle_str)
 				finally:
