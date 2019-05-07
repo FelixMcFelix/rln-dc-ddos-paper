@@ -157,18 +157,12 @@ class SmartishRouter(app_manager.RyuApp):
 		# Each bucket corresponds to an identified "way out".
 		# On miss, use this group action.
 		# For this network, only one "outside" so only one group, 0.
-		buckets = []
-		for port in self.escape_map[dpid]:
-			bucket = parser.OFPBucket(1, actions=[
-				parser.OFPActionOutput(port)
-			])
-			buckets.append(bucket)
-
-			self.add_group(datapath, buckets)
+		g = 0
+		self.add_port_split(datapath, list(self.escape_map[dpid]), group_id=g)
 
 		self.table_miss(datapath,
-#			actions=[parser.OFPActionOutput(ofp.OFPP_FLOOD)],
-			actions=[parser.OFPActionGroup(0)],
+			# actions=[parser.OFPActionOutput(ofp.OFPP_FLOOD)],
+			actions=[parser.OFPActionGroup(g)],
 			table_id=t)
 
 		# Table 3: (internal dest routing)
@@ -176,51 +170,70 @@ class SmartishRouter(app_manager.RyuApp):
 
 		t = 3
 
-		#if dpid in self.entry_map:
-		l_dict = self.entry_map[dpid]
-		print(l_dict)
-		for ip, (port, adjacent) in l_dict.items():
-			#print ip, "on port", port, "is adjacent?", adjacent
-			rewrites = [] if not adjacent else [
-				parser.OFPActionSetField(
-					eth_dst=self.macs[ip],
-				),
-				parser.OFPActionSetField(
-					eth_src=self.pretend_mac,
-				),
-			]
+		g_dict = self.ecmp_routes[dpid]
+		for ip, ports in g_dict:
+			g += 1
+			ps = []
+			p_actions = []
+			for port, adjacent in ports:
+				ps.append(port)
+				p_actions.append([] if not adjacent else [
+					parser.OFPActionSetField(
+						eth_dst=self.macs[ip],
+					),
+					parser.OFPActionSetField(
+						eth_src=self.pretend_mac,
+					),
+				])
+
+			self.add_port_split(datapath,
+				ps,
+				bucket_prepend_actions=p_actions,
+				group_id=g,
+			)
+
 			self.add_flow(datapath, 1,
 				parser.OFPMatch(
 					eth_type=ipv4_eth,
 					ipv4_dst=(ip, "255.255.255.255"),
 				),
-				actions=rewrites+[parser.OFPActionOutput(port)],
+				# actions=rewrites+[parser.OFPActionOutput(port)],
+				actions=[parser.OFPActionGroup(g)],
 				table_id=t
 			)
-		#else:
-		#	self.add_flow(datapath, 1,
-		#		parser.OFPMatch(
-		#			eth_type=ipv4_eth,
-		#			ipv4_dst=("10.0.0.1", "255.255.255.255"),
-		#		),
-		#		actions=[parser.OFPActionOutput(0)],
-		#		table_id=t
-		#	)
+
 		print("done setting up switch")
 			
 	def add_group(self, datapath, buckets=[], command=None, type_=None, group_id=0):
 		ofproto = datapath.ofproto
 		parser = datapath.ofproto_parser
 
-                if command is None:
-                    command = ofproto.OFPGC_ADD
-                if type_ is None:
-                    type_ = ofproto.OFPGT_SELECT
+		if command is None:
+			command = ofproto.OFPGC_ADD
+		if type_ is None:
+			type_ = ofproto.OFPGT_SELECT
 
 		mod = parser.OFPGroupMod(datapath, command,
 			type_, group_id, buckets)
 
 		datapath.send_msg(mod)
+
+	def add_port_split(self, datapath, ports, port_weights=None, bucket_prepend_actions=None, **kwargs):
+		# THis SHOULD pass through group_id...
+		if port_weights is None:
+			port_weights = [1 for e in ports]
+
+		if bucket_prepend_actions is None:
+			bucket_prepend_actions = [[] for e in ports]
+
+		buckets = []
+		for (port, weight, prepend) in zip(ports, port_weights, bucket_prepend_actions):
+			bucket = parser.OFPBucket(weight, actions=prepend + [
+				parser.OFPActionOutput(port)
+			])
+			buckets.append(bucket)
+
+		self.add_group(datapath, buckets, **kwargs)
 
 	def add_flow(self, datapath, priority, match, actions=None, table_id=0, next_table=None, importance=1):
 		ofproto = datapath.ofproto
