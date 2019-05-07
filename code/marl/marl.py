@@ -51,6 +51,7 @@ def marlExperiment(
 		evil_range = [2.5, 6],
 		good_file = "../../data/pcaps/bigFlows.pcap",
 		bad_file = None,
+		topol = "tree",
 
 		explore_episodes = 80000,
 		episodes = 1000,#100000
@@ -921,8 +922,19 @@ def marlExperiment(
 			)
 		return hosts
 
-	def makeTeam(parent, inter_count, learners_per_inter, sarsas=[], graph=None,
+	def makeTeam(parent, inter_count, learners_per_inter, new_topol_shape, sarsas=[], graph=None,
 			ss_label=None, port_dict=None):
+
+		# link_name = "{}-eth1".format(server_switch.name)
+
+		# vertex_map[server_label] = server
+		# vertex_map[switch_label] = server_switch
+		# monitored_links.append(link_name)
+		# link_map[(server_label, switch_label)] = link_name
+		# link_map[(switch_label, server_label)] = link_name
+
+		(monitored_links, dests, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
+
 		leader = routedSwitch(parent, 0, port_dict=port_dict)
 
 		def add_to_graph(parent, new_child, label=None):
@@ -949,6 +961,8 @@ def marlExperiment(
 			intermediates.append(new_interm)
 			inter_label = add_to_graph(leader_label, new_interm)
 
+			# FIXME: move to new topology tracking method...
+
 			for j in xrange(learners_per_inter):
 				new_learn = routedSwitch(new_interm, 1, port_dict=port_dict)
 				nll = add_to_graph(inter_label, new_learn)
@@ -964,7 +978,8 @@ def marlExperiment(
 				new_extern = routedSwitch(new_learn, 2)
 				extern_switches.append(new_extern)
 
-		return (leader, intermediates, learners, extern_switches, hosts, sarsas)
+		new_topol_shape = (monitored_links, dests, core_links, actors, externals, vertex_map, link_map)
+		return ((leader, intermediates, learners, extern_switches, hosts, sarsas), new_topol_shape)
 
 	def makeHosts(team, hosts_per_learner, hosts_upper=None):
 		if hosts_upper is None:
@@ -983,7 +998,22 @@ def marlExperiment(
 
 		return (leader, intermediates, learners, extern_switches, new_hosts, sarsas)
 
-	def buildNet(n_teams, team_sarsas=[]):
+	def buildTreeNet(n_teams, team_sarsas=[]):
+		# names of all internal links
+		monitored_links = []
+		# dest graph node labels
+		dests = []
+		# link objects which need limits set.
+		core_links = []
+		# array of (graph node, sarsa, leader)
+		actors = []
+		# array of graph nodes (locations to attach hosts)
+		externals = []
+		# map from graph node -> object
+		vertex_map = {}
+		# go from (label, label) -> index into link names
+		link_map = {}
+
 		server = newNamedHost()
 		server_switch = newNamedSwitch()
 		server_switch.controlled = use_controller
@@ -1001,20 +1031,40 @@ def marlExperiment(
 		server_label = ((server.IP(), server.MAC()), None)
 		switch_label = (None, server_switch.dpid)
 		G.add_edge(server_label, switch_label)
+		link_name = "{}-eth1".format(server_switch.name)
+
+		dests.append(server_label)
+		core_links.append(core_link)
+		vertex_map[server_label] = server
+		vertex_map[switch_label] = server_switch
+		monitored_links.append(link_name)
+		link_map[(server_label, switch_label)] = link_name
+		link_map[(switch_label, server_label)] = link_name
+
+		new_topol_shape = (monitored_links, dests, core_links, actors, externals, vertex_map, link_map)
 
 		teams = []
 		for i in xrange(n_teams):
-			t = makeTeam(server_switch, n_inters, n_learners,
+			(t, n_s) = makeTeam(server_switch, n_inters, n_learners, new_topol_shape,
 				sarsas=[] if make_sarsas else team_sarsas[i],
 				graph=G,
 				ss_label=switch_label,
-				port_dict=port_dict)
+				port_dict=port_dict,)
 			# this doesn't need to even be here
 			#trackedLink(server_switch, t[0], port_dict=)
 			teams.append(t)
 			if make_sarsas: team_sarsas.append(t[-1])
+			new_topol_shape = n_s
 
-		return (server, server_switch, core_link, teams, team_sarsas, G, port_dict)
+		return (server, server_switch, core_link, teams, team_sarsas, G, port_dict, new_topol_shape)
+
+	def buildEcmpNet(n_teams, team_sarsas=[]):
+		pass
+
+	if topol == "tree":
+		buildNet = buildTreeNet
+	elif topol == "ecmp":
+		buildNet = buildEcmpNet
 
 	### THE EXPERIMENT? ###
 
@@ -1047,7 +1097,9 @@ def marlExperiment(
 
 		# build the network model...
 		# EVERY TIME, because scorched-earth is the only language mininet speaks
-		(server, server_switch, core_link, teams, team_sarsas, graph, port_dict) = buildNet(n_teams, team_sarsas=store_sarsas)
+		(server, server_switch, core_link, teams, team_sarsas, graph, port_dict, new_topol_shape) = buildNet(n_teams, team_sarsas=store_sarsas)
+
+		print new_topol_shape
 
 		learner_pos = {}
 		learner_name = []
