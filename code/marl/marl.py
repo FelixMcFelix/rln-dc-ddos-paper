@@ -927,8 +927,11 @@ def marlExperiment(
 
 		(monitored_links, dests, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
 
-		def link_in_new_topol(node1, node2, node1_label, node2_label):
-			link_name = "{}-eth1".format(node2.name)
+		def link_in_new_topol(node1, node2, node1_label, node2_label, critical=False):
+			link_name = "{}{}-eth1".format(
+				"!" if critical else "",
+				node2.name,
+			)
 
 			vertex_map[node1_label] = node1
 			vertex_map[node2_label] = node2
@@ -1107,8 +1110,22 @@ def marlExperiment(
 		# build the network model...
 		# EVERY TIME, because scorched-earth is the only language mininet speaks
 		(server, server_switch, core_link, teams, team_sarsas, graph, port_dict, new_topol_shape) = buildNet(n_teams, team_sarsas=store_sarsas)
+		(monitored_links, dests, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
 
-		print new_topol_shape
+		# Compute paths from agents to each dest.
+		# Use bigrams to essentially figure out all equal-cost hops.
+		dest_map = {}
+		for (node, _sarsa, _leader) in actors:
+			for dest in dests:
+				paths = nx.all_shortest_paths(graph, node, dest)
+				for path in escape_paths:
+					for (n1, n2) in zip(path, path[1:]):
+						# when trying to reach dest from n1, go through n2
+						if (n1, dest) not in dest_map:
+							dest_map[(n1, dest)] = set()
+						dest_map[(n1, dest)].add(n2)
+
+		print dest_map
 
 		learner_pos = {}
 		learner_name = []
@@ -1170,6 +1187,7 @@ def marlExperiment(
 			# for each dpid, find the port which is closest to each IP
 			entry_map = {}
 			escape_map = {}
+			dest_map = {}
 			for dnode in dpids:
 				(_, dpid) = dnode
 				entry_map[dpid] = {}
