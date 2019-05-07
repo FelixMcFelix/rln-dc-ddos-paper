@@ -288,7 +288,7 @@ def marlExperiment(
 			"-c", str(subclient_count),
 			"-b", "../opus-voip-traffic",
 			"--ip-strategy", "even",
-			"--iface", "{}-eth0".format(host.name),
+			#"--iface", "{}-eth0".format(host.name),
 			"--constant",
 			"--refresh",
 		]
