@@ -984,7 +984,7 @@ def marlExperiment(
 			for j in xrange(learners_per_inter):
 				new_learn = routedSwitch(new_interm, 1, port_dict=port_dict)
 				nll = add_to_graph(inter_label, new_learn)
-				link_in_new_topol(new_interm, new_learn, inter_label, nll)
+				link_in_new_topol(new_interm, new_learn, inter_label, nll, critical=True)
 				_ = link_to_outside(nll)
 
 				# Init and pair the actual learning agent here, too!
@@ -1002,7 +1002,7 @@ def marlExperiment(
 				extern_switches.append(new_extern)
 				externals.append(new_extern)
 
-		new_topol_shape = (monitored_links, dests, core_links, actors, externals, vertex_map, link_map)
+		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map)
 		return ((leader, intermediates, learners, extern_switches, hosts, sarsas), new_topol_shape)
 
 	def makeHosts(hosts, externs, hosts_per_learner, hosts_upper=None):
@@ -1128,7 +1128,7 @@ def marlExperiment(
 		(monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
 
 		dest_from_ip = {}
-		for dest in dest:
+		for dest in dests:
 			dest_from_ip[dest[0][0]] = dest
 
 		# Compute paths from agents to each dest.
@@ -1151,9 +1151,10 @@ def marlExperiment(
 		learner_pos = {}
 		learner_name = []
 
-		for i, (actor, _sarsa, _leader) in enumerate(learners):
-			learner_pos[actor.name] = len(learner_name)
-			learner_name.append(actor.name)
+		for i, (actor, _sarsa, _leader) in enumerate(actors):
+			name = vertex_map[actor].name
+			learner_pos[name] = len(learner_name)
+			learner_name.append(name)
 
 		# setup the controller, if required...
 		ctl_proc = None
@@ -1272,7 +1273,7 @@ def marlExperiment(
 		# need to remember which hosts correspond to which agent...
 		# that agent then has a leader
 
-		for (host, good, bw, _, _, extern_no) in new_hosts:
+		for (host, good, bw, _, _, extern_no) in all_hosts:
 			(_a_node, _a_sarsa, a_leader) = actors[extern_no]
 
 			bw_team = None
@@ -1331,6 +1332,7 @@ def marlExperiment(
 		executeRouteQueue()
 
 		# Spool up the monitoring tool.
+		#print monitored_links
 		mon_cmd = server_switch.popen(
 			["../marl-bwmon/marl-bwmon"]
 			+ (["-s"] if bw_mon_socketed else [])
@@ -1572,7 +1574,7 @@ def marlExperiment(
 							"http {\n" +
 							"\tserver {\n" +
 							"\t\tinclude global.conf;\n" +
-							"\t\tlisten {}:80;\n".format(dest[0][0]) +
+							"\t\tlisten {}:80;\n".format(dest_node[0][0]) +
 							"\t}\n" +
 							"}\n"
 						)
@@ -1620,9 +1622,9 @@ def marlExperiment(
 			elif model == "nginx":
 				# TODO: split into good_model and bad_model choices
 				if submodel == "http" or (submodel is None and good):
-					cmd = th_cmd(dests, bw, ip=target_ip)
+					cmd = th_cmd(dests, bw, target_ip=target_ip)
 				elif submodel == "opus-voip" and good:
-					cmd = opus_cmd(dests, bw, host, ip=target_ip)
+					cmd = opus_cmd(dests, bw, host, target_ip=target_ip)
 				elif submodel == "udp-flood" or ((submodel is None or submodel == "opus-voip") and not good):
 					#rate_const = 3.0 if not good else 4.0
 					udp_h_size = 28.0
@@ -1709,7 +1711,6 @@ def marlExperiment(
 			if interrupted[0]:
 				break
 			# Make the last actions a reality!
-			block_size = len(learners)
 			if not spiffy_but_bad:
 				enactActions(actors, learner_traces, vertex_map)
 			else:
@@ -1828,10 +1829,6 @@ def marlExperiment(
 			first_sarsa = None
 
 			flows_to_query = []
-			# FIXME: main loop -- what I need to rework...			
-			team_true_loads = bw_teams[team_no]
-
-			leader_index = switch_list_indices[leader.name]
 
 			datas = {}
 			totals = {}
@@ -1844,11 +1841,11 @@ def marlExperiment(
 
 				for link in dest_links[dest]:
 					index = link_map[link]
+					(data_g_o, data_b_o) = datas[dest]
 					(data_g, data_b) = get_data(index)
 
 					totals[dest] += get_total(index)
-					datas[dest][0] += data_g
-					datas[dest][1] += data_b
+					datas[dest] = (data_g_o + data_g, data_b_o + data_b)
 
 				# assume that all dests are receiving an equal share of bw_all...
 				r_g = safe_reward_func(std_marl, totals[dest], datas[dest][0], bw_all[0]/float(len(dests)),
@@ -1865,20 +1862,6 @@ def marlExperiment(
 			for learner_no, (node_label, sarsa, leader_nodes) in enumerate(actors):
 				node = vertex_map[node_label]
 
-				l_rewards = {}
-				leader_index = 1 if if leader_nodes is None else link_map[leader_nodes]
-
-				# FIXME: reconcile multiple everything w/ marl's standard action...
-				for dest in dests:
-					# assume that all dests are receiving an equal share of bw_all...
-					if use_path_measurements:
-						r_l = g_rewards[dest]
-					else:
-						r_l = safe_reward_func(reward_func, totals[dest], datas[dest][0], bw_all[0]/float(len(dests)),
-							get_total(leader_index), get_data(leader_index)[0], bw_teams[leader_index][0],
-							n_teams, l_cap, ratio)
-
-					l_rewards[dest] = r_l
 
 				if first_sarsa is None:
 					first_sarsa = sarsa
@@ -1894,15 +1877,17 @@ def marlExperiment(
 				# hash_fn = smart_hash if use_path_measurements else dumb_hash
 				hash_fn = smart_hash if actions_target_flows else dumb_hash
 
-				def indices_for_state_vec(dst_ip):
-					curr = dest_from_ip[dst_ip]
+				def indices_for_state_vec(dst_ip, src_ip):
+					curr = node_label
+					end = dest_from_ip[dst_ip]
 					path = [curr]
-					while curr != node_label: 
-						next_set = dest_map[curr][node_label]
+					while curr != end: 
+						next_set = list(dest_map[curr][end])
 						curr = next_set[hash_fn(len(next_set), src_ip, dst_ip)]
 						path.append(curr)
 
 					# have a complete path, convert now...
+					path.reverse()
 					parts = zip(path, path[1:])
 					h0 = parts[0]
 					h3 = parts[-1]
@@ -1918,11 +1903,26 @@ def marlExperiment(
 					return [h0] + internals + [h3]
 
 				# here is where global state is built.
-				important_indices = [switch_list_indices[name] for name in [
-					intermediates[learner_no/n_learners].name, node.name
-				]]
+				# traditional "leader" is main_links[2]
+				t_dest = dests[np.random.choice(len(dests))]
+				main_links = indices_for_state_vec(t_dest[0][0], "0.0.0.0")
 
-				state_vec = [total_mbps[index] for index in [0, leader_index]+important_indices]
+				state_vec = [total_mbps[link_map[x]] for x in main_links]
+
+				l_rewards = {}
+				# FIXME: reconcile multiple everything w/ marl's standard action...
+				for dest in dests:
+					# assume that all dests are receiving an equal share of bw_all...
+					if use_path_measurements:
+						r_l = g_rewards[dest]
+					else:
+						lead = leader_nodes if leader_nodes is not None else main_links[2]
+						lead_i = link_map[lead]
+						r_l = safe_reward_func(reward_func, totals[dest], datas[dest][0], bw_all[0]/float(len(dests)),
+							get_total(lead_i), get_data(lead_i)[0], bw_teams[lead][0],
+							n_teams, l_cap, ratio)
+
+					l_rewards[dest] = r_l
 
 				l_index = learner_no
 				# if on hard mode, do some other stuff instead.
@@ -1951,15 +1951,17 @@ def marlExperiment(
 
 					(local_work, local_work_set, local_visited_set) = queue_holder["curr"]
 					local_pos = queue_holder["pos"]
+					print "true", state_vec
 
 					# TODO: strip old entries?
 					# PROCESS ALL NEW DATA.
 					for (src_ip, props_dict) in flows_seen:
 						for (dst_ip, props) in props_dict.iteritems():
 							# we know src, and dst. rebuild state-vec.
-							main_links = indices_for_state_vec(dst_ip)
+							main_links = indices_for_state_vec(dst_ip, src_ip)
 
 							state_vec = [total_mbps[link_map[x]] for x in main_links]
+							print state_vec
 
 							flows_to_query.append(src_ip)
 
@@ -2165,12 +2167,6 @@ def marlExperiment(
 					queue_holder["curr"] = (local_work, local_work_set, local_visited_set)
 					queue_holder["pos"] = local_pos
 				else:
-					# Either make this happen once per dest, or choose a dest at random.
-					t_dest = dests[np.random.choice(len(dests))]
-					main_links = indices_for_state_vec(t_dest[0][0])
-
-					state_vec = [total_mbps[link_map[x]] for x in main_links]
-
 					prev_state = learner_traces[l_index]
 					if prev_state == {}:
 						machine = AcTrans()
