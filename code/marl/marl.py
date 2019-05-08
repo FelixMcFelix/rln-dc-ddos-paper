@@ -932,12 +932,13 @@ def marlExperiment(
 				"!" if critical else "",
 				node2.name,
 			)
+			index = len(monitored_links)
 
 			vertex_map[node1_label] = node1
 			vertex_map[node2_label] = node2
 			monitored_links.append(link_name)
-			link_map[(node1_label, node2_label)] = link_name
-			link_map[(node2_label, node1_label)] = link_name
+			link_map[(node1_label, node2_label)] = index
+			link_map[(node2_label, node1_label)] = index
 
 		leader = routedSwitch(parent, 0, port_dict=port_dict)
 
@@ -984,7 +985,7 @@ def marlExperiment(
 					local_sarsa = sarsas[(i * inter_count) + j]
 				
 				learners.append(new_learn)
-				actors.append((nll, local_sarsa, leader_label))
+				actors.append((nll, local_sarsa, (ss_label, leader_label)))
 
 				new_extern = routedSwitch(new_learn, 2)
 				extern_switches.append(new_extern)
@@ -993,11 +994,9 @@ def marlExperiment(
 		new_topol_shape = (monitored_links, dests, core_links, actors, externals, vertex_map, link_map)
 		return ((leader, intermediates, learners, extern_switches, hosts, sarsas), new_topol_shape)
 
-	def makeHosts(team, hosts_per_learner, hosts_upper=None):
+	def makeHosts(hosts, externs, hosts_per_learner, hosts_upper=None):
 		if hosts_upper is None:
 			hosts_upper = hosts_per_learner
-
-		(leader, intermediates, learners, extern_switches, hosts, sarsas) = team
 
 		for (host, _, _, link, _) in hosts:
 			host.stop()#deleteIntfs=True)
@@ -1005,10 +1004,10 @@ def marlExperiment(
 
 		new_hosts = []
 
-		for extern in extern_switches:
+		for extern in externs:
 			new_hosts += addHosts(extern, hosts_per_learner, hosts_upper)
 
-		return (leader, intermediates, learners, extern_switches, new_hosts, sarsas)
+		return new_hosts
 
 	def buildTreeNet(n_teams, team_sarsas=[]):
 		# names of all internal links
@@ -1017,7 +1016,7 @@ def marlExperiment(
 		dests = []
 		# link objects which need limits set.
 		core_links = []
-		# array of (graph node, sarsa, leader node)
+		# array of (graph node, sarsa, leader's link points)
 		actors = []
 		# array of graph nodes (locations to attach hosts)
 		externals = []
@@ -1050,8 +1049,8 @@ def marlExperiment(
 		vertex_map[server_label] = server
 		vertex_map[switch_label] = server_switch
 		monitored_links.append(link_name)
-		link_map[(server_label, switch_label)] = link_name
-		link_map[(switch_label, server_label)] = link_name
+		link_map[(server_label, switch_label)] = len(monitored_links) - 1
+		link_map[(switch_label, server_label)] = len(monitored_links) - 1
 
 		new_topol_shape = (monitored_links, dests, core_links, actors, externals, vertex_map, link_map)
 
@@ -1091,6 +1090,7 @@ def marlExperiment(
 		interrupted[0] = True
 
 	signal.signal(signal.SIGINT, sigint_handle)
+	old_hosts = []
 
 	for ep in xrange(episodes):
 		Cleanup.cleanup()
@@ -1131,25 +1131,10 @@ def marlExperiment(
 
 		learner_pos = {}
 		learner_name = []
-		tracked_switches = [server_switch] + list(itertools.chain.from_iterable([
-			[leader] + intermediates + learners for (leader, intermediates, learners, _, _, _) in teams
-		]))
 
-		for (_, _, learners, _, _, _) in teams:
-			for learner in learners:
-				learner_pos[learner.name] = len(learner_name)
-				learner_name.append(learner.name)
-
-		tracked_interfaces = [
-			"{}{}-eth1".format(
-				"!" if actions_target_flows and el.name in learner_pos else "",
-				el.name,
-			) for el in tracked_switches
-		]
-
-		switch_list_indices = {}
-		for i, sw in enumerate(tracked_switches):
-			switch_list_indices[sw.name] = i
+		for i, (actor, _sarsa, _leader) in enumerate(learners):
+			learner_pos[actor.name] = len(learner_name)
+			learner_name.append(actor.name)
 
 		# setup the controller, if required...
 		ctl_proc = None
@@ -1251,54 +1236,43 @@ def marlExperiment(
 			#controller = net.addController("c0", controller=RemoteController, ip="127.0.0.1", port=6633)
 
 		# remake/reclassify hosts
-		all_hosts = []
 		host_procs = []
-		l_teams = []
 
-		bw_teams = []
 		# good, bad, total
 		bw_all = [0.0 for i in xrange(3)]
 
 		# Assign hosts again, and memorise the load they intend to push.
-		for team in teams:
-			new_team = makeHosts(team, *host_range)
-			new_hosts = new_team[4]
+		# FIXME: need to get old hosts into here somehow...
+		all_hosts = makeHosts(old_hosts, externals, *host_range)
+		old_hosts = all_hosts
 
-			# need to know the intended loads of each class (overall and per-team).
-			# good, bad, total
-			bw_stats = [0.0 for i in xrange(3)]
-			for (host, good, bw, _, _) in new_hosts:
-				if good:
-					bw_stats[0] += bw
-					bw_all[0] += bw
-				else:
-					bw_stats[1] += bw
-					bw_all[1] += bw
-				bw_stats[2] += bw
-				bw_all[2] += bw
+		# need to know the intended loads of each class (overall and per-team).
+		# good, bad, total
+		bw_stats = [0.0 for i in xrange(3)]
+		for (host, good, bw, _, _) in new_hosts:
+			if good:
+				bw_stats[0] += bw
+				bw_all[0] += bw
+			else:
+				bw_stats[1] += bw
+				bw_all[1] += bw
+			bw_stats[2] += bw
+			bw_all[2] += bw
 
-			bw_teams.append(bw_stats)
-			all_hosts += new_hosts
+		for (node, sarsa, _link_pts) in actors:
+			# reset network model to default rules.
+			#updateUpstreamRoute(node)
 
-			l_teams.append(new_team)
-		teams = l_teams
-
-		# Per team stuff - 
-		for (_, _, learners, _, _, sarsas) in teams:
-			for (node, sarsa) in zip(learners, sarsas):
-				# reset network model to default rules.
-				#updateUpstreamRoute(node)
-
-				# Assume initial state is all zeroes (new network)
-				sarsa.bootstrap(sarsa.to_state(np.zeros(sarsaParams["vec_size"])))
+			# Assume initial state is all zeroes (new network)
+			sarsa.bootstrap(sarsa.to_state(np.zeros(sarsaParams["vec_size"])))
 		
 		# Update master link's bandwidth limit after hosts init.
 		capacity = calc_max_capacity(len(all_hosts))
 		print capacity, bw_all
 		if protect_final_hop:
-			core_link.intf1.config(bw=float(capacity))
-			core_link.intf2.config(bw=float(capacity))
-			pass
+			for core_link in core_links:
+				core_link.intf1.config(bw=float(capacity))
+				core_link.intf2.config(bw=float(capacity))
 
 		# Track the rewards, total load observed and legit rates per step (split by episode)
 		rewards.append([])
@@ -1314,7 +1288,7 @@ def marlExperiment(
 
 		# What do the hosts believe their IP to be?
 		# i.e. this won't set correctly until the net has started.
-		for (h, i) in [(host, ip) for (host, _, _, _, ip) in all_hosts] + [(server, server.IP())]:
+		for (h, i) in [(host, ip) for (host, _, _, _, ip) in all_hosts] + [(vertex_map[d], d[0][0]) for d in dests]:
 			h.setIP(i, 24)
 			h.setDefaultRoute(h.intf())
 
@@ -1325,7 +1299,7 @@ def marlExperiment(
 		mon_cmd = server_switch.popen(
 			["../marl-bwmon/marl-bwmon"]
 			+ (["-s"] if bw_mon_socketed else [])
-			+ tracked_interfaces,
+			+ monitored_links,
 			stdin=PIPE,
 			stderr=sys.stderr
 		)
@@ -1566,7 +1540,7 @@ def marlExperiment(
 
 		if model == "nginx":
 			#net.interact()
-						pass
+			pass
 
 		server_ip = server.IP()
 
@@ -1578,6 +1552,7 @@ def marlExperiment(
 		#		for (host, good, bw, link, ip) in hosts:
 		#			host.cmd(p_cmd)
 
+		# FIXME: this is the point from where I need to keep working...
 		for (_, _, _, _, hosts, _) in teams:
 			for (host, good, bw, link, ip) in hosts:
 				if model == "tcpreplay":
@@ -1764,7 +1739,7 @@ def marlExperiment(
 
 			#print postsleep - presleep
 			preask = time.time()
-			(time_ns, unfused_load_mbps, parsed_flows) = ask_stats(flows_to_query, len(tracked_interfaces), len(learner_pos))
+			(time_ns, unfused_load_mbps, parsed_flows) = ask_stats(flows_to_query, len(monitored_links), len(learner_pos))
 			postask = time.time()
 			if print_times:
 				print "total:", postask - preask
