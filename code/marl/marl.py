@@ -250,21 +250,31 @@ def marlExperiment(
 	if single_learner and single_learner_ep_scale:
 		explore_episodes *= float(n_teams * n_inters * n_learners) 
 
-	def th_cmd(bw):
+	def random_target(dests):
+		target_dest = dests[0] if len(dests) == 1 else dests[random.randint(0, len(dests)-1)]
+		return target_dest[0][0]
+
+	def th_cmd(dests, bw, target_ip=None):
+		if target_ip is None:
+			target_ip = random_target(dests)
+
 		return [
 			"../traffic-host/target/release/traffic-host",
 			str(bw),
 		] + (
-			["-s", "http://10.0.0.1/gcc-8.2.0.tar.gz"] if not randomise else \
+			["-s", "http://{}/gcc-8.2.0.tar.gz".format(target_ip)] if not randomise else \
 			[
 				"-r",
 				"-l", "../traffic-host/htdoc-deps.ron",
+				"-s", "http://{}/".format(target_ip)
 			]
 		) + (
 			[] if randomise_count is None else ["-c", str(randomise_count)]
 		)
 	total_thing = [0.0]
-	def opus_cmd(bw, host):
+	def opus_cmd(dests, bw, host, target_ip=None):
+		ip_list = [d[0][0] for d in dests]
+
 		# Do we want multiple calls?
 		# The stats observed show that flows occupy (in expectation)
 		# ~52kbps (median 49.906) with the below settings. If flows were constantly submitting,
@@ -284,7 +294,7 @@ def marlExperiment(
 		return [
 			"../opus-voip-traffic/target/release/opus-voip-traffic",
 			#"../opus-voip-traffic/target/debug/opus-voip-traffic",
-			"-i", "10.0.0.1",
+			"-i", ",".join(ip_list),
 			"-m", "5000",
 			"-c", str(subclient_count),
 			"-b", "../opus-voip-traffic",
@@ -834,12 +844,12 @@ def marlExperiment(
 			sw.controlled = True
 		return sw
 
-	def enactActions(learners, sarsas, flow_action_sets):
+	def enactActions(actors, flow_action_sets, vertex_map):
 		if actions_target_flows:
 			intime = time.time()
-			for i, (node, sarsa, maps) in enumerate(zip(learners, sarsas, flow_action_sets)):
+			for i, ((node_label, sarsa, _leader), maps) in enumerate(zip(actors, flow_action_sets)):
+				node = vertex_map[node_label]
 				for ip_pair, state in maps.iteritems():
-					# FIXME: don't send if action already taken...
 					#print "{}: {}".format(i, ip)
 					(_, action, machine, _, guard) = state
 
@@ -857,7 +867,8 @@ def marlExperiment(
 			if print_times:
 				print "do_acs:", outtime-intime
 		else:
-			for (node, sarsa, state) in zip(learners, sarsas, flow_action_sets):
+			for ((node_label, sarsa, _leader), maps) in zip(actors, flow_action_sets):
+				node = vertex_map[node_label]
 				if len(state) == 0:
 					action = default_machine_state
 				else:
@@ -895,7 +906,7 @@ def marlExperiment(
 		ip = "{}.{}.{}.{}".format(*ip_bytes)
 		return (ip, ip_bytes)
 
-	def addHosts(extern, hosts_per_learner, hosts_upper):
+	def addHosts(extern, extern_no, hosts_per_learner, hosts_upper):
 		host_count = (hosts_per_learner if hosts_per_learner == hosts_upper
 			else random.randint(hosts_per_learner, hosts_upper)
 		)
@@ -918,14 +929,14 @@ def marlExperiment(
 			new_host.setIP(ip, 24)
 
 			hosts.append(
-				(new_host, good, bw, link, ip)
+				(new_host, good, bw, link, ip, extern_no)
 			)
 		return hosts
 
 	def makeTeam(parent, inter_count, learners_per_inter, new_topol_shape, sarsas=[], graph=None,
 			ss_label=None, port_dict=None):
 
-		(monitored_links, dests, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
+		(monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
 
 		def link_in_new_topol(node1, node2, node1_label, node2_label, critical=False):
 			link_name = "{}{}-eth1".format(
@@ -998,14 +1009,14 @@ def marlExperiment(
 		if hosts_upper is None:
 			hosts_upper = hosts_per_learner
 
-		for (host, _, _, link, _) in hosts:
+		for (host, _, _, link, _, _) in hosts:
 			host.stop()#deleteIntfs=True)
 			link.delete()
 
 		new_hosts = []
 
-		for extern in externs:
-			new_hosts += addHosts(extern, hosts_per_learner, hosts_upper)
+		for i, extern in enumerate(externs):
+			new_hosts += addHosts(extern, i, hosts_per_learner, hosts_upper)
 
 		return new_hosts
 
@@ -1014,6 +1025,8 @@ def marlExperiment(
 		monitored_links = []
 		# dest graph node labels
 		dests = []
+		# Links relating to each dest.
+		dest_links = {}
 		# link objects which need limits set.
 		core_links = []
 		# array of (graph node, sarsa, leader's link points)
@@ -1052,7 +1065,9 @@ def marlExperiment(
 		link_map[(server_label, switch_label)] = len(monitored_links) - 1
 		link_map[(switch_label, server_label)] = len(monitored_links) - 1
 
-		new_topol_shape = (monitored_links, dests, core_links, actors, externals, vertex_map, link_map)
+		dest_links[server_label] = [(server_label, switch_label)]
+
+		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map)
 
 		teams = []
 		for i in xrange(n_teams):
@@ -1110,7 +1125,11 @@ def marlExperiment(
 		# build the network model...
 		# EVERY TIME, because scorched-earth is the only language mininet speaks
 		(server, server_switch, core_link, teams, team_sarsas, graph, port_dict, new_topol_shape) = buildNet(n_teams, team_sarsas=store_sarsas)
-		(monitored_links, dests, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
+		(monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
+
+		dest_from_ip = {}
+		for dest in dest:
+			dest_from_ip[dest[0][0]] = dest
 
 		# Compute paths from agents to each dest.
 		# Use bigrams to essentially figure out all equal-cost hops.
@@ -1240,23 +1259,39 @@ def marlExperiment(
 
 		# good, bad, total
 		bw_all = [0.0 for i in xrange(3)]
+		bw_teams = {}
 
 		# Assign hosts again, and memorise the load they intend to push.
-		# FIXME: need to get old hosts into here somehow...
 		all_hosts = makeHosts(old_hosts, externals, *host_range)
 		old_hosts = all_hosts
 
 		# need to know the intended loads of each class (overall and per-team).
+		# can make bw_teams as a dict against leader_node
 		# good, bad, total
-		bw_stats = [0.0 for i in xrange(3)]
-		for (host, good, bw, _, _) in new_hosts:
+
+		# need to remember which hosts correspond to which agent...
+		# that agent then has a leader
+
+		for (host, good, bw, _, _, extern_no) in new_hosts:
+			(_a_node, _a_sarsa, a_leader) = actors[extern_no]
+
+			bw_team = None
+			if a_leader is not None:
+				if a_leader not in bw_teams:
+					bw_teams[a_leader] = [0.0 for i in xrange(3)]
+				bw_team = bw_teams[a_leader]
+			
 			if good:
-				bw_stats[0] += bw
+				if bw_team is not None:
+					bw_team[0] += bw
 				bw_all[0] += bw
 			else:
-				bw_stats[1] += bw
+				if bw_team is not None:
+					bw_team[1] += bw
 				bw_all[1] += bw
-			bw_stats[2] += bw
+
+			if bw_team is not None:
+				bw_team[2] += bw
 			bw_all[2] += bw
 
 		for (node, sarsa, _link_pts) in actors:
@@ -1288,7 +1323,7 @@ def marlExperiment(
 
 		# What do the hosts believe their IP to be?
 		# i.e. this won't set correctly until the net has started.
-		for (h, i) in [(host, ip) for (host, _, _, _, ip) in all_hosts] + [(vertex_map[d], d[0][0]) for d in dests]:
+		for (h, i) in [(host, ip) for (host, _, _, _, ip, _) in all_hosts] + [(vertex_map[d], d[0][0]) for d in dests]:
 			h.setIP(i, 24)
 			h.setDefaultRoute(h.intf())
 
@@ -1519,30 +1554,47 @@ def marlExperiment(
 				return (time_ns, unfused_load_mbps, parsed_flows)
 
 		# spool up server if need be
-		server_proc = None
+		server_procs = []
 
-		if model == "nginx":
-			if submodel is None:
-				cmd = [
-					"nginx",
-					"-p", "../traffic-host",
-					"-c", "h1.conf",
-				]
-			elif submodel == "opus-voip":
-				cmd = [
-					"../opus-voip-traffic/target/release/opus-voip-traffic",
-					"--server",
-				]
+		for i, dest_node in enumerate(dests):
+			dest = vertex_map[dest_node]
+			if model == "nginx":
+				if submodel is None:
+					# How to have a sane config for each?
+					# Config needs to include the IP so that listening works as intended...
+					fname = "temp{}.conf".format(i)
 
-			server_proc = server.popen(
-				cmd, stdin=PIPE, stderr=sys.stderr
-			)
+					with open("../traffic-host/"+fname, "w") as f:
+						f.write(
+							"events {\n" +
+							"\tworker_connections 1024;\n" +
+							"}\n\n" +
+							"http {\n" +
+							"\tserver {\n" +
+							"\t\tinclude global.conf;\n" +
+							"\t\tlisten {}:80;\n".format(dest[0][0]) +
+							"\t}\n" +
+							"}\n"
+						)
+
+					cmd = [
+						"nginx",
+						"-p", "../traffic-host",
+						"-c", fname,
+					]
+				elif submodel == "opus-voip":
+					cmd = [
+						"../opus-voip-traffic/target/release/opus-voip-traffic",
+						"--server",
+					]
+
+				server_procs.append(dest.popen(
+					cmd, stdin=PIPE, stderr=sys.stderr
+				))
 
 		if model == "nginx":
 			#net.interact()
 			pass
-
-		server_ip = server.IP()
 
 		# gen traffic at each host. This MUST happen after the bootstrap.
 		#time.sleep(3)
@@ -1552,57 +1604,57 @@ def marlExperiment(
 		#		for (host, good, bw, link, ip) in hosts:
 		#			host.cmd(p_cmd)
 
-		# FIXME: this is the point from where I need to keep working...
-		for (_, _, _, _, hosts, _) in teams:
-			for (host, good, bw, link, ip) in hosts:
-				if model == "tcpreplay":
-					cmd = [
-						"tcpreplay-edit",
-						"-i", host.intfNames()[0],
-						"-l", str(0),
-						"-S", "0.0.0.0/0:{}/32".format(ip),
-						"-D", "0.0.0.0/0:{}/32".format(server_ip)
-					] + (
-						[] if old_style else ["-M", str(bw)]
-					) + [(good_file if good else bad_file)]
-				elif model == "nginx":
-					# TODO: split into good_model and bad_model choices
-					if submodel == "http" or (submodel is None and good):
-						cmd = th_cmd(bw)
-					elif submodel == "opus-voip" and good:
-						cmd = opus_cmd(bw, host)
-					elif submodel == "udp-flood" or ((submodel is None or submodel == "opus-voip") and not good):
-						#rate_const = 3.0 if not good else 4.0
-						udp_h_size = 28.0
-						bw_MB = (bw / 8.0) * (10.0**6.0)
-						target = 1500.0
-						s = target - udp_h_size
-						#now, find delay in microseconds between packets of size 1500
-						interval_s = target/bw_MB
-						interval_us = int(interval_s * (10.0 ** 6.0))
-						print interval_s
-	
-						cmd = [
-							"hping3",
-							"--udp",
-							#"-i", "u{}".format(rate_const),
-							#"-d", str(expand),
-							"-i", "u{}".format(interval_us),
-							"-d", str(int(s)),
-							#"-a", ip,
-							"-I", "h",
-							"10.0.0.1"
-						]
-				else:
-					cmd = []
+		for (host, good, bw, link, ip, extern_no) in all_hosts:
+			target_dest = dests[0] if len(dests) == 1 else dests[random.randint(0, len(dests)-1)]
+			target_ip = target_dest[0][0]
+			if model == "tcpreplay":
+				cmd = [
+					"tcpreplay-edit",
+					"-i", host.intfNames()[0],
+					"-l", str(0),
+					"-S", "0.0.0.0/0:{}/32".format(ip),
+					"-D", "0.0.0.0/0:{}/32".format(target_ip)
+				] + (
+					[] if old_style else ["-M", str(bw)]
+				) + [(good_file if good else bad_file)]
+			elif model == "nginx":
+				# TODO: split into good_model and bad_model choices
+				if submodel == "http" or (submodel is None and good):
+					cmd = th_cmd(dests, bw, ip=target_ip)
+				elif submodel == "opus-voip" and good:
+					cmd = opus_cmd(dests, bw, host, ip=target_ip)
+				elif submodel == "udp-flood" or ((submodel is None or submodel == "opus-voip") and not good):
+					#rate_const = 3.0 if not good else 4.0
+					udp_h_size = 28.0
+					bw_MB = (bw / 8.0) * (10.0**6.0)
+					target = 1500.0
+					s = target - udp_h_size
+					#now, find delay in microseconds between packets of size 1500
+					interval_s = target/bw_MB
+					interval_us = int(interval_s * (10.0 ** 6.0))
+					print interval_s
 
-				if len(cmd) > 0:
-					env_new = os.environ.copy()
-					env_new["RUST_BACKTRACE"] = "1"
-					host_procs.append(host.popen(
-						cmd, stdin=PIPE, stderr=sys.stdout,
-						env=env_new
-					))
+					cmd = [
+						"hping3",
+						"--udp",
+						#"-i", "u{}".format(rate_const),
+						#"-d", str(expand),
+						"-i", "u{}".format(interval_us),
+						"-d", str(int(s)),
+						#"-a", ip,
+						"-I", "h",
+						target_ip
+					]
+			else:
+				cmd = []
+
+			if len(cmd) > 0:
+				env_new = os.environ.copy()
+				env_new["RUST_BACKTRACE"] = "1"
+				host_procs.append(host.popen(
+					cmd, stdin=PIPE, stderr=sys.stdout,
+					env=env_new
+				))
 
 		# Let the pcaps come to life.
 		time.sleep(3)
@@ -1630,8 +1682,9 @@ def marlExperiment(
 			print "new limit is:", ratio*capacity, "from", capacity
 
 			if protect_final_hop:
-				core_link.intf1.config(bw=ratio*capacity)
-				core_link.intf2.config(bw=ratio*capacity)
+				for core_link in core_links:
+					core_link.intf1.config(bw=ratio*float(capacity))
+					core_link.intf2.config(bw=ratio*float(capacity))
 
 		last_traffic_ratio = 0.0
 		g_reward = 0.0
@@ -1640,10 +1693,10 @@ def marlExperiment(
 			#net.interact()
 			pass
 
-		learner_stats = [{} for _ in learner_pos]
-		learner_traces = [{} for _ in learner_pos]
-		learner_queues = [{"curr": ([], set(), set()), "future": set(), "pos": 0} for _ in learner_pos]
-		learner_fvecs = [{} for _ in learner_pos]
+		learner_stats = [{} for _ in actors]
+		learner_traces = [{} for _ in actors]
+		learner_queues = [{"curr": ([], set(), set()), "future": set(), "pos": 0} for _ in actors]
+		learner_fvecs = [{} for _ in actors]
 		flows_to_query = []
 
 		# Dict mapping flow-key to speed measurement and time at which it was taken.
@@ -1656,45 +1709,44 @@ def marlExperiment(
 			if interrupted[0]:
 				break
 			# Make the last actions a reality!
-			for team_no, (_, _, learners, _, _, sarsas) in enumerate(teams):
-				block_size = len(learners)
-				if not spiffy_but_bad:
-					enactActions(learners, sarsas, learner_traces[team_no * block_size:])
-				else:
-					curr_time = time.time()
-					# NOTE: go over each entry of spiffy_measurements[0],
-					# s_m[ip] = (rate, timestamp, unlimited, node)
-					# if the entry in table 1 exists (and is older than spiffy_act_time)
-					# look for the corresponding stats in table 2.
-					# Use the ratio of current/first rate to determine a verdict
-					# spiffy_verdict[ip] = true => bad (demote to complete filter)
-					# then delete from the first two tables
-					to_delete = []
+			block_size = len(learners)
+			if not spiffy_but_bad:
+				enactActions(actors, learner_traces, vertex_map)
+			else:
+				curr_time = time.time()
+				# NOTE: go over each entry of spiffy_measurements[0],
+				# s_m[ip] = (rate, timestamp, unlimited, node)
+				# if the entry in table 1 exists (and is older than spiffy_act_time)
+				# look for the corresponding stats in table 2.
+				# Use the ratio of current/first rate to determine a verdict
+				# spiffy_verdict[ip] = true => bad (demote to complete filter)
+				# then delete from the first two tables
+				to_delete = []
 
-					for ip in spiffy_measurements[0]:
-						(rate, timestamp, unlimited, node) = spiffy_measurements[0][ip]
-						if not unlimited:
-							unlimited = True
-							updateUpstreamRoute(node, ac_prob=0, target_ip=ip)
+				for ip in spiffy_measurements[0]:
+					(rate, timestamp, unlimited, node) = spiffy_measurements[0][ip]
+					if not unlimited:
+						unlimited = True
+						updateUpstreamRoute(node, ac_prob=0, target_ip=ip)
 
-						if curr_time - timestamp >= spiffy_act_time and ip in spiffy_measurements[1]:
-							curr_rate = spiffy_measurements[1][ip]
-							tbe = float(curr_rate)/max(float(rate), 0.0001)
-							bad_flow = tbe < 1/(1-spiffy_drop_rate)
-							spiffy_verdict[ip] = bad_flow
+					if curr_time - timestamp >= spiffy_act_time and ip in spiffy_measurements[1]:
+						curr_rate = spiffy_measurements[1][ip]
+						tbe = float(curr_rate)/max(float(rate), 0.0001)
+						bad_flow = tbe < 1/(1-spiffy_drop_rate)
+						spiffy_verdict[ip] = bad_flow
 
-							if bad_flow:
-								updateUpstreamRoute(node, ac_prob=1, target_ip=ip)
+						if bad_flow:
+							updateUpstreamRoute(node, ac_prob=1, target_ip=ip)
 
-							to_delete.append(ip)
-							print ip, rate, curr_rate, tbe, 1/(1-spiffy_drop_rate), bad_flow, "should have been", (ip%2 == 1)
-						else:
-							spiffy_measurements[0][ip] = (rate, timestamp, unlimited, node)
+						to_delete.append(ip)
+						print ip, rate, curr_rate, tbe, 1/(1-spiffy_drop_rate), bad_flow, "should have been", (ip%2 == 1)
+					else:
+						spiffy_measurements[0][ip] = (rate, timestamp, unlimited, node)
 
-					for ip in to_delete:
-						for el in spiffy_measurements:
-							if ip in el:
-								del el[ip]
+				for ip in to_delete:
+					for el in spiffy_measurements:
+						if ip in el:
+							del el[ip]
 
 			if i == 100:
 				#net.interact()
@@ -1703,32 +1755,31 @@ def marlExperiment(
 
 			if randomise:
 				counter = 0
-				for (_, _, _, _, hosts, _) in teams:
-					for (host, good, bw, link, ip) in hosts:
-						curr_proc = host_procs[counter]
-						finished = curr_proc.poll() is not None
-						if good and finished:
-							my_if = host.intf()
-							if randomise_new_ip:
-								link = my_if.link
-								# get partner
-								# unhook IF from both sides
-								# create new between them with new IP (shazam!)
-								# set hosts' default routes to new IF
-								parent = (link.intf1 if my_if == link.intf2 else link.intf2).node
-								newIP = genIP(good)
-								switch_cmd(parent, [], ip_masker_message(newIP[0], ip), False)
-								# TODO: think about changing bw/goodness?
+				for (host, good, bw, link, ip, extern_no) in all_hosts:
+					curr_proc = host_procs[counter]
+					finished = curr_proc.poll() is not None
+					if good and finished:
+						my_if = host.intf()
+						if randomise_new_ip:
+							link = my_if.link
+							# get partner
+							# unhook IF from both sides
+							# create new between them with new IP (shazam!)
+							# set hosts' default routes to new IF
+							parent = (link.intf1 if my_if == link.intf2 else link.intf2).node
+							newIP = genIP(good)
+							switch_cmd(parent, [], ip_masker_message(newIP[0], ip), False)
+							# TODO: think about changing bw/goodness?
 
-							if submodel is None:
-								cmd = th_cmd(bw)
-							elif submodel == "opus-voip":
-								cmd = opus_cmd(bw, host)
-							# restart traffic-host
-							host_procs[counter] = host.popen(
-								cmd, stdin=sys.stdout, stderr=sys.stderr
-							)
-						counter += 1
+						if submodel is None:
+							cmd = th_cmd(dests, bw)
+						elif submodel == "opus-voip":
+							cmd = opus_cmd(dests, bw, host)
+						# restart traffic-host
+						host_procs[counter] = host.popen(
+							cmd, stdin=sys.stdout, stderr=sys.stderr
+						)
+					counter += 1
 
 			presleep = time.time()
 
@@ -1745,7 +1796,7 @@ def marlExperiment(
 				print "total:", postask - preask
 
 			def mbpsify(bts):
-					return 8000*float(bts)/time_ns
+				return 8000*float(bts)/time_ns
 
 			load_mbps = [(ig+og, ib+ob) for ((ig, ib), (og, ob)) in zip(unfused_load_mbps[::2], unfused_load_mbps[1::2])]
 
@@ -1777,292 +1828,377 @@ def marlExperiment(
 			first_sarsa = None
 
 			flows_to_query = []
-			for team_no, (leader, intermediates, learners, _, _, sarsas) in enumerate(teams):
-				team_true_loads = bw_teams[team_no]
+			# FIXME: main loop -- what I need to rework...			
+			team_true_loads = bw_teams[team_no]
 
-				leader_index = switch_list_indices[leader.name]
+			leader_index = switch_list_indices[leader.name]
 
-				# Compute reward!
-				reward = safe_reward_func(reward_func, get_total(0), get_data(0)[0], bw_all[0],
-					get_total(leader_index), get_data(leader_index)[0], bw_teams[team_no][0],
-					n_teams, l_cap, ratio)
+			datas = {}
+			totals = {}
+			g_rewards = {}
+			g_reward = 0.0
+			for dest in dests:
+				#use the data from all of:
+				totals[dest] = 0.0
+				datas[dest] = (0.0, 0.0)
 
-				g_reward = safe_reward_func(std_marl, get_total(0), get_data(0)[0], bw_all[0],
-					get_total(leader_index), get_data(leader_index)[0], bw_teams[team_no][0],
-					n_teams, l_cap, ratio)
+				for link in dest_links[dest]:
+					index = link_map[link]
+					(data_g, data_b) = get_data(index)
 
-				#print g_reward, get_total(0), get_data(0)[0], bw_all[0], n_teams, l_cap, ratio
+					totals[dest] += get_total(index)
+					datas[dest][0] += data_g
+					datas[dest][1] += data_b
 
-				intime = time.time()
-				for learner_no, (node, sarsa) in enumerate(zip(learners, sarsas)):
-					if first_sarsa is None:
-						first_sarsa = sarsa
+				# assume that all dests are receiving an equal share of bw_all...
+				r_g = safe_reward_func(std_marl, totals[dest], datas[dest][0], bw_all[0]/float(len(dests)),
+					0.0, 0.0, 0.0, 0, l_cap, ratio)
 
-					target_sarsa = first_sarsa if single_learner else sarsa
+				g_rewards[dest] = r_g
 
-					important_indices = [switch_list_indices[name] for name in [
-						intermediates[learner_no/n_learners].name, node.name
-					]]
+				# make the exported g_reward an average.
+				g_reward += (r_g / float(len(dests)))
 
-					state_vec = [total_mbps[index] for index in [0, leader_index]+important_indices]
+			#print g_reward, get_total(0), get_data(0)[0], bw_all[0], n_teams, l_cap, ratio
 
-					l_index = learner_no + (team_no * len(learners))
-					# if on hard mode, do some other stuff instead.
-					if actions_target_flows:
-						# props: (
-						#  len_ns, sz_in, sz_out, [0-2]
-						#  wnd_sz_in, wnd_sz_out, [3-4]
-						#  pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, [5-7]
-						#  pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, [8-10]
-						#  wnd_iat_mean, wnd_iat_var [11-12]
-						# )
-						flow_space = learner_stats[l_index]
-						flow_traces = learner_traces[l_index]
-						flows_seen = parsed_flows[l_index]
-						queue_holder = learner_queues[l_index]
-						fvec_holder = learner_fvecs[l_index]
+			intime = time.time()
+			for learner_no, (node_label, sarsa, leader_nodes) in enumerate(actors):
+				node = vertex_map[node_label]
 
-						#if i%10 == 0:
-						#	print "laerner {} occupying:".format(l_index), len(flow_space), len(flow_traces), len(flows_to_query)
+				l_rewards = {}
+				leader_index = 1 if if leader_nodes is None else link_map[leader_nodes]
 
-						total_spent = 0.0
-						def can_act():
-							return trs_maxtime is None or total_spent <= trs_maxtime
+				# FIXME: reconcile multiple everything w/ marl's standard action...
+				for dest in dests:
+					# assume that all dests are receiving an equal share of bw_all...
+					if use_path_measurements:
+						r_l = g_rewards[dest]
+					else:
+						r_l = safe_reward_func(reward_func, totals[dest], datas[dest][0], bw_all[0]/float(len(dests)),
+							get_total(leader_index), get_data(leader_index)[0], bw_teams[leader_index][0],
+							n_teams, l_cap, ratio)
 
-						# learner_queues = [{"curr": ([], set(), set()), "future": set(), "pos": 0} for _ in learner_pos]
+					l_rewards[dest] = r_l
 
-						(local_work, local_work_set, local_visited_set) = queue_holder["curr"]
-						local_pos = queue_holder["pos"]
+				if first_sarsa is None:
+					first_sarsa = sarsa
 
-						# TODO: strip old entries?
-						# PROCESS ALL NEW DATA.
-						for (src_ip, props_dict) in flows_seen:
-							for (dst_ip, props) in props_dict.iteritems():
-								flows_to_query.append(src_ip)
+				target_sarsa = first_sarsa if single_learner else sarsa
 
-								ip_pair = (src_ip, dst_ip)
+				def dumb_hash(*args):
+					return 0
 
-								if ip_pair not in flow_space:
-									flow_space[ip_pair] = {
-										"ip": src_ip,
-										"last_act": 0.0 if not spiffy_mode else 0.05,
-										"last_rate_in": -1.0,
-										"last_rate_out": -1.0,
-										"pkt_in_count": 0,
-										"pkt_out_count": 0,
-									}
-								l = flow_space[ip_pair]
+				def smart_hash(n_choices, src, dst, *args):
+					return 0
 
-								l["cx_ratio"] = min(*props[1:3]) / max(*props[1:3])
-								l["length"] = props[0]
-								l["size"] = props[1] + props[2]
-								l["mean_iat"] = props[11]
-								l["pkt_in_count"] += props[7]
-								l["pkt_out_count"] += props[10]
-								l["pkt_in_wnd_count"] = props[7]
-								l["pkt_out_wnd_count"] = props[10]
-								l["mean_bpp_in"] = props[5]
-								l["mean_bpp_out"] = props[8]
-								l["bytes_in"] = props[3]
-								l["bytes_out"] = props[4]
+				# hash_fn = smart_hash if use_path_measurements else dumb_hash
+				hash_fn = smart_hash if actions_target_flows else dumb_hash
 
-								observed_rate_in = mbpsify(props[3])
-								observed_rate_out = mbpsify(props[4])
+				def indices_for_state_vec(dst_ip):
+					curr = dest_from_ip[dst_ip]
+					path = [curr]
+					while curr != node_label: 
+						next_set = dest_map[curr][node_label]
+						curr = next_set[hash_fn(len(next_set), src_ip, dst_ip)]
+						path.append(curr)
 
-								if l["last_rate_in"] < 0.0:
-									l["last_rate_in"] = observed_rate_in
-									l["last_rate_out"] = observed_rate_out
-								l["delta_in"] = observed_rate_in - l["last_rate_in"]
-								l["delta_out"] = observed_rate_out - l["last_rate_out"]
-								total_vec = state_vec + flow_to_state_vec(l)
-								flow_space[ip_pair] = l
+					# have a complete path, convert now...
+					parts = zip(path, path[1:])
+					h0 = parts[0]
+					h3 = parts[-1]
+					internals = []
+					if len(parts) == 1:
+						internals = [h0, h3]
+					else:
+						usables = parts[1:-1]
+						tert_pt = float(len(usables)) / 3.0
+						internals.append(usables[int(tert_pt)])
+						internals.append(usables[int(tert_pt*2)])
 
-								fvec = combine_flow_vecs(fvec_holder[ip_pair], total_vec) if ip_pair in fvec_holder else total_vec
-								fvec_holder[ip_pair] = fvec
-								# maybe push this seen IP into the future set
-								# When? If it's not in the current work set,
-								# or it has been visited and is in the current set.
-								if ip_pair not in local_work_set or ip_pair in local_visited_set:
-									queue_holder["future"].add(ip_pair)
+					return [h0] + internals + [h3]
 
-								if spiffy_but_bad:
-									# if already under scrutiny or if there's enough space to add, then (maybe) act
-									# also, don't act if we already made a verdict...
-									total_s_bw = observed_rate_in + observed_rate_out
-									if ip_pair in spiffy_measurements[0]:
-										spiffy_measurements[1][ip_pair] = total_s_bw
-									elif ip_pair not in spiffy_verdict and len(spiffy_measurements[0]) < spiffy_max_experiments and np.random.random() < spiffy_pick_prob:
-										spiffy_measurements[0][ip_pair] = (total_s_bw, time.time(), False, node)
+				# here is where global state is built.
+				important_indices = [switch_list_indices[name] for name in [
+					intermediates[learner_no/n_learners].name, node.name
+				]]
 
-						# FIXME: ensure that all the code if prepared to take ip_pair, NOT ip.
-						if local_pos >= len(local_work):
-							local_pos = 0
-							local_work_set = queue_holder["future"]
-							local_visited_set = set()
-							queue_holder["future"] = set()
-							# take a shuffle! Ideally without perturbing RNG
-							# used for IP generation...
-							# I'd fix that, but the amount of new IPs
-							# we need is stochastic anyhow.
-							local_work = list(local_work_set)
-							random.shuffle(local_work)
-						else:
-							#print "existing work: task size {}, pos {}".format(len(local_work_set), local_pos)
-							pass
+				state_vec = [total_mbps[index] for index in [0, leader_index]+important_indices]
 
-						flows_procd = 0
-						# ACT ON A SUBSET OF CURRENT
-						while can_act() and local_pos < len(local_work):
-							ip_pair = local_work[local_pos]
-							local_visited_set.add(ip_pair)
+				l_index = learner_no
+				# if on hard mode, do some other stuff instead.
+				if actions_target_flows:
+					# props: (
+					#  len_ns, sz_in, sz_out, [0-2]
+					#  wnd_sz_in, wnd_sz_out, [3-4]
+					#  pkt_in_sz_mean, pkt_in_sz_var, pkt_in_count, [5-7]
+					#  pkt_out_sz_mean, pkt_out_sz_var, pkt_out_count, [8-10]
+					#  wnd_iat_mean, wnd_iat_var [11-12]
+					# )
+					flow_space = learner_stats[l_index]
+					flow_traces = learner_traces[l_index]
+					flows_seen = parsed_flows[l_index]
+					queue_holder = learner_queues[l_index]
+					fvec_holder = learner_fvecs[l_index]
 
-							s_t = time.time()
+					#if i%10 == 0:
+					#	print "laerner {} occupying:".format(l_index), len(flow_space), len(flow_traces), len(flows_to_query)
+
+					total_spent = 0.0
+					def can_act():
+						return trs_maxtime is None or total_spent <= trs_maxtime
+
+					# learner_queues = [{"curr": ([], set(), set()), "future": set(), "pos": 0} for _ in learner_pos]
+
+					(local_work, local_work_set, local_visited_set) = queue_holder["curr"]
+					local_pos = queue_holder["pos"]
+
+					# TODO: strip old entries?
+					# PROCESS ALL NEW DATA.
+					for (src_ip, props_dict) in flows_seen:
+						for (dst_ip, props) in props_dict.iteritems():
+							# we know src, and dst. rebuild state-vec.
+							main_links = indices_for_state_vec(dst_ip)
+
+							state_vec = [total_mbps[link_map[x]] for x in main_links]
+
+							flows_to_query.append(src_ip)
+
+							ip_pair = (src_ip, dst_ip)
+
+							if ip_pair not in flow_space:
+								flow_space[ip_pair] = {
+									"ip": src_ip,
+									"last_act": 0.0 if not spiffy_mode else 0.05,
+									"last_rate_in": -1.0,
+									"last_rate_out": -1.0,
+									"pkt_in_count": 0,
+									"pkt_out_count": 0,
+								}
 							l = flow_space[ip_pair]
 
-							# Each needs its own view of the state...
-							# (and specifies its restriction thereof)
-							# Combine these to get a vector of likelihoods,
-							# get the highest-epsilon to calculate the action.
-							# Then update each model with the TRUE action chosen.
-							fvec = fvec_holder[ip_pair]
-							total_vec = fvec[:feature_max]
+							l["cx_ratio"] = min(*props[1:3]) / max(*props[1:3])
+							l["length"] = props[0]
+							l["size"] = props[1] + props[2]
+							l["mean_iat"] = props[11]
+							l["pkt_in_count"] += props[7]
+							l["pkt_out_count"] += props[10]
+							l["pkt_in_wnd_count"] = props[7]
+							l["pkt_out_wnd_count"] = props[10]
+							l["mean_bpp_in"] = props[5]
+							l["mean_bpp_out"] = props[8]
+							l["bytes_in"] = props[3]
+							l["bytes_out"] = props[4]
 
-							# single_learner support: just take firstmost...
-							s_tree_t = 0 if single_learner else team_no
-							s_tree_l = 0 if single_learner else learner_no
-							subactors = [(target_sarsa, restrict)] + [(s_tree[s_tree_t][s_tree_l], r) for (s_tree, r) in contributors]
+							observed_rate_in = mbpsify(props[3])
+							observed_rate_out = mbpsify(props[4])
 
-							last_sarsa = sarsa
-							ac_vals = np.zeros(len(sarsa.actions))
-							substates = []
-							need_decay = True
+							if l["last_rate_in"] < 0.0:
+								l["last_rate_in"] = observed_rate_in
+								l["last_rate_out"] = observed_rate_out
+							l["delta_in"] = observed_rate_in - l["last_rate_in"]
+							l["delta_out"] = observed_rate_out - l["last_rate_out"]
+							total_vec = state_vec + flow_to_state_vec(l)
+							flow_space[ip_pair] = l
 
-							for s_ac_num, (s, r) in enumerate(subactors):
-								tx_vec = total_vec if r is None else [total_vec[i] for i in r]
-								state = s.to_state(np.array(tx_vec))
-								#print "state len (from, to)", (len(tx_vec), len(state))
+							fvec = combine_flow_vecs(fvec_holder[ip_pair], total_vec) if ip_pair in fvec_holder else total_vec
+							fvec_holder[ip_pair] = fvec
+							# maybe push this seen IP into the future set
+							# When? If it's not in the current work set,
+							# or it has been visited and is in the current set.
+							if ip_pair not in local_work_set or ip_pair in local_visited_set:
+								queue_holder["future"].add(ip_pair)
 
-								# if there was an earlier decision made on this flow, then update the past state estimates associated.
-								# Compute and store the intended update for each flow.
-								if ip_pair in flow_traces:
-									dm = [i] if record_deltas_in_times else None
-										
-									dat = flow_traces[ip_pair]
-									(st, z, narrowing_in_use) = dat[0][s_ac_num]
-									machine = dat[2]
+							if spiffy_but_bad:
+								# if already under scrutiny or if there's enough space to add, then (maybe) act
+								# also, don't act if we already made a verdict...
+								total_s_bw = observed_rate_in + observed_rate_out
+								if ip_pair in spiffy_measurements[0]:
+									spiffy_measurements[1][ip_pair] = total_s_bw
+								elif ip_pair not in spiffy_verdict and len(spiffy_measurements[0]) < spiffy_max_experiments and np.random.random() < spiffy_pick_prob:
+									spiffy_measurements[0][ip_pair] = (total_s_bw, time.time(), False, node)
 
-									# handful of steps:
-									#  only draw new if none
-									#  decrement uses
-									#  don't use in update step if just generated
-									#  don't use in action step if about to expire
-									allow_update_narrowing = False
-									allow_action_narrowing = False
+					# FIXME: ensure that all the code if prepared to take ip_pair, NOT ip.
+					if local_pos >= len(local_work):
+						local_pos = 0
+						local_work_set = queue_holder["future"]
+						local_visited_set = set()
+						queue_holder["future"] = set()
+						# take a shuffle! Ideally without perturbing RNG
+						# used for IP generation...
+						# I'd fix that, but the amount of new IPs
+						# we need is stochastic anyhow.
+						local_work = list(local_work_set)
+						random.shuffle(local_work)
+					else:
+						#print "existing work: task size {}, pos {}".format(len(local_work_set), local_pos)
+						pass
 
-									# narrowing removal---opens up flow for other state exam again
-									if narrowing_in_use is not None and narrowing_in_use[0] <= 0:
-										narrowing_in_use = None
+					flows_procd = 0
+					# ACT ON A SUBSET OF CURRENT
+					while can_act() and local_pos < len(local_work):
+						ip_pair = local_work[local_pos]
+						local_visited_set.add(ip_pair)
 
-									if narrowing_in_use is None and (np.random.uniform() < s.get_epsilon() * explore_feature_isolation_modifier):
-										# remaining updates, narrowing itself.
+						s_t = time.time()
+						l = flow_space[ip_pair]
 
-										# If always global, play about with the selection (raise LB).
-										mod = 1 if always_include_global else 0
-										narrowing_in_use = [ 
-											explore_feature_isolation_duration,
-											([0] if always_include_global else []) + [np.random.choice(s.tiling_set_count-mod)+mod],
-										]
-										allow_action_narrowing = True
-									elif narrowing_in_use is not None:
-										narrowing_in_use[0] -= 1
-										allow_update_narrowing = True
-										allow_action_narrowing = narrowing_in_use[0] > 0
+						# Each needs its own view of the state...
+						# (and specifies its restriction thereof)
+						# Combine these to get a vector of likelihoods,
+						# get the highest-epsilon to calculate the action.
+						# Then update each model with the TRUE action chosen.
+						fvec = fvec_holder[ip_pair]
+						total_vec = fvec[:feature_max]
+
+						# single_learner support: just take firstmost...
+						# structure is historical; scan across lengthwise...
+						s_tree_t = 0
+						s_tree_l = 0
+						if not single_learner and len(contributors) > 0:
+							(s, r) = contributors[0]
+							branch_len = len(s[0])
+							s_tree_t = learner_no / branch_len
+							s_tree_l = learner_no % branch_len
+						subactors = [(target_sarsa, restrict)] + [(s_tree[s_tree_t][s_tree_l], r) for (s_tree, r) in contributors]
+
+						last_sarsa = sarsa
+						ac_vals = np.zeros(len(sarsa.actions))
+						substates = []
+						need_decay = True
+
+						for s_ac_num, (s, r) in enumerate(subactors):
+							tx_vec = total_vec if r is None else [total_vec[i] for i in r]
+							state = s.to_state(np.array(tx_vec))
+							#print "state len (from, to)", (len(tx_vec), len(state))
+
+							# if there was an earlier decision made on this flow, then update the past state estimates associated.
+							# Compute and store the intended update for each flow.
+							if ip_pair in flow_traces:
+								dm = [i] if record_deltas_in_times else None
 									
-									(would_choose, new_vals, z_vec) = s.update(
-										state,
-										reward,
-										(st, dat[1], z),
-										decay=False,
-										delta_space=dm,
-										action_narrowing=None if not allow_action_narrowing else narrowing_in_use[1],
-										update_narrowing=None if not allow_update_narrowing else narrowing_in_use[1],
-									)
+								dat = flow_traces[ip_pair]
+								(st, z, narrowing_in_use) = dat[0][s_ac_num]
+								machine = dat[2]
 
-									if record_deltas_in_times:
-										action_comps[-1].append(dm)
-								else:
-									(would_choose, new_vals, z_vec) = s.bootstrap(state)
-									need_decay = False
-									machine = AcTrans()
+								# handful of steps:
+								#  only draw new if none
+								#  decrement uses
+								#  don't use in update step if just generated
+								#  don't use in action step if about to expire
+								allow_update_narrowing = False
+								allow_action_narrowing = False
+
+								# narrowing removal---opens up flow for other state exam again
+								if narrowing_in_use is not None and narrowing_in_use[0] <= 0:
 									narrowing_in_use = None
 
-								ac_vals += new_vals
-								substates.append((state, z_vec, narrowing_in_use))
+								if narrowing_in_use is None and (np.random.uniform() < s.get_epsilon() * explore_feature_isolation_modifier):
+									# remaining updates, narrowing itself.
 
-								last_sarsa = s
+									# If always global, play about with the selection (raise LB).
+									mod = 1 if always_include_global else 0
+									narrowing_in_use = [ 
+										explore_feature_isolation_duration,
+										([0] if always_include_global else []) + [np.random.choice(s.tiling_set_count-mod)+mod],
+									]
+									allow_action_narrowing = True
+								elif narrowing_in_use is not None:
+									narrowing_in_use[0] -= 1
+									allow_update_narrowing = True
+									allow_action_narrowing = narrowing_in_use[0] > 0
+								
+								(would_choose, new_vals, z_vec) = s.update(
+									state,
+									l_rewards[dest_from_ip[ip_pair[1]]],
+									(st, dat[1], z),
+									decay=False,
+									delta_space=dm,
+									action_narrowing=None if not allow_action_narrowing else narrowing_in_use[1],
+									update_narrowing=None if not allow_update_narrowing else narrowing_in_use[1],
+								)
 
-							l_action = last_sarsa.select_action_from_vals(ac_vals)
-							machine.move(l_action)
-							flow_traces[ip_pair] = (substates, l_action, machine, z_vec, [True])
+								if record_deltas_in_times:
+									action_comps[-1].append(dm)
+							else:
+								(would_choose, new_vals, z_vec) = s.bootstrap(state)
+								need_decay = False
+								machine = AcTrans()
+								narrowing_in_use = None
 
-							if need_decay:
-								for (s, _) in subactors:
-									s.decay()
+							ac_vals += new_vals
+							substates.append((state, z_vec, narrowing_in_use))
 
-							observed_rate_in = l["last_rate_in"] + l["delta_in"]
-							observed_rate_out = l["last_rate_out"] + l["delta_out"]
+							last_sarsa = s
 
-							# TODO: maybe only update this whole thing if we're choosing to examine this flow.
-							l["last_act"] = machine.action()#l_action
-							l["last_rate_in"] = observed_rate_in
-							l["last_rate_out"] = observed_rate_out
+						l_action = last_sarsa.select_action_from_vals(ac_vals)
+						machine.move(l_action)
+						flow_traces[ip_pair] = (substates, l_action, machine, z_vec, [True])
 
-							flow_space[ip] = l
-							# print l
-							# End time.
-							e_t = time.time()
-							total_spent += e_t - s_t
+						if need_decay:
+							for (s, _) in subactors:
+								s.decay()
 
-							if record_times:
-								action_comps[-1].append((i, e_t - s_t))
+						observed_rate_in = l["last_rate_in"] + l["delta_in"]
+						observed_rate_out = l["last_rate_out"] + l["delta_out"]
 
-							learner_traces[l_index] = flow_traces
-							local_pos += 1
-							flows_procd += 1
-							del fvec_holder[ip_pair]
+						# TODO: maybe only update this whole thing if we're choosing to examine this flow.
+						l["last_act"] = machine.action()#l_action
+						l["last_rate_in"] = observed_rate_in
+						l["last_rate_out"] = observed_rate_out
 
-						#print "Managed: {}/{}-{} flows in under {}".format(flows_procd, local_pos-flows_procd, len(local_work_set), trs_maxtime)
-
-						queue_holder["curr"] = (local_work, local_work_set, local_visited_set)
-						queue_holder["pos"] = local_pos
-					else:
-						prev_state = learner_traces[l_index]
-						if prev_state == {}:
-							machine = AcTrans()
-							prev_state = (sarsa.last_act, machine)
-
-						(last_act, machine) = prev_state
-
-						# Start time of action computation
-						s_t = time.time()
-
-						# Encode state (as seen by this learner)
-						state = sarsa.to_state(np.array(state_vec))
-
-						# Learn!
-						target_sarsa.update(state, reward, last_act)
-						machine.move(sarsa.last_act[1])
-						learner_traces[l_index] = (sarsa.last_act, machine)
-
+						flow_space[ip] = l
+						# print l
 						# End time.
 						e_t = time.time()
+						total_spent += e_t - s_t
 
 						if record_times:
 							action_comps[-1].append((i, e_t - s_t))
 
-				outtime = time.time()
-				if print_times:
-					print "choose_acs:", outtime-intime
+						learner_traces[l_index] = flow_traces
+						local_pos += 1
+						flows_procd += 1
+						del fvec_holder[ip_pair]
+
+					#print "Managed: {}/{}-{} flows in under {}".format(flows_procd, local_pos-flows_procd, len(local_work_set), trs_maxtime)
+
+					queue_holder["curr"] = (local_work, local_work_set, local_visited_set)
+					queue_holder["pos"] = local_pos
+				else:
+					# Either make this happen once per dest, or choose a dest at random.
+					t_dest = dests[np.random.choice(len(dests))]
+					main_links = indices_for_state_vec(t_dest[0][0])
+
+					state_vec = [total_mbps[link_map[x]] for x in main_links]
+
+					prev_state = learner_traces[l_index]
+					if prev_state == {}:
+						machine = AcTrans()
+						prev_state = (sarsa.last_act, machine)
+
+					(last_act, machine) = prev_state
+
+					# Start time of action computation
+					s_t = time.time()
+
+					# Encode state (as seen by this learner)
+					state = sarsa.to_state(np.array(state_vec))
+
+					# Learn!
+					l_rewards[t_dest]
+					target_sarsa.update(state, reward, last_act)
+					machine.move(sarsa.last_act[1])
+					learner_traces[l_index] = (sarsa.last_act, machine)
+
+					# End time.
+					e_t = time.time()
+
+					if record_times:
+						action_comps[-1].append((i, e_t - s_t))
+
+			outtime = time.time()
+			if print_times:
+				print "choose_acs:", outtime-intime
 
 			good_traffic_percents[-1].append(last_traffic_ratio)
 			rewards[-1].append(g_reward)
@@ -2093,7 +2229,7 @@ def marlExperiment(
 			bw_sock.shutdown(socket.SHUT_RDWR)
 			bw_sock.close()
 
-		if server_proc is not None:
+		for server_proc in server_procs:
 			try:
 				server_proc.terminate()
 			except:
@@ -2111,7 +2247,7 @@ def marlExperiment(
 				print "couldn't cleanly shutdown host process..."
 
 		host_procs = []
-		server_proc = None
+		server_procs = []
 		ctl_proc = None
 
 		net.stop()
