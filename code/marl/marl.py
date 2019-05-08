@@ -257,6 +257,7 @@ def marlExperiment(
 	def th_cmd(dests, bw, target_ip=None):
 		if target_ip is None:
 			target_ip = random_target(dests)
+		#print "aiming for http://{}/".format(target_ip)
 
 		return [
 			"../traffic-host/target/release/traffic-host",
@@ -850,7 +851,6 @@ def marlExperiment(
 			for i, ((node_label, sarsa, _leader), maps) in enumerate(zip(actors, flow_action_sets)):
 				node = vertex_map[node_label]
 				for ip_pair, state in maps.iteritems():
-					#print "{}: {}".format(i, ip)
 					(_, action, machine, _, guard) = state
 
 					if not guard[0]:
@@ -860,14 +860,14 @@ def marlExperiment(
 					# tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 					tx_ac = machine.action() if isinstance(a, (int, long)) else a
 					#tx_ac = 0.0
-					#print "placing {} in {}".format(tx_ac, ip_pair)
+					#print "agent {}: placing {} in {}".format(i, tx_ac, ip_pair)
 					updateUpstreamRoute(node, ac_prob=tx_ac, target_ip=ip_pair)
 					guard[0] = False
 			outtime = time.time()
 			if print_times:
 				print "do_acs:", outtime-intime
 		else:
-			for ((node_label, sarsa, _leader), maps) in zip(actors, flow_action_sets):
+			for i, ((node_label, sarsa, _leader), state) in enumerate(zip(actors, flow_action_sets)):
 				node = vertex_map[node_label]
 				if len(state) == 0:
 					action = default_machine_state
@@ -878,6 +878,7 @@ def marlExperiment(
 				tx_ac = sarsa.actions[a] if isinstance(a, (int, long)) else a
 				#print "chose {}".format(tx_ac)
 				#tx_ac = 0.9
+				#print "agent {}: placing {}".format(i, tx_ac)
 				updateUpstreamRoute(node, ac_prob=tx_ac)
 
 	def moralise(value, good, max_val=255, no_goods=[0, 255]):
@@ -1951,7 +1952,7 @@ def marlExperiment(
 
 					(local_work, local_work_set, local_visited_set) = queue_holder["curr"]
 					local_pos = queue_holder["pos"]
-					print "true", state_vec
+					#print "true", state_vec
 
 					# TODO: strip old entries?
 					# PROCESS ALL NEW DATA.
@@ -1961,7 +1962,7 @@ def marlExperiment(
 							main_links = indices_for_state_vec(dst_ip, src_ip)
 
 							state_vec = [total_mbps[link_map[x]] for x in main_links]
-							print state_vec
+							#print state_vec
 
 							flows_to_query.append(src_ip)
 
@@ -2181,8 +2182,7 @@ def marlExperiment(
 					state = sarsa.to_state(np.array(state_vec))
 
 					# Learn!
-					l_rewards[t_dest]
-					target_sarsa.update(state, reward, last_act)
+					target_sarsa.update(state, l_rewards[t_dest], last_act)
 					machine.move(sarsa.last_act[1])
 					learner_traces[l_index] = (sarsa.last_act, machine)
 
