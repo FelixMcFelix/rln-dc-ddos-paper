@@ -51,7 +51,10 @@ def marlExperiment(
 		evil_range = [2.5, 6],
 		good_file = "../../data/pcaps/bigFlows.pcap",
 		bad_file = None,
+
 		topol = "tree",
+		ecmp_servers = 8,
+		ecmp_k = 4,
 
 		explore_episodes = 80000,
 		episodes = 1000,#100000
@@ -194,7 +197,7 @@ def marlExperiment(
 
 	if manual_early_limit is None and estimate_const_limit:
 		linkopts_core["bw"] = calc_max_capacity(
-			host_range[1] * n_teams * n_inters * n_learners
+			host_range[1] * n_teams * n_inters * n_learners / (1.0 if topol != ecmp else float(ecmp_servers))
 		)
 
 	# reward functions: choose wisely!
@@ -829,7 +832,9 @@ def marlExperiment(
 
 	def routedSwitch(upstreamNode, variant, *args, **kw_args):
 		sw = newNamedSwitch(*args)
-		trackedLink(upstreamNode, sw, **kw_args)
+		if upstreamNode is not None:
+			trackedLink(upstreamNode, sw, **kw_args)
+
 		if not use_controller:
 			updateUpstreamRoute(sw)
 		elif variant == 0:
@@ -908,9 +913,12 @@ def marlExperiment(
 		return (ip, ip_bytes)
 
 	def addHosts(extern, extern_no, hosts_per_learner, hosts_upper):
+		scaler = 1 if topol == "tree" else (n_teams * n_inters * n_learners) / ((ecmp_k/2)**2)
 		host_count = (hosts_per_learner if hosts_per_learner == hosts_upper
 			else random.randint(hosts_per_learner, hosts_upper)
 		)
+
+		host_count *= scaler
 
 		hosts = []
 
@@ -1086,7 +1094,151 @@ def marlExperiment(
 		return (server, server_switch, core_link, teams, team_sarsas, G, port_dict, new_topol_shape)
 
 	def buildEcmpNet(n_teams, team_sarsas=[]):
-		pass
+		# names of all internal links
+		monitored_links = []
+		# dest graph node labels
+		dests = []
+		# Links relating to each dest.
+		dest_links = {}
+		# link objects which need limits set.
+		core_links = []
+		# array of (graph node, sarsa, leader's link points)
+		actors = []
+		# array of graph nodes (locations to attach hosts)
+		externals = []
+		# map from graph node -> object
+		vertex_map = {}
+		# go from (label, label) -> index into link names
+		link_map = {}
+
+		# FIXME: allow full offline training again, one day...
+		make_sarsas = True
+
+		G = nx.Graph()
+		port_dict = {}
+
+		# Okay, build something like a fat tree.
+		# start w/ the dests...
+		for i in xrange(ecmp_servers):
+			server = newNamedHost()
+			assignIP(server)
+			server_label = ((server.IP(), server.MAC()), None)
+			vertex_map[server_label] = server
+
+			dests.append(server_label)
+
+		def link_in_new_topol(node1, node2, node1_label, node2_label, critical=False):
+			link_name = "{}{}-eth{}".format(
+				"!" if critical else "",
+				node2.name,
+				len(node2.ports),
+			)
+			index = len(monitored_links)
+
+			vertex_map[node1_label] = node1
+			vertex_map[node2_label] = node2
+			monitored_links.append(link_name)
+			link_map[(node1_label, node2_label)] = index
+			link_map[(node2_label, node1_label)] = index
+
+		def add_to_graph(parent, new_child, label=None):
+			if label is None:
+				label = (None, new_child.dpid)
+			if graph is not None and parent is not None:
+				graph.add_edge(parent, label)
+			return label
+
+		def link_to_outside(parent):
+			return add_to_graph(parent, None, label=(("0.0.0.0", None), None))
+
+		# now we need to assign dests to pods
+		# there are k/2 hosts per edge node:
+		#  there are k/2 edge nodes, and k/2 aggregation in a pod
+		max_hosts_per_pod = (ecmp_k**2) / 4
+		e_k_2 = ecmp_k/2
+		pods_required = int(math.ceil(float(ecmp_servers) / float(max_hosts_per_pod)))
+		edge_nodes = []
+		for i in xrange(pods_required * e_k_2):
+			edge_switch = routedSwitch(None, 0, port_dict=port_dict)
+			edge_nodes.append(edge_switch)
+
+			# connect up the edge switch to its intended children
+			for dest_node in dests[i*e_k_2:min(len(dests, (i+1)*e_k_2))]:
+				dest = vertex_map[dest_node]
+				core_link = trackedLink(dest, edge_switch, extras=linkopts_core)#, port_dict=port_dict)
+				map_link(port_dict, dest, edge_switch)
+				switch_label = add_to_graph(dest, edge_switch)
+
+				core_links.append(core_link)
+				link_in_new_topol(dest, edge_switch, dest_node, switch_label)
+				dest_links[dest_node] = [(dest_node, switch_label)]
+
+		def normal_link(n1, n2, n1_l, critical=False, link=True):
+			if link:
+				trackedLink(upstreamNode, sw, **kw_args)
+			n2_l = add_to_graph(n1, n2)
+			map_link(port_dict, n1, n2)
+			link_in_new_topol(n1, n2, n1_l, n2_l, critical)
+			return n2_l
+
+		# Now, the aggregation layer.
+		# Take k/2 edge_nodes, generate k/2 more aggregation nodes, then do a complete bipartite linking
+		agg_nodes = []
+		agg_nodes_by_pod = []
+		for i in xrange(pods_required * e_k_2):
+			#generate, then find the relevant children
+			agg_switch = routedSwitch(None, 0, port_dict=port_dict)
+			group_index = (i % e_k_2)
+			start = i - group_index
+			for child in edge_nodes[start:start+e_k_2]:
+				normal_link(agg_switch, child, (None, agg_switch.dpid))
+				
+			agg_nodes.append(agg_switch)
+			if group_index == 0:
+				agg_nodes_by_pod.append([])
+			agg_nodes_by_pod[-1].append(agg_switch)
+
+		# Now, the core layer. There are (k/2)^2 such nodes.
+		# Each core node connects to one element in each pod,
+		# before connecting to an agent and then an external node.
+		# Worry about agg-core links later...
+		newSarsas = len(sarsas) == 0
+
+		core_nodes = []
+		for i in xrange(e_k_2*e_k_2):
+			core_switch = routedSwitch(None, 0, port_dict=port_dict)
+
+			new_learn = routedSwitch(core_switch, 1, port_dict=port_dict)
+			nll = normal_link(
+				core_switch,
+				new_learn,
+				(None, core_switch.dpid),
+				critical=True, link=False)
+			_ = link_to_outside(nll)
+
+			# Init and pair the actual learning agent here, too!
+			# Bootstrapping happens later -- per-episode, in the 0-load state.
+			if newSarsas:
+				local_sarsa = AgentClass(**sarsaParams)
+			else:
+				local_sarsa = sarsas[i]
+			
+			learners.append(new_learn)
+			actors.append((nll, local_sarsa, None))
+
+			new_extern = routedSwitch(new_learn, 2)
+			externals.append(new_extern)
+
+		# Now, connect each aggregate to its relevant core switches.
+		for pod in agg_nodes_by_pod:
+			for i, node in enumerate(pod):
+				targets = core_nodes[i*e_k_2:(i+1*e_k_2)]
+				for core in targets:
+					# link node and core
+					normal_link(node, core, (None, node.dpid))
+		
+		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map)
+		return (None, edge_nodes[0], None, None, None, G, port_dict, new_topol_shape)
 
 	if topol == "tree":
 		buildNet = buildTreeNet

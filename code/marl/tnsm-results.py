@@ -164,7 +164,7 @@ if __name__ == "__main__":
 		indiv_prefix = "separate"
 
 	topol = expt_part(topols, deps)
-	# FIXME: do something with topol
+	params["topol"] = topol
 	deps.append(topols)
 
 	results = marlExperiment(**params)
