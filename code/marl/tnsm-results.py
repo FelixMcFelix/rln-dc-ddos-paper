@@ -50,7 +50,7 @@ single_learners = [
 
 topols = [
 	"tree",
-#	"ecmp",
+	"ecmp",
 ]
 
 def total_per_model(model):
@@ -97,7 +97,7 @@ if __name__ == "__main__":
 	}
 
 	deps = []
-	
+
 	discount = expt_part(discounts, deps)
 	deps.append(discounts)
 

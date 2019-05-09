@@ -197,7 +197,7 @@ def marlExperiment(
 
 	if manual_early_limit is None and estimate_const_limit:
 		linkopts_core["bw"] = calc_max_capacity(
-			host_range[1] * n_teams * n_inters * n_learners / (1.0 if topol != ecmp else float(ecmp_servers))
+			host_range[1] * n_teams * n_inters * n_learners / (1.0 if topol != "ecmp" else float(ecmp_servers))
 		)
 
 	# reward functions: choose wisely!
@@ -251,7 +251,7 @@ def marlExperiment(
 		actions_target_flows = True
 
 	if single_learner and single_learner_ep_scale:
-		explore_episodes *= float(n_teams * n_inters * n_learners) 
+		explore_episodes *= float(n_teams * n_inters * n_learners)
 
 	def random_target(dests):
 		target_dest = dests[0] if len(dests) == 1 else dests[random.randint(0, len(dests)-1)]
@@ -294,7 +294,7 @@ def marlExperiment(
 		subclient_count = int(math.ceil(max(1.0, bw / flow_bw)))
 		total_thing[0] += flow_bw * subclient_count
 		print subclient_count, total_thing
-		
+
 		return [
 			"../opus-voip-traffic/target/release/opus-voip-traffic",
 			#"../opus-voip-traffic/target/debug/opus-voip-traffic",
@@ -514,7 +514,7 @@ def marlExperiment(
 	def openSwitchSocket(switch):
 		if switch.name in switch_sockets[0]:
 			killsock(switch_sockets[0][switch.name])
-			
+
 		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		s.connect(("127.0.0.1", switch.listenPort))
 		s.sendall(ofpb.ofp_hello(None, None))
@@ -554,7 +554,7 @@ def marlExperiment(
 				except:
 					s = openSwitchSocket(switch)
 			if needs_check:
-				print ofpp.parse(s.recv(4096)) 
+				print ofpp.parse(s.recv(4096))
 
 	def executeRouteQueue():
 		for el in route_commands[0]:
@@ -673,7 +673,7 @@ def marlExperiment(
 		)
 
 		groups = []
-		
+
 		for i in xrange(num_drop_groups):
 			#calc pdrop number
 			prob = 1.0 - (i/float(num_drop_groups))
@@ -846,7 +846,7 @@ def marlExperiment(
 			updateUpstreamRoute(sw)
 		elif variant == 2:
 			#external
-			prepExternal(sw)	
+			prepExternal(sw)
 			sw.controlled = True
 		return sw
 
@@ -1003,7 +1003,7 @@ def marlExperiment(
 					sarsas.append(local_sarsa)
 				else:
 					local_sarsa = sarsas[(i * inter_count) + j]
-				
+
 				learners.append(new_learn)
 				actors.append((nll, local_sarsa, (ss_label, leader_label)))
 
@@ -1020,7 +1020,7 @@ def marlExperiment(
 
 		for (host, _, _, link, _, _) in hosts:
 			host.stop()#deleteIntfs=True)
-			link.delete()
+			#link.delete()
 
 		new_hosts = []
 
@@ -1119,19 +1119,16 @@ def marlExperiment(
 
 		# Okay, build something like a fat tree.
 		# start w/ the dests...
+		servers = []
 		for i in xrange(ecmp_servers):
 			server = newNamedHost()
-			assignIP(server)
-			server_label = ((server.IP(), server.MAC()), None)
-			vertex_map[server_label] = server
-
-			dests.append(server_label)
+			servers.append(server)
 
 		def link_in_new_topol(node1, node2, node1_label, node2_label, critical=False):
 			link_name = "{}{}-eth{}".format(
 				"!" if critical else "",
 				node2.name,
-				len(node2.ports),
+				len(node2.ports)-1,
 			)
 			index = len(monitored_links)
 
@@ -1144,8 +1141,7 @@ def marlExperiment(
 		def add_to_graph(parent, new_child, label=None):
 			if label is None:
 				label = (None, new_child.dpid)
-			if graph is not None and parent is not None:
-				graph.add_edge(parent, label)
+			G.add_edge(parent, label)
 			return label
 
 		def link_to_outside(parent):
@@ -1163,20 +1159,26 @@ def marlExperiment(
 			edge_nodes.append(edge_switch)
 
 			# connect up the edge switch to its intended children
-			for dest_node in dests[i*e_k_2:min(len(dests, (i+1)*e_k_2))]:
-				dest = vertex_map[dest_node]
+			for dest in servers[i*e_k_2:min(len(servers), (i+1)*e_k_2)]:
 				core_link = trackedLink(dest, edge_switch, extras=linkopts_core)#, port_dict=port_dict)
+
+				# can't assign IP without a link...
+				assignIP(dest)
+				server_label = ((dest.IP(), dest.MAC()), None)
+				vertex_map[server_label] = dest
+
+				dests.append(server_label)
 				map_link(port_dict, dest, edge_switch)
-				switch_label = add_to_graph(dest, edge_switch)
+				switch_label = add_to_graph(server_label, edge_switch)
 
 				core_links.append(core_link)
-				link_in_new_topol(dest, edge_switch, dest_node, switch_label)
-				dest_links[dest_node] = [(dest_node, switch_label)]
+				link_in_new_topol(dest, edge_switch, server_label, switch_label)
+				dest_links[server_label] = [(server_label, switch_label)]
 
-		def normal_link(n1, n2, n1_l, critical=False, link=True):
+		def normal_link(n1, n2, n1_l, critical=False, link=True, **kw_args):
 			if link:
-				trackedLink(upstreamNode, sw, **kw_args)
-			n2_l = add_to_graph(n1, n2)
+				trackedLink(n1, n2, **kw_args)
+			n2_l = add_to_graph(n1_l, n2)
 			map_link(port_dict, n1, n2)
 			link_in_new_topol(n1, n2, n1_l, n2_l, critical)
 			return n2_l
@@ -1192,7 +1194,7 @@ def marlExperiment(
 			start = i - group_index
 			for child in edge_nodes[start:start+e_k_2]:
 				normal_link(agg_switch, child, (None, agg_switch.dpid))
-				
+
 			agg_nodes.append(agg_switch)
 			if group_index == 0:
 				agg_nodes_by_pod.append([])
@@ -1202,11 +1204,12 @@ def marlExperiment(
 		# Each core node connects to one element in each pod,
 		# before connecting to an agent and then an external node.
 		# Worry about agg-core links later...
-		newSarsas = len(sarsas) == 0
+		newSarsas = len(team_sarsas) == 0
 
 		core_nodes = []
 		for i in xrange(e_k_2*e_k_2):
 			core_switch = routedSwitch(None, 0, port_dict=port_dict)
+			core_nodes.append(core_switch)
 
 			new_learn = routedSwitch(core_switch, 1, port_dict=port_dict)
 			nll = normal_link(
@@ -1222,8 +1225,7 @@ def marlExperiment(
 				local_sarsa = AgentClass(**sarsaParams)
 			else:
 				local_sarsa = sarsas[i]
-			
-			learners.append(new_learn)
+
 			actors.append((nll, local_sarsa, None))
 
 			new_extern = routedSwitch(new_learn, 2)
@@ -1232,11 +1234,12 @@ def marlExperiment(
 		# Now, connect each aggregate to its relevant core switches.
 		for pod in agg_nodes_by_pod:
 			for i, node in enumerate(pod):
-				targets = core_nodes[i*e_k_2:(i+1*e_k_2)]
+
+				targets = core_nodes[i*e_k_2:(i+1)*e_k_2]
 				for core in targets:
 					# link node and core
 					normal_link(node, core, (None, node.dpid))
-		
+
 		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map)
 		return (None, edge_nodes[0], None, None, None, G, port_dict, new_topol_shape)
 
@@ -1299,7 +1302,7 @@ def marlExperiment(
 							dest_map[n1][dest] = set()
 						dest_map[n1][dest].add(n2)
 
-		print dest_map
+		#print dest_map
 
 		learner_pos = {}
 		learner_name = []
@@ -1356,6 +1359,7 @@ def marlExperiment(
 				for inode in ips:
 					((ip, _), _) = inode
 					path = apsp[dnode][inode]
+					#print dpid, path, ip
 					port = port_dict[dpid][hard_label(path[1])]
 					# (port_no, adjacent?)
 					entry_map[dpid][ip] = (port, len(path)==2)
@@ -1434,7 +1438,7 @@ def marlExperiment(
 				if a_leader not in bw_teams:
 					bw_teams[a_leader] = [0.0 for i in xrange(3)]
 				bw_team = bw_teams[a_leader]
-			
+
 			if good:
 				if bw_team is not None:
 					bw_team[0] += bw
@@ -1454,9 +1458,9 @@ def marlExperiment(
 
 			# Assume initial state is all zeroes (new network)
 			sarsa.bootstrap(sarsa.to_state(np.zeros(sarsaParams["vec_size"])))
-		
+
 		# Update master link's bandwidth limit after hosts init.
-		capacity = calc_max_capacity(len(all_hosts))
+		capacity = calc_max_capacity(len(all_hosts))/float(len(dests))
 		print capacity, bw_all
 		if protect_final_hop:
 			for core_link in core_links:
@@ -1690,7 +1694,7 @@ def marlExperiment(
 							layer.append((struct.unpack("I", ip_bytes)[0], prop_holder))
 							#if e[3] > 0:
 							#	print "culprit: {}, {}".format(e[0], e[3])
-						
+
 					parsed_flows.append(layer)
 
 				time_ns = int(data[0][:-2])
@@ -1843,6 +1847,7 @@ def marlExperiment(
 
 		last_traffic_ratio = 0.0
 		g_reward = 0.0
+		reward = 0.0
 
 		if ep > 0:
 			#net.interact()
@@ -1976,9 +1981,6 @@ def marlExperiment(
 
 			l_cap = (2.0 if state_direction == "fuse" else 1.0) * capacity
 
-			last_traffic_ratio = min(get_data(0)[0]/bw_all[0], 1.0)
-			if not (i % 10): print "\titer {}/{}, good:{}, load:{:.2f} ({:.2f},{:.2f})".format(i, episode_length, last_traffic_ratio, total_mbps[0], *unfused_total_mbps[0:2])
-
 			first_sarsa = None
 
 			flows_to_query = []
@@ -1987,6 +1989,10 @@ def marlExperiment(
 			totals = {}
 			g_rewards = {}
 			g_reward = 0.0
+			reward = 0.0
+
+			dest_sum_data = [0.0, 0.0]
+			direction_sum = [0.0, 0.0]
 			for dest in dests:
 				#use the data from all of:
 				totals[dest] = 0.0
@@ -1999,6 +2005,13 @@ def marlExperiment(
 
 					totals[dest] += get_total(index)
 					datas[dest] = (data_g_o + data_g, data_b_o + data_b)
+					dest_sum_data[0] += data_g
+					dest_sum_data[1] += data_b
+
+					unfused_start = index*2
+					in_out = unfused_total_mbps[unfused_start:unfused_start+2]
+					direction_sum[0] += in_out[0]
+					direction_sum[1] += in_out[1]
 
 				# assume that all dests are receiving an equal share of bw_all...
 				r_g = safe_reward_func(std_marl, totals[dest], datas[dest][0], bw_all[0]/float(len(dests)),
@@ -2010,6 +2023,10 @@ def marlExperiment(
 				g_reward += (r_g / float(len(dests)))
 
 			#print g_reward, get_total(0), get_data(0)[0], bw_all[0], n_teams, l_cap, ratio
+
+			# FIXME: make relevant to multi-dest.
+			last_traffic_ratio = min(dest_sum_data[0]/bw_all[0], 1.0)
+			if not (i % 10): print "\titer {}/{}, good:{}, load:{:.2f} ({:.2f},{:.2f})".format(i, episode_length, last_traffic_ratio, dest_sum_data[0] + dest_sum_data[1], *direction_sum)
 
 			intime = time.time()
 			for learner_no, (node_label, sarsa, leader_nodes) in enumerate(actors):
@@ -2034,7 +2051,7 @@ def marlExperiment(
 					curr = node_label
 					end = dest_from_ip[dst_ip]
 					path = [curr]
-					while curr != end: 
+					while curr != end:
 						next_set = list(dest_map[curr][end])
 						curr = next_set[hash_fn(len(next_set), src_ip, dst_ip)]
 						path.append(curr)
@@ -2076,6 +2093,7 @@ def marlExperiment(
 							n_teams, l_cap, ratio)
 
 					l_rewards[dest] = r_l
+					reward += r_l/float(len(dests)*len(actors))
 
 				l_index = learner_no
 				# if on hard mode, do some other stuff instead.
@@ -2230,7 +2248,7 @@ def marlExperiment(
 							# Compute and store the intended update for each flow.
 							if ip_pair in flow_traces:
 								dm = [i] if record_deltas_in_times else None
-									
+
 								dat = flow_traces[ip_pair]
 								(st, z, narrowing_in_use) = dat[0][s_ac_num]
 								machine = dat[2]
@@ -2252,7 +2270,7 @@ def marlExperiment(
 
 									# If always global, play about with the selection (raise LB).
 									mod = 1 if always_include_global else 0
-									narrowing_in_use = [ 
+									narrowing_in_use = [
 										explore_feature_isolation_duration,
 										([0] if always_include_global else []) + [np.random.choice(s.tiling_set_count-mod)+mod],
 									]
@@ -2261,7 +2279,7 @@ def marlExperiment(
 									narrowing_in_use[0] -= 1
 									allow_update_narrowing = True
 									allow_action_narrowing = narrowing_in_use[0] > 0
-								
+
 								(would_choose, new_vals, z_vec) = s.update(
 									state,
 									l_rewards[dest_from_ip[ip_pair[1]]],
@@ -2334,7 +2352,7 @@ def marlExperiment(
 					state = sarsa.to_state(np.array(state_vec))
 
 					# Learn!
-					target_sarsa.update(state, l_rewards[t_dest], last_act)
+					target_sarsa.update(state, reward, last_act)
 					machine.move(sarsa.last_act[1])
 					learner_traces[l_index] = (sarsa.last_act, machine)
 
@@ -2403,9 +2421,9 @@ def marlExperiment(
 		store_sarsas = team_sarsas
 		next_ip = [1]
 
-		for sar in store_sarsas:
+		#for sar in store_sarsas:
 			#print sar[0].values
-			pass
+			#pass
 
 	# Okay, done!
 	# Run interesting stats stuff here? Just save the results? SAVE THE LEARNED MODEL?!
