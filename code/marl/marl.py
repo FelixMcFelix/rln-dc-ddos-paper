@@ -1433,7 +1433,8 @@ def marlExperiment(
 		host_ip_mac_map = {}
 
 		for (host, good, bw, _, _, extern_no) in all_hosts:
-			host_ip_mac_map[socket.inet_pton(socket.AF_INET, host.IP())] = host.MAC()
+			(lhs,) = struct.unpack("I", socket.inet_aton(host.IP()))
+			host_ip_mac_map[lhs] = host.MAC()
 			(_a_node, _a_sarsa, a_leader) = actors[extern_no]
 
 			bw_team = None
@@ -1932,7 +1933,8 @@ def marlExperiment(
 							newIP = genIP(good)
 							switch_cmd(parent, [], ip_masker_message(newIP[0], ip), False)
 							# TODO: think about changing bw/goodness?
-							host_ip_mac_map[ip[1]] = host.MAC()
+							(lhs,) = struct.unpack("I", socket.inet_aton(newIP[0]))
+							host_ip_mac_map[lhs] = host.MAC()
 
 						if submodel is None:
 							cmd = th_cmd(dests, bw)
@@ -2053,7 +2055,8 @@ def marlExperiment(
 					vlan_id = 0 #u16
 					ether_type = 0x800 #u16
 					#src_ip is already a u32
-					dst_ip_new = socket.inet_pton(socket.AF_INET, dest_ip) # u32
+					#dst_ip_new = socket.inet_pton(socket.AF_INET, dst_ip) # u32
+					(lhs,) = struct.unpack("I", socket.inet_aton(dst_ip)) # u32
 					port = 0 if submodel is not None else 80
 					base = struct.pack(
 						"<ssHHIIH",
@@ -2062,7 +2065,7 @@ def marlExperiment(
 						vlan_id,
 						ether_type,
 						src_ip,
-						dst_ip_new,
+						lhs,
 						port,
 					)
 
@@ -2071,19 +2074,20 @@ def marlExperiment(
 					# assume equal weight
 					hashes = [hash(base + struct.pack("<I", i)) for i in xrange(n_choices)]
 					winner = np.argmax(hashes)
-					print "chose {} as winner...".format(winner)
 
 					return winner
 
 				# hash_fn = smart_hash if use_path_measurements else dumb_hash
 				hash_fn = smart_hash if actions_target_flows else dumb_hash
 
-				def indices_for_state_vec(dst_ip, src_ip):
+				def indices_for_state_vec(dst_ip, src_ip, show_choices=False):
 					curr = node_label
 					end = dest_from_ip[dst_ip]
 					path = [curr]
 					while curr != end:
 						next_set = list(dest_map[curr][end])
+						if show_choices:
+							print next_set
 						curr = next_set[hash_fn(
 							len(next_set),
 							src_ip, dst_ip,
@@ -2110,7 +2114,7 @@ def marlExperiment(
 				# here is where global state is built.
 				# traditional "leader" is main_links[2]
 				t_dest = dests[np.random.choice(len(dests))]
-				main_links = indices_for_state_vec(t_dest[0][0], "0.0.0.0")
+				main_links = indices_for_state_vec(t_dest[0][0], 0)
 
 				state_vec = [total_mbps[link_map[x]] for x in main_links]
 
