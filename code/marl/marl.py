@@ -1430,7 +1430,10 @@ def marlExperiment(
 		# need to remember which hosts correspond to which agent...
 		# that agent then has a leader
 
+		host_ip_mac_map = {}
+
 		for (host, good, bw, _, _, extern_no) in all_hosts:
+			host_ip_mac_map[socket.inet_pton(socket.AF_INET, host.IP())] = host.MAC()
 			(_a_node, _a_sarsa, a_leader) = actors[extern_no]
 
 			bw_team = None
@@ -1929,6 +1932,7 @@ def marlExperiment(
 							newIP = genIP(good)
 							switch_cmd(parent, [], ip_masker_message(newIP[0], ip), False)
 							# TODO: think about changing bw/goodness?
+							host_ip_mac_map[ip[1]] = host.MAC()
 
 						if submodel is None:
 							cmd = th_cmd(dests, bw)
@@ -2041,8 +2045,35 @@ def marlExperiment(
 				def dumb_hash(*args):
 					return 0
 
-				def smart_hash(n_choices, src, dst, *args):
-					return 0
+				def smart_hash(n_choices, src_ip, dst_ip, src_mac, *args):
+					def bytify(mac):
+						return mac.replace(":", "").decode("hex")
+					src_mac_new = bytify(src_mac)
+					dst_mac = bytify("00:00:00:01:00:00")
+					vlan_id = 0 #u16
+					ether_type = 0x800 #u16
+					#src_ip is already a u32
+					dst_ip_new = socket.inet_pton(socket.AF_INET, dest_ip) # u32
+					port = 0 if submodel is not None else 80
+					base = struct.pack(
+						"<ssHHIIH",
+						src_mac_new,
+						dst_mac,
+						vlan_id,
+						ether_type,
+						src_ip,
+						dst_ip_new,
+						port,
+					)
+
+					# winner selection according to Ben Pfaff
+					# https://mail.openvswitch.org/pipermail/ovs-discuss/2018-March/046459.html
+					# assume equal weight
+					hashes = [hash(base + struct.pack("<I", i)) for i in xrange(n_choices)]
+					winner = np.argmax(hashes)
+					print "chose {} as winner...".format(winner)
+
+					return winner
 
 				# hash_fn = smart_hash if use_path_measurements else dumb_hash
 				hash_fn = smart_hash if actions_target_flows else dumb_hash
@@ -2053,7 +2084,11 @@ def marlExperiment(
 					path = [curr]
 					while curr != end:
 						next_set = list(dest_map[curr][end])
-						curr = next_set[hash_fn(len(next_set), src_ip, dst_ip)]
+						curr = next_set[hash_fn(
+							len(next_set),
+							src_ip, dst_ip,
+							host_ip_mac_map[src_ip] if src_ip in host_ip_mac_map else "00:00:00:00:00:00"
+						)]
 						path.append(curr)
 
 					# have a complete path, convert now...
