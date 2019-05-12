@@ -28,17 +28,17 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 set xrange [-1.0:14.5]
 set xtics ("Marl" 0.0, \
-	"Marl++" 1.0, \
-	"SPF" 2.0, \
+	"Instant" 1.0, \
+	"Guarded" 2.0, \
 	"Marl" 4.0, \
-	"Marl++" 5.0, \
-	"SPF" 6.0, \
+	"Instant" 5.0, \
+	"Guarded" 6.0, \
 	"Marl" 8.0, \
-	"Marl++" 9.0, \
-	"SPF" 10.0, \
+	"Instant" 9.0, \
+	"Guarded" 10.0, \
 	"Marl" 12.0, \
-	"Marl++" 13.0, \
-	"SPF " 14.0, \
+	"Instant" 13.0, \
+	"Guarded" 14.0, \
 	) scale 0.0
 #set key inside bottom right
 set boxwidth 1

@@ -1,5 +1,5 @@
 set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}'
-set output "tnsm-tcp-16-single.tex"
+set output "tnsm-ecmp-tcp-16-single.tex"
 
 load "inferno.pal"
 
@@ -24,8 +24,8 @@ set ylabel "Ratio Legit Traffic Preserved"
 set yrange [0.0:1.0]
 set key inside top right
 
-plot '../results/tnsm-tree-16-tcp-m-separate.avg.csv' u 1:3 w lines smooth sbezier title "Marl" dt 1, \
-     '../results/tnsm-tree-16-tcp-mpp-separate.avg.csv' u 1:3 w lines smooth sbezier title "Instant" ls 3 dt (18,2,2,2), \
-     '../results/tnsm-tree-16-tcp-spf-separate.avg.csv' u 1:3 w lines smooth sbezier title "Guarded" ls 5 dt (6,2,2,2), \
-     '../results/tnsm-tree-16-tcp-mpp-single.avg.csv' u 1:3 w lines smooth sbezier title "Instant (Single)" ls 6 dt (18,2), \
-     '../results/tnsm-tree-16-tcp-spf-single.avg.csv' u 1:3 w lines smooth sbezier title "Guarded (Single)" ls 7 dt (6,2), \
+plot '../results/tnsm-ecmp-16-tcp-m-separate.avg.csv' u 1:3 w lines smooth sbezier title "Marl" dt 1, \
+     '../results/tnsm-ecmp-16-tcp-mpp-separate.avg.csv' u 1:3 w lines smooth sbezier title "Instant" ls 3 dt (18,2,2,2), \
+     '../results/tnsm-ecmp-16-tcp-spf-separate.avg.csv' u 1:3 w lines smooth sbezier title "Guarded" ls 5 dt (6,2,2,2), \
+     '../results/tnsm-ecmp-16-tcp-mpp-single.avg.csv' u 1:3 w lines smooth sbezier title "Instant (Single)" ls 6 dt (18,2), \
+     '../results/tnsm-ecmp-16-tcp-spf-single.avg.csv' u 1:3 w lines smooth sbezier title "Guarded (Single)" ls 7 dt (6,2), \

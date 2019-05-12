@@ -12,23 +12,28 @@ variants = [
 ]
 
 illegal_combos = set()
-# illegal_combos.add(("m", "udp", "channel"))
+illegal_combos.add(("spf", "opus", "single"))
 # illegal_combos.add(("spf", "udp", "channel"))
 # illegal_combos.add(("spf", "tcp", "channel"))
 
 def get_average_reward(filename):
-	with open(filename, "r") as csvfile:
-		reader = csv.reader(csvfile)
-		# _ = nereader.next()
+	output = 0.0
+	try:
+		with open(filename, "r") as csvfile:
+			reader = csv.reader(csvfile)
+			# _ = nereader.next()
 
-		dats = []
-		for i, row in enumerate(reader):
-			if i == 0:
-				continue
+			dats = []
+			for i, row in enumerate(reader):
+				if i == 0:
+					continue
 
-			dats.append(float(row[3]))
+				dats.append(float(row[3]))
 
-		return np.mean(dats)
+			output = np.mean(dats)
+	except:
+		print("file {} not found".format(filename))
+	return output
 
 def write_table(out_file, data):
 	lm = len(models)
@@ -94,7 +99,7 @@ def get_data():
 			row = []
 
 			row.append(get_average_reward(
-				"../results/tnsm-tree-{}-{}-m-separate.csv".format(
+				"../results/tnsm-ecmp-{}-{}-m-separate.csv".format(
 					n,
 					t,
 					)
@@ -103,7 +108,7 @@ def get_data():
 			# do it for all parts now.
 			for m_i, m in enumerate(models):
 				for v in variants:
-					f_str = "../results/tnsm-tree-{}-{}-{}-{}.csv" if v[1] is None else v[1]
+					f_str = "../results/tnsm-ecmp-{}-{}-{}-{}.csv" if v[1] is None else v[1]
 					m_str = m if v[3] is None else v[3][m_i]
 					row.append(get_average_reward(
 						# f_str.format(m_str, t, v[0], n)

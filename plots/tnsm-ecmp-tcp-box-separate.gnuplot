@@ -1,5 +1,5 @@
 set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}' createstyle
-set output "tnsm-tcp-box-separate.tex"
+set output "tnsm-ecmp-tcp-box-separate.tex"
 
 #load "parula.pal"
 load "inferno.pal"
@@ -50,17 +50,17 @@ set label "$n=4$" at graph 0.317,-0.22
 set label "$n=8$" at graph 0.573,-0.22
 set label "$n=16$" at graph 0.83,-0.22
 
-plot '../results/tnsm-tree-2-tcp-m-separate.avg.csv' u (0.0):3:(1.0) ls 1 ps .1, \
-     '../results/tnsm-tree-2-tcp-mpp-separate.avg.csv' u (1.0):3:(1.0) ls 1 ps .1, \
-     '../results/tnsm-tree-2-tcp-spf-separate.avg.csv' u (2.0):3:(1.0) ls 1 ps .1, \
-     '../results/tnsm-tree-4-tcp-m-separate.avg.csv' u (4.0):3:(1.0) ls 3 ps .1, \
-     '../results/tnsm-tree-4-tcp-mpp-separate.avg.csv' u (5.0):3:(1.0) ls 3 ps .1, \
-     '../results/tnsm-tree-4-tcp-spf-separate.avg.csv' u (6.0):3:(1.0) ls 3 ps .1, \
-     '../results/tnsm-tree-8-tcp-m-separate.avg.csv' u (8.0):3:(1.0) ls 5 ps .1, \
-     '../results/tnsm-tree-8-tcp-mpp-separate.avg.csv' u (9.0):3:(1.0) ls 5 ps .1, \
-     '../results/tnsm-tree-8-tcp-spf-separate.avg.csv' u (10.0):3:(1.0) ls 5 ps .1, \
-     '../results/tnsm-tree-16-tcp-m-separate.avg.csv' u (12.0):3:(1.0) ls 7 ps .1, \
-     '../results/tnsm-tree-16-tcp-mpp-separate.avg.csv' u (13.0):3:(1.0) ls 7 ps .1, \
-     '../results/tnsm-tree-16-tcp-spf-separate.avg.csv' u (14.0):3:(1.0) ls 7 ps .1, \
+plot '../results/tnsm-ecmp-2-tcp-m-separate.avg.csv' u (0.0):3:(1.0) ls 1 ps .1, \
+     '../results/tnsm-ecmp-2-tcp-mpp-separate.avg.csv' u (1.0):3:(1.0) ls 1 ps .1, \
+     '../results/tnsm-ecmp-2-tcp-spf-separate.avg.csv' u (2.0):3:(1.0) ls 1 ps .1, \
+     '../results/tnsm-ecmp-4-tcp-m-separate.avg.csv' u (4.0):3:(1.0) ls 3 ps .1, \
+     '../results/tnsm-ecmp-4-tcp-mpp-separate.avg.csv' u (5.0):3:(1.0) ls 3 ps .1, \
+     '../results/tnsm-ecmp-4-tcp-spf-separate.avg.csv' u (6.0):3:(1.0) ls 3 ps .1, \
+     '../results/tnsm-ecmp-8-tcp-m-separate.avg.csv' u (8.0):3:(1.0) ls 5 ps .1, \
+     '../results/tnsm-ecmp-8-tcp-mpp-separate.avg.csv' u (9.0):3:(1.0) ls 5 ps .1, \
+     '../results/tnsm-ecmp-8-tcp-spf-separate.avg.csv' u (10.0):3:(1.0) ls 5 ps .1, \
+     '../results/tnsm-ecmp-16-tcp-m-separate.avg.csv' u (12.0):3:(1.0) ls 7 ps .1, \
+     '../results/tnsm-ecmp-16-tcp-mpp-separate.avg.csv' u (13.0):3:(1.0) ls 7 ps .1, \
+     '../results/tnsm-ecmp-16-tcp-spf-separate.avg.csv' u (14.0):3:(1.0) ls 7 ps .1, \
 
 set out
