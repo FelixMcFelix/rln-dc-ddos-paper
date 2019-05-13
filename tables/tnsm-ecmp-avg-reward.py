@@ -12,7 +12,7 @@ variants = [
 ]
 
 illegal_combos = set()
-illegal_combos.add(("spf", "opus", "single"))
+#illegal_combos.add(("spf", "opus", "single"))
 # illegal_combos.add(("spf", "udp", "channel"))
 # illegal_combos.add(("spf", "tcp", "channel"))
 
