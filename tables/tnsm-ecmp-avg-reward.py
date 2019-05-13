@@ -63,7 +63,7 @@ def write_table(out_file, data):
 	for traffic in traffics:
 		for i, n in enumerate(ns):
 			key = (traffic,n)
-			out_file.write("{} & {} ".format("" if i>0 else traffic.upper(), n))
+			out_file.write("{} & {} ".format("" if i>0 else traffic.upper(), n * 3))
 
 			row = data[key]
 			for j, _ in enumerate(row):
