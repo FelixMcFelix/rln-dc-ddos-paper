@@ -785,7 +785,7 @@ The action set is then simply to \emph{maintain}, \emph{increase}, or \emph{decr
 
 We choose these potential values for $p$ to add complete filtering to a steady progression of rate-limiters (\SI{25}{\percent} increments for UDP traffic).
 The outlier, $p=0.05$, corresponds to roughly a \SI{50}{\percent} rate reduction for TCP flows in our test topology.
-This uneven spread of choices for $p$ allows light and heavy rate reduction to be applied to both congestion-aware and non-congestion-aware traffic as required.
+This uneven spread of choices for $p$ allows light and heavy rate reduction to be applied to both congestion-aware and congestion-unaware traffic as required.
 
 To enable temporary bandwidth expansion in all deployments, every flow is initially placed under light packet drop ($p=0.05$); this is chosen above the equivalent for UDP due to TCP's higher prevalence.
 Most importantly, an agent must now choose to punish a flow multiple times in succession to cause rapid degradation, reducing variance while allowing an agent to see how a host reacts to structured changes in the environment.
