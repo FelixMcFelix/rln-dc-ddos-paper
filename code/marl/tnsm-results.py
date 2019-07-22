@@ -82,6 +82,8 @@ if __name__ == "__main__":
 		"discount": 0.0,
 		"dt": 0.05,
 
+		"ecmp_servers": 2,
+
 		"explore_episodes": 0.8,
 		"episodes": 10,
 		"episode_length": 10000,
