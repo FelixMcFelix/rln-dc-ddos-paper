@@ -852,6 +852,21 @@ An implementation in a systems language such as Rust or C++ would allow faster p
 
 ?? Here is where I would put my ramblings about system architecture...
 
+?? API between agent and switches/other agents? Push/Pull API on stats? How do they share experience? Could broadcasts aid both?
+
+\begin{figure}
+	\centering
+	\resizebox{\linewidth}{!}{\begin{tikzpicture}
+		\node(remote){Remote};
+		\node[below=4 of remote](linestart){};
+%		\node[on grid, right=1 of linestart](lineend){};
+		\path let \p1 = (linestart) in node (lineend) at (10,\y1){};
+		\draw [dashed] (linestart) -- (lineend);
+		\node[below of=linestart](local){Local};
+	\end{tikzpicture}}
+	\caption{System architecture  for our RL-driven DDoS defence system.}
+\end{figure}
+
 \section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
 
 \begin{figure}
