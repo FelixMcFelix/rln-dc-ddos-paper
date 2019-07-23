@@ -1,7 +1,7 @@
 set terminal tikz standalone color size 9cm,6cm font '\scriptsize' preamble '\usepackage{microtype} \usepackage{times} \usepackage[T1]{fontenc} \usepackage{siunitx}\sisetup{detect-all}'
 set output "tnsm-algo-m-udp.tex"
 
-load "inferno.pal"
+load "parula.pal"
 
 set style line 102 lc rgb '#a0a0a0' lt 1 lw 1
 set border ls 102

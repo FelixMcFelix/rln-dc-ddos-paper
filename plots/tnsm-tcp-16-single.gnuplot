@@ -23,9 +23,11 @@ set ylabel "Ratio Legit Traffic Preserved"
 
 set yrange [0.0:1.0]
 set key inside top right
+set key font ",6"
 
 plot '../results/tnsm-tree-16-tcp-m-separate.avg.csv' u 1:3 w lines smooth sbezier title "Marl" dt 1, \
      '../results/tnsm-tree-16-tcp-mpp-separate.avg.csv' u 1:3 w lines smooth sbezier title "Instant" ls 3 dt (18,2,2,2), \
      '../results/tnsm-tree-16-tcp-spf-separate.avg.csv' u 1:3 w lines smooth sbezier title "Guarded" ls 5 dt (6,2,2,2), \
      '../results/tnsm-tree-16-tcp-mpp-single.avg.csv' u 1:3 w lines smooth sbezier title "Instant (Single)" ls 6 dt (18,2), \
      '../results/tnsm-tree-16-tcp-spf-single.avg.csv' u 1:3 w lines smooth sbezier title "Guarded (Single)" ls 7 dt (6,2), \
+     '../results/tnsm-baseline-ecmp-16-tcp.avg.csv' u 1:3 w lines smooth sbezier title "Unprotected" ls 8 dt (6,2), \
