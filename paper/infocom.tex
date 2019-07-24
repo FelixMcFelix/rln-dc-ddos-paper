@@ -14,7 +14,8 @@
 \usepackage[dvipsnames]{xcolor}
 \usepackage{graphicx}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, calc, fit, positioning}
+\usepackage{varwidth}
+\usetikzlibrary{arrows.meta, calc, fit, positioning, shapes.misc}
 
 \usepackage{etoolbox}
 \usepackage[binary-units, per-mode=symbol]{siunitx}
@@ -850,19 +851,104 @@ An implementation in a systems language such as Rust or C++ would allow faster p
 
 \section{System Architecture}\label{sec:system-architecture}
 
-?? Here is where I would put my ramblings about system architecture...
+%?? Here is where I would put my ramblings about system architecture...
+We present a description...
 
+\subsection{Stats API}
 ?? API between agent and switches/other agents? Push/Pull API on stats? How do they share experience? Could broadcasts aid both?
+
+?? How do stats get from switcehs to the agent?
+
+?? What does experience transfer look like? Why?
 
 \begin{figure}
 	\centering
 	\resizebox{\linewidth}{!}{\begin{tikzpicture}
 		\node(remote){Remote};
-		\node[below=4 of remote](linestart){};
-%		\node[on grid, right=1 of linestart](lineend){};
-		\path let \p1 = (linestart) in node (lineend) at (10,\y1){};
+		
+		%%%
+		
+		\node[below=0.2 of remote](swpos){};
+		\node[fill=white!80!uofgcobalt, draw=black, minimum height=1.5cm, minimum width=2cm, below right= 0.1 of swpos.north west](sw1){};
+		\node[fill=white!80!uofgcobalt, draw=black, minimum height=1.5cm, minimum width=2cm, below right= 0.1 of sw1.north west](sw2){};
+		\node[fill=white!80!uofgcobalt, draw=black, minimum height=1.5cm, minimum width=2cm, below right= 0.1 of sw2.north west](switch){};
+		\node[below right, inner sep=2pt] at (switch.north west) {\small Switch};
+		\node[fill=white!90!uofgcobalt, draw, rectangle, rounded corners=0.05cm, above=0.1] (oswlc) at (switch.south) {\begin{varwidth}{1.5 cm}\small \centering Load\\Collector\end{varwidth}};
+		
+		%
+		
+		\node[right=2 of swpos](epos){};
+		\node[fill=white!80!uofgthistle, draw=black, minimum height=1.5cm, minimum width=3.5cm, below right= 0.1 of epos.north west](e1){};
+		\node[fill=white!80!uofgthistle, draw=black, minimum height=1.5cm, minimum width=3.5cm, below right= 0.1 of e1.north west](e2){};
+		\node[fill=white!80!uofgthistle, draw=black, minimum height=1.5cm, minimum width=3.5cm, below right= 0.1 of e2.north west](egress){};
+		\node[below right, inner sep=2pt] at (egress.north west) {\small Egress Switch};
+		\node[fill=white!90!uofgthistle, draw, rectangle, rounded corners=0.05cm, above=0.1] (eglc) at ($(egress.south) + (-0.85,0)$) {\begin{varwidth}{1.5 cm}\small \centering Load\\Collector\end{varwidth}};
+		\node[fill=white!90!uofgthistle, draw, rectangle, rounded corners=0.05cm, right=0.1] (egest) at (eglc.east) {\begin{varwidth}{1.5 cm}\small \centering Estimator\\$g(\cdot)$\end{varwidth}};
+		
+		%
+		
+		\node[right=3.5 of epos](apos){};
+		\node[fill=white!60!uofgpumpkin, draw=black, minimum height=1.5cm, minimum width=2cm, below right= 0.1 of apos.north west](a1){};
+		\node[fill=white!60!uofgpumpkin, draw=black, minimum height=1.5cm, minimum width=2cm, below right= 0.1 of a1.north west](a2){};
+		\node[fill=white!60!uofgpumpkin, draw=black, minimum height=1.5cm, minimum width=2cm, below right= 0.1 of a2.north west](otheragent){};
+		\node[below right, inner sep=2pt] at (otheragent.north west) {\small Agent VF};
+		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, above=0.3] (oasa) at (otheragent.south) {\begin{varwidth}{1.5 cm}\small \centering Stats API\end{varwidth}};
+		
+		%
+		
+		\node[below=2.5 of remote.west](linestart){};
+		\path let \p1 = (linestart) in node (lineend) at (9,\y1){};
 		\draw [dashed] (linestart) -- (lineend);
-		\node[below of=linestart](local){Local};
+		
+		%%%
+		
+		\node[below=2.6 of remote](local){Local};
+		
+		%%%
+		
+		\node[below=0.2 of local](aswpos){};
+		\node[fill=white!80!uofgthistle, draw=black, minimum height=3.5cm, minimum width=2.2cm, below right= 0.1 of aswpos.north west](aswitch){};
+		\node[below right, inner sep=2pt] at (aswitch.north west) {\small Agent Switch};
+		\node[fill=white!90!uofgthistle, draw, rectangle, rounded corners=0.05cm, above=0.1] (aswoft) at (aswitch.south) {\begin{varwidth}{1.5 cm}\small \centering OpenFlow\\Tables\end{varwidth}};
+		\node[fill=white!90!uofgthistle, draw, rectangle, rounded corners=0.05cm, above=0.1] (aswsc) at (aswoft.north) {\begin{varwidth}{1.5 cm}\small \centering Stats\\Collector\end{varwidth}};
+		\node[fill=white!90!uofgthistle, draw, rectangle, rounded corners=0.05cm, above=0.1] (aswlc) at (aswsc.north) {\begin{varwidth}{1.5 cm}\small \centering Load\\Collector\end{varwidth}};
+		
+		%
+		
+		\node[right=3 of aswpos](avfpos){};
+		\node[fill=white!60!uofgpumpkin, draw=black, minimum height=3.5cm, minimum width=4.5cm, below right= 0.1 of avfpos.north west](avf){};
+		\node[below right, inner sep=2pt] at (avf.north west) {\small Agent VF};
+		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, below=0.15] (avfsa) at ($(avf.north) + (0.2,0)$) {\begin{varwidth}{1.5 cm}\small \centering Stats API\end{varwidth}};
+		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, below=0.9] (avfdb) at (avfsa.south west) {\begin{varwidth}{1.5 cm}\small \centering Flowstate\\Database\end{varwidth}};
+		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, right=0.1] (avfsched) at (avfdb.east) {\begin{varwidth}{1.5 cm}\small \centering TRSE\\Scheduler\end{varwidth}};
+		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, below=2.3] (avfcore) at (avfsa.south) {\begin{varwidth}{1.5 cm}\small \centering Core\end{varwidth}};
+		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, right=0.8] (avfrl) at (avfcore.east) {\begin{varwidth}{1.5 cm}\small \centering RL\end{varwidth}};
+		
+		%%%
+		
+		\tikzset{>=stealth}
+		
+		\draw[thick, ->] (aswlc) -- (avfsa.west) node[midway,above] {\tiny Current load};
+		\draw[thick, ->] (aswsc) -- (avfsa.west) node[midway,sloped, above] {\tiny Flow stats};
+		
+		\draw[thick, ->] (oswlc) -- (avfsa) node[midway,above, sloped] {\tiny Current load};
+		
+		\draw[thick, ->] (eglc) -- (avfsa) node[midway,above, sloped] {\tiny Current load};
+		\draw[thick, ->] (egest) -- (avfsa) node[midway,above, sloped] {\tiny Estimation data};
+		
+		\draw[thick, <->] (oasa) -- (avfsa) node[midway,above, sloped] {\tiny Experience};
+		
+		\draw[thick, ->] (avfsa) -- (avfdb) node[midway,above, sloped] {\tiny State};
+		\draw[thick, ->] (avfsa) -- (avfsched) node[midway,above, sloped] {\tiny Live flows};
+		
+		\draw[thick, ->] (avfcore) -- (aswoft) node[midway,above, sloped] {\tiny Packet drop rules};
+		\draw[thick, <->] (avfcore) -- (avfdb) node[midway,below, sloped] {\tiny State};
+		\draw[thick, <->] (avfcore) -- (avfsched) node[midway,below, sloped] {\tiny Work};
+		\draw[thick, <-] ($(avfcore.east) + (0,0.1)$) -- ($(avfrl.west) + (0,0.1)$) node[midway,above, sloped] {\tiny Actions};
+		\draw[thick, ->] (avfcore) -- (avfrl) node[midway,below, sloped] {\tiny State};
+		
+		\draw[thick, ->] (avfsa.east) to [out=0, in=45] (avfrl.north);
+		\node[right=0.3] at (avfsa.east) {\tiny Experience};
 	\end{tikzpicture}}
 	\caption{System architecture  for our RL-driven DDoS defence system.}
 \end{figure}
