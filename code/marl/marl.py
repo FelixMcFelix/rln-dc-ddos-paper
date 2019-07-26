@@ -77,6 +77,7 @@ def marlExperiment(
 		model = "tcpreplay",
 		submodel = None,
 		rescale_opus = False,
+		mix_model = None,
 
 		use_controller = False,
 		moralise_ips = True,
@@ -937,8 +938,21 @@ def marlExperiment(
 
 			new_host.setIP(ip, 24)
 
+			if mix_model is None:
+				sm = submodel
+			else:
+				draw = random.random()
+				total = 0.0
+				i = 0
+				found_sm = False
+				while (not found_sm) && i < len(mix_model):
+					total += p
+					if draw < total:
+						sm = m["submodel"]
+						found_sm = True
+
 			hosts.append(
-				(new_host, good, bw, link, ip, extern_no)
+				(new_host, good, bw, link, ip, extern_no, sm)
 			)
 		return hosts
 
@@ -1432,7 +1446,7 @@ def marlExperiment(
 
 		host_ip_mac_map = {}
 
-		for (host, good, bw, _, _, extern_no) in all_hosts:
+		for (host, good, bw, _, _, extern_no, sm) in all_hosts:
 			(lhs,) = struct.unpack("I", socket.inet_aton(host.IP()))
 			host_ip_mac_map[lhs] = host.MAC()
 			(_a_node, _a_sarsa, a_leader) = actors[extern_no]
@@ -1485,7 +1499,7 @@ def marlExperiment(
 
 		# What do the hosts believe their IP to be?
 		# i.e. this won't set correctly until the net has started.
-		for (h, i) in [(host, ip) for (host, _, _, _, ip, _) in all_hosts] + [(vertex_map[d], d[0][0]) for d in dests]:
+		for (h, i) in [(host, ip) for (host, _, _, _, ip, _, _) in all_hosts] + [(vertex_map[d], d[0][0]) for d in dests]:
 			h.setIP(i, 24)
 			h.setDefaultRoute(h.intf())
 
@@ -1722,38 +1736,47 @@ def marlExperiment(
 		for i, dest_node in enumerate(dests):
 			dest = vertex_map[dest_node]
 			if model == "nginx":
-				if submodel is None:
-					# How to have a sane config for each?
-					# Config needs to include the IP so that listening works as intended...
-					fname = "temp{}.conf".format(i)
+				cmds = []
+				
+				if mix_model is None:
+					sms = [submodel]
+				else:
+					sms = [m["submodel"] for (p, m) in mix_model]
+				for sm in sms:
+					if sm is None:
+						# How to have a sane config for each?
+						# Config needs to include the IP so that listening works as intended...
+						fname = "temp{}.conf".format(i)
 
-					with open("../traffic-host/"+fname, "w") as f:
-						f.write(
-							"events {\n" +
-							"\tworker_connections 1024;\n" +
-							"}\n\n" +
-							"http {\n" +
-							"\tserver {\n" +
-							"\t\tinclude global.conf;\n" +
-							"\t\tlisten {}:80;\n".format(dest_node[0][0]) +
-							"\t}\n" +
-							"}\n"
-						)
+						with open("../traffic-host/"+fname, "w") as f:
+							f.write(
+								"events {\n" +
+								"\tworker_connections 1024;\n" +
+								"}\n\n" +
+								"http {\n" +
+								"\tserver {\n" +
+								"\t\tinclude global.conf;\n" +
+								"\t\tlisten {}:80;\n".format(dest_node[0][0]) +
+								"\t}\n" +
+								"}\n"
+							)
 
-					cmd = [
-						"nginx",
-						"-p", "../traffic-host",
-						"-c", fname,
-					]
-				elif submodel == "opus-voip":
-					cmd = [
-						"../opus-voip-traffic/target/release/opus-voip-traffic",
-						"--server",
-					]
+						cmd = [
+							"nginx",
+							"-p", "../traffic-host",
+							"-c", fname,
+						]
+					elif submodel == "opus-voip":
+						cmd = [
+							"../opus-voip-traffic/target/release/opus-voip-traffic",
+							"--server",
+						]
+					cmds.push(cmd)
 
-				server_procs.append(dest.popen(
-					cmd, stdin=PIPE, stderr=sys.stderr
-				))
+				for cmd in cmds:
+					server_procs.append(dest.popen(
+						cmd, stdin=PIPE, stderr=sys.stderr
+					))
 
 		if model == "nginx":
 			#net.interact()
@@ -1767,7 +1790,7 @@ def marlExperiment(
 		#		for (host, good, bw, link, ip) in hosts:
 		#			host.cmd(p_cmd)
 
-		for (host, good, bw, link, ip, extern_no) in all_hosts:
+		for (host, good, bw, link, ip, extern_no, sm) in all_hosts:
 			target_dest = dests[0] if len(dests) == 1 else dests[random.randint(0, len(dests)-1)]
 			target_ip = target_dest[0][0]
 			if model == "tcpreplay":
@@ -1782,11 +1805,11 @@ def marlExperiment(
 				) + [(good_file if good else bad_file)]
 			elif model == "nginx":
 				# TODO: split into good_model and bad_model choices
-				if submodel == "http" or (submodel is None and good):
+				if sm == "http" or (sm is None and good):
 					cmd = th_cmd(dests, bw, target_ip=target_ip)
-				elif submodel == "opus-voip" and good:
+				elif sm == "opus-voip" and good:
 					cmd = opus_cmd(dests, bw, host, target_ip=target_ip)
-				elif submodel == "udp-flood" or ((submodel is None or submodel == "opus-voip") and not good):
+				elif sm == "udp-flood" or ((sm is None or sm == "opus-voip") and not good):
 					#rate_const = 3.0 if not good else 4.0
 					udp_h_size = 28.0
 					bw_MB = (bw / 8.0) * (10.0**6.0)
@@ -1918,7 +1941,7 @@ def marlExperiment(
 
 			if randomise:
 				counter = 0
-				for (host, good, bw, link, ip, extern_no) in all_hosts:
+				for (host, good, bw, link, ip, extern_no, sm) in all_hosts:
 					curr_proc = host_procs[counter]
 					finished = curr_proc.poll() is not None
 					if good and finished:
@@ -1936,9 +1959,9 @@ def marlExperiment(
 							(lhs,) = struct.unpack("I", socket.inet_aton(newIP[0]))
 							host_ip_mac_map[lhs] = host.MAC()
 
-						if submodel is None:
+						if sm is None:
 							cmd = th_cmd(dests, bw)
-						elif submodel == "opus-voip":
+						elif sm == "opus-voip":
 							cmd = opus_cmd(dests, bw, host)
 						# restart traffic-host
 						host_procs[counter] = host.popen(

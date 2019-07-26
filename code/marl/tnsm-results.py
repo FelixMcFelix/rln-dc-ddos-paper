@@ -147,6 +147,23 @@ if __name__ == "__main__":
 		params["randomise"] = True
 		params["randomise_new_ip"] = True
 		params["reward_direction"] = "in"
+	elif traffic_prefix == "mix":
+		params["randomise"] = True
+		params["randomise_count"] = 1
+		params["randomise_new_ip"] = True
+		params["reward_direction"] = "inout"
+		params["mix_model"] = [
+			# TCP
+			(0.8, {
+				"model": "nginx",
+				"submodel": None
+			}),
+			# Opus
+			(0.2, {
+				"model": "nginx",
+				"submodel": "opus-voip",
+			}),
+		]
 	deps.append(traffic_types)
 
 	broken_math = expt_part(maths, deps)
