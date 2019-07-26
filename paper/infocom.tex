@@ -324,23 +324,17 @@ Malicious hosts send many small requests, spoofed to appear as though they origi
 \emph{Transit-link/link-flooding attacks} have been the subject of recent attention, wherein malicious traffic is forwarded across core links needed to reach a target (but not to the target itself) \cite{DBLP:conf/sp/KangLG13, DBLP:conf/esorics/StuderP09}.
 
 \subsection{Reinforcement Learning}\label{sec:reinforcement-learning}
-\emph{Reinforcement learning} (RL) is a variant of machine learning principally concerned with training an agent to choose an optimal sequence of actions in the pursuit of a given task \cite{RL2E}.
-We assume the agent has a certain amount of knowledge whenever a decision must be made: at any point in time $t$, it knows which \emph{state} it is in ($S_t \in \mathcal{S}$), the set of \emph{actions} which are available to it ($\operatorname{A}(S_t) \subseteq \mathcal{A}$) and, if available, a numeric \emph{reward} obtained from the last action chosen ($R_t \in \mathbb{R}, A_{t-1} \in \operatorname{A}(S_{t-1})$).
+\emph{Reinforcement learning} (RL) is a variant of machine learning concerned with training an agent to choose an optimal sequence of actions for a given task \cite{RL2E}.
+We assume at any point in time $t$, an agent knows which \emph{state} it is in ($S_t \in \mathcal{S}$), the set of \emph{actions} which are available to it ($\operatorname{A}(S_t) \subseteq \mathcal{A}$) and numeric \emph{reward} obtained from the last action chosen ($R_t \in \mathbb{R}, A_{t-1} \in \operatorname{A}(S_{t-1})$).
 This model of system interaction is best described as a \emph{Markov Decision Process} (MDP).
-RL methods combine this information with a current \emph{policy} $\pi$ to determine which action should be taken: such a choice need not be optimal if an agent needs to further explore some region of the state space.
-The policy is then further refined by updating value estimates for state-action pairs or via policy gradient methods, meaning that RL-based approaches learn adaptively and online if reward functions are available in the environment they are deployed in.
-In practice, this means that agents are able to automatically adapt to evolving problems without operator intervention or a new, custom-built training corpus.
-
-From any point in a sequence of decisions, we may describe the sum of rewards yet to come as the \emph{discounted return}, $G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \ldots$, choosing the discount factor $\gamma \in [0,1)$ to determine how crucial future rewards are vis-\`{a}-vis the current state.
-Formally, an agent's goal is to choose actions which maximise the \emph{expected discounted return} $\operatorname{\mathbb{E}_{\pi}}[G_t]$.
+RL methods combine this information with a current \emph{policy} $\pi$ to determine which action should be taken.
+The policy is refined as more decisions and rewards become available, learning adaptively and online.
+In practice, this means that agents are able to automatically adapt to evolving problems without operator intervention or a new training corpus.
 
 %?? Include some details of function approximation in the formalisation? I.e. tile coding, stability and convergence guarantees...
-
-There is immense variation in \emph{how} policies and/or values may be learned, reliant upon the learning environment, problem and required convergence guarantees.
-In particular, we shall focus on methods which choose actions according to their value estimates from the current state: let $\operatorname{q}(s, a) \in \mathbb{R}$ denote the estimate of action $a$'s value if it were to be taken in state $s$.
+We focus on methods based on action value estimates from the current state: let $\operatorname{q}(s, a) \in \mathbb{R}$ denote the estimate of action $a$'s value if it were to be taken in state $s$.
 %?? Revisit the maths here, d, dim A, s...
-Exact (tabular) representations require that we store a value estimate for each action in every state---if state is real-valued or high-dimensional, then computation and storage quickly become infeasible.
-To cope with a continuous state and/or action space, one valuable technique is to employ linear function approximation backed by \emph{tile coding} \cite[pp.\ \numrange{217}{221}]{RL2E}.
+To cope with a continuous state and/or action space, one technique to obtain this value is to employ linear function approximation backed by \emph{tile coding} \cite[pp.\ \numrange{217}{221}]{RL2E}.
 
 \begin{figure}
 	\centering
@@ -441,18 +435,13 @@ To cope with a continuous state and/or action space, one valuable technique is t
 	
 	\caption{
 		An example of tile coding for 2-dimensional state and 4 actions, using 2 tilings, 3 tiles per dimension, and a bias tile.
-		All components of $s$ are clamped to the range $[0,1]$.
-		For simplicity, we denote $\bm{x}(s,\cdot)$ as a list of indices and represent the values of all actions at each tile with a vector.
-		(a) The state $s$ activates the bias tile and exactly one tile in each tiling.
-		(b) The action values of active tiles are summed to produce the current value estimate for each action available in $s$---for this state, local knowledge ensures that action 4 is chosen by the greedy policy despite typically being a poor choice elsewhere.
 		\label{fig:tilecode}
 	}
 \end{figure}
 
-Tile coding is a form of feature representation which converts a state-action pair into a sparse boolean feature vector $\operatorname{\mathbf{x}}(s, a)$ by subdividing a $d$-dimensional subset of the space into a number of overlapping grids with an optional bias component.
+Tile coding is a form of feature representation which converts a state-action pair into a sparse boolean feature vector $\operatorname{\mathbf{x}}(s, a)$ by subdividing a $d$-dimensional subset of the space into a number of overlapping grids.
 Each tile corresponds to an entry of $\operatorname{\mathbf{x}}(s, a)$ which is set to 1 if the state-action pair lies within it.
 \Cref{fig:tilecode-code} demonstrates the process for a 2-dimensional state space, and that the numbers of tilings and tiles per dimension control feature resolution and generalisation.
-Moreover, to capture combinatorial effects or create multi-scale representation we may combine codings by concatenating individual feature vectors.
 We may then approximate an action's value with respect to a policy parameter vector $\wvec{}$, defining some $\acval{s}{a}{\wvec{}} \approx \operatorname{q}(s, a)$:
 \begin{equation}
 %	\begin{gather}
@@ -468,97 +457,15 @@ Given a learning rate $\alpha \in \mathbb{R}$ and initialising $\wvec{0}=\bm{0}$
 	\bm{w}_{t+1} = \bm{w}_{t} + \alpha \delta_t \nabla{\acval{S_t}{A_t}{\wvec{t}}},
 	\end{gather}%
 	\label{eqn:sg-sarsa}%
-	where $\delta_t$ is known as the \emph{temporal-difference} (TD) error, and the vector gradient $\nabla$ is taken with respect to $\wvec{}$.
+	where $\delta_t$ is known as the \emph{temporal-difference} (TD) error, the discount factor $\gamma \in [0,1)$ determines how crucial future rewards are, and the vector gradient $\nabla$ is taken with respect to $\wvec{}$.
 \end{subequations}
 
 Computing the approximate value of every action available in the current state forms the basis of a policy.
-Actions with maximal value can be chosen each time (the \emph{greedy} policy), we might modify this by taking random actions with probability $\epsilon$ to encourage early exploration (the \emph{$\epsilon$-greedy policy}), or we might use some other mechanism.
-\Cref{fig:tilecode-select} extends the prior working example to show how the value of each action is computed (and which action would be chosen by a greedy policy), combining a global estimate ($T_{\mathit{bias}}$) with knowledge particular to each state.
+To encourage early exploration, actions with maximal value can be chosen each time except when taking random actions with probability $\epsilon$---an \emph{$\epsilon$-greedy policy}).
+\Cref{fig:tilecode-select} extends the prior working example to show how the value of each action is computed (and which action would be chosen by a greedy policy).
 
-\begin{figure}
-	\centering
-	\resizebox{0.5\linewidth}{!}{
-		\begin{tikzpicture}		
-		% Top half
-		\def\startacs{
-			{0.8},
-			{0.3},
-			{-0.4}%
-		}
-		
-		\foreach \line [count=\y] in \startacs {
-			\foreach \pix [count=\x] in \line {
-				\ifthenelse{\lengthtest{\pix pt < 0 pt}}{
-					\pgfmathtruncatemacro\lambda{(\pix+1)*100}
-					\draw[shift={(-0.7,0)},fill=midac!\lambda!lowac] (0.7*\x,-0.35*\y) rectangle +(0.7,0.35);
-				}{
-					\pgfmathtruncatemacro\lambda{\pix*100}
-					\draw[shift={(-0.7,0)},fill=highac!\lambda!midac] (0.7*\x,-0.35*\y) rectangle +(0.7,0.35);
-				}
-				\node[shift={(-0.35,0.175)}] at (0.7*\x,-0.35*\y) {\footnotesize \pix};
-			}
-		}
-		
-		\draw[xstep=0.7cm,ystep=0.35cm,shift={(0,0)}] (0,-1.06) grid (0.7,0);
-		\node[label=left:{$T_{1,9}$},shift={(0,-0.125)}] at (0,0) {}; 
-		\node[label=left:{$T_{2,5}$},shift={(0,-0.125)}] at (0,-0.375) {}; 
-		\node[label=left:{$T_{\mathit{bias}}$},shift={(0,-0.125)}] at (0,-0.75) {};
-		\node[label=below:{\footnotesize Action 4},shift={(0.35,-0.125)}] at (0,-0.75) {};
-		\node[label=above:{\footnotesize $\wvec{t}$},shift={(0.35,-0.125)}] at (0,0) {};
-		
-		\def\finalacs{
-			{0.7},
-			{0.2},
-			{-0.5}%
-		}
-	
-		\foreach \line [count=\y] in \finalacs {
-			\foreach \pix [count=\x] in \line {
-				\ifthenelse{\lengthtest{\pix pt < 0 pt}}{
-					\pgfmathtruncatemacro\lambda{(\pix+1)*100}
-					\draw[shift={(2-0.7,0)},fill=midac!\lambda!lowac] (0.7*\x,-0.35*\y) rectangle +(0.7,0.35);
-				}{
-					\pgfmathtruncatemacro\lambda{\pix*100}
-					\draw[shift={(2-0.7,0)},fill=highac!\lambda!midac] (0.7*\x,-0.35*\y) rectangle +(0.7,0.35);
-				}
-				\node[shift={(2-0.35,0.175)}] at (0.7*\x,-0.35*\y) {\footnotesize \pix};
-			}
-		}
-		
-		\draw[xstep=0.7cm,ystep=0.35cm,shift={(2,0)}] (0,-1.06) grid +(0.7,1.06);
-		\node[label=below:{\footnotesize Action 4},shift={(2.35,-0.125)}] at (0,-0.75) {};
-		\node[label=above:{\footnotesize $\wvec{t+1}$},shift={(0.35,-0.125)}] at (2,0) {};
-		
-		\draw[->] (0.9,-0.5) -- node[above] {$+ \alpha \delta_t$} (1.8,-0.5);
-		\end{tikzpicture}
-	}
-
-\caption{
-	The update step for \cref{fig:tilecode}, given an observed TD error $\delta_t=-0.2$ (indicating a lower observed reward than the expected long-term value of \num{0.7}) and $\alpha=0.5$.
-	Action 4's value is thus reduced in the tiles associated with state $s$, but remains the most likely choice; the negative $\delta_t$ may have arisen from noise in the reward signal.
-	For illustrative purposes, we choose an unrealistically high $\alpha$ (typically, $\alpha\le0.05$ is a more reasonable choice).
-	\label{fig:tilecode-update}
-}
-\end{figure}
-
-This combination of algorithm and coding strategy is well-optimised, if actions are discrete; this allows a particularly efficient (vectorised) implementation of the policy and update rules by storing a vector of action values for each tile.
-Action values for any state are then obtained by summing the weight vectors from all activated tiles---taking $|\mathcal{A}|(n_{\mathit{tilings}}-1)$ floating point additions per decision.
-Observing that $\nabla{\acval{s}{a}{\wvec{}}} = \operatorname{\mathbf{x}}(s, a)$, further optimisations arise by considering that a tile-coded feature vector is a binary vector of constant Hamming weight (and so is amenable to representation as an array of indices, $s_{\mathit{list}}$).
-This means that we need only perform $n_{\mathit{tilings}} + 2$ additions and \num{2} multiplications per model update:
-\begin{equation}
-\bm{w}_{t+1}[i][\operatorname{index}(A_t)] = \bm{w}_{t}[i][\operatorname{index}(A_t)] + \alpha \delta_t, \forall i \in s_{\mathit{list}}.
-\label{eqn:sg-sarsa-opt}
-\end{equation}
-\Cref{fig:tilecode-update} shows how this applies to our prior example.
-If desired we may define a state space with an arbitrary number of tiles per dimension (higher-resolution, lower generalisation), yet having constant-size state vectors and constant action computation cost ($\mathcal{O}(n_{\mathit{tilings}})$).
-Beyond this, we need not store action values for tiles which have not yet been visited, conserving memory.
-A caveat of tile coding remains, in that the value of $\alpha$ must be reduced according to the number of tilings to prevent divergence at the expense of slower learning ($\alpha \leftarrow \alpha / n_{\mathit{tilings}}$).
-
-%?? Is this \emph{actually} just sarsa? We're using fn approx (of course), but this is fraught with its own difficulties. Is it strictly speaking correct to describe it as Sarsa at this point? It's, at the very least, 1-step semi-gradient Sarsa given that it is clearly on-policy w/ fn approx...
-
-%\subsection{Intrusion Detection}
-%Probably want to talk about NIDS/IPS,
-%?? Discuss mininet? Networking terms? SDN stuff?
+This combination of algorithm and coding strategy is well-optimised, if actions are discrete.
+A particularly efficient (vectorised) implementation is described by \textcite{RL2E}---briefly, we need only perform $n_{\mathit{tilings}} + 2$ additions and \num{2} multiplications per model update and constant action computation cost ($\mathcal{O}(n_{\mathit{tilings}})$).
 
 \subsection{Motivation}\label{sec:motivation}
 %?? What makes RL a suitable method for network anomaly detection, what features are most relevant?
@@ -833,33 +740,72 @@ Defining \emph{imperfect service} $P_{M,n}$ to mean any case where all $n$ hosts
 \end{corr}
 When considering that many hosts have an especially adverse reaction to our main means of control, flow-level granularity becomes an obvious choice.
 
-\subsection{Systems Considerations}\label{sec:systems-considerations}
-Taking many actions per-timestep means that any agents are assigned a larger, and potentially unbounded, set of tasks to perform every time they receive load and flow statistics from the network and their parent switch.
-This introduces some potential issues: the inability to respond to unexpected changes in flow state, delayed service of new flows, and risks that flow states become outdated.
-At their worst, these risks present additional attack surface to an adversary.
-To adapt to these problems, we make use of \emph{timed random sequential} updates.
+\section{System Architecture}\label{sec:system-architecture}
 
-Each agent begins with an empty work list.
-For the set of flows active in any timestep, we shuffle the list and perform as many action calculations and updates as possible, within a set time limit.
-Uncompleted work is passed on to the next timestep, until the list is emptied, at which point is is repopulated using the set of available measurements.
-To ensure that flow control actions are made with recent information, we combine state vectors for unvisited flows in the current work set, and replace the stored vector for all others.
+%?? Here is where I would put my ramblings about system architecture...
+We present our design of a system which operates and support the effective real-world deployment of RL-based agents, acting to mitigate DDoS attacks.
+\Cref{fig:sys-arch} displays this visually, separating system elements which are local to each agent from those which reside elsewhere in the network.
+We describe the main purpose and operation of each module within an agent's \emph{virtual function} (VF), and discuss techniques to make deployment more efficient using existing technologies.
+
+\subsection{Core and RL Executor}
+The core module is the main loop for decision-making in an agent's architecture.
+At each timestep, the core receives information about which flows have arrived and should be acted upon from the \emph{TRS Scheduler}.
+The core then retrieves the current and previous state vector associated with each flow from the \emph{Flowstate Database}, passing them into the RL algorithm alongside the last action chosen for that flow (if available).
+
+The RL algorithm then returns an action.
+Each action is passed to the database, which computes and returns the desired packet drop rate according to the agent model (instant/guarded) while updating flow state.
+This is then converted into an OpenFlow message carrying the packet drop rules; these are sent in a single message to the agent's switch using the same groupings produced by the scheduler.
+Finally, timing information is passed back into the scheduler to refine its estimates about how much work should be scheduled in the next timestep.
+
+\subsection{Stats API and Collectors}
+To act effectively, the agents we have designed require a rich assortment of information from the network and other agents.
+Each agent then exposes an API through which statistics and policy information may arrive.
+%?? API between agent and switches/other agents? Push/Pull API on stats? How do they share experience? Could broadcasts aid both?
+
+%?? What does experience transfer look like? Why? Explain that every agent has a different policy, and why this is beneficial
+Our agents can act either independently, having no agent-to-agent communication, or cooperatively.
+In the latter case agents transfer, when possible, \emph{experience} to one another---lists of state-action-state transitions with associated rewards.
+It's noted that a transition may be high-value or surprising to one agent, while well-known to another, causing each to produce different policy updates from the same unit of experience.
+For this reason we choose not to transfer policy deltas between agents, causing each to learn its own policy.
+We leave the study of which scheme achieves better performance to future work.
+
+%?? How do stats get from switcehs to the agent?
+Load collectors and estimators periodically push their observations to each active agent VF.
+In our current implementation, load statistics are gathered via VFs active at each network switch, though we expect that OpenFlow stats requests, NetFlow or SNMP data may be used to derive load measures.
+Transferring state to agents and experience sharing can both be made more efficient through effective use of broadcast addressing in a target network.
+Depending on the capabilities of switches in the network, the estimator can either send actual benign traffic estimates or parameters for use in a reward function.
+
+\subsection{Flowstate Database}
+For each flow 5-tuple, we hold two state vectors containing the features described in \cref{sec:rethinking-the-state-space}---the current state, and the state which induced the last action.
+To ensure that flow control actions are made with recent information, we combine state vectors for unvisited flows in the current work set.
 State vector combination is done by summing deltas and packet counts, updating means via weighted sums, and replacing all other fields with the newest measurements.
+For flows outside of the current work list, we simply replace the stored vector.
+
+\subsection{TRS Scheduler}
+Acting on a possibly unbounded set of flows in each timestep introduces some potential issues: the inability to respond to unexpected changes in flow state, delayed service of new flows, and the risk that flow states become outdated.
+At their worst, these risks present additional attack surface to an adversary.
+To tackle these problems, we make use of \emph{Timed Random Sequential} updates.
+
+The scheduler begins with a shuffled work list of active flows.
+When requested, the scheduler estimates the cost of an action computation using the timing information received from the core, proceeding down the list to send a set of 5-tuples to the core which can be handled in a set time limit.
+The scheduler continues until the list is empty, at which point it is repopulated and reshuffled with active flows.
+
 Following \citeauthor{DBLP:conf/sigcomm/ChenL0L18}'s observations concerning short flows \cite{DBLP:conf/sigcomm/ChenL0L18}, we maintain a deadline of \SI{1}{\milli\second}---in tests, an agent is typically able to process around 3 flows in this time.
 We expect this should be tuned based on the frequency at which statistics arrive.
 The amount of processed flows per deadline depends on the agent design (FLOP count according to policy size, as in \cref{sec:discussion}), but also on the amount of flow telemetry data needing processed---our current implementation is written in python, restricting most of this handling to a single thread.
 An implementation in a systems language such as Rust or C++ would allow faster processing.
 
-\section{System Architecture}\label{sec:system-architecture}
+\subsection{Agent Switches}
+%?? How do we do stat collection?
+Our agent switches operate a modified version of Open vSwitch, implementing an action which requests that each matched packet be dropped with a certain probability.
+To get around the lack of floating-point support in many environments, we represent this probability using a 32-bit unsigned integer (scaling \num{1.0} to $2^{32}-1$).
+On commodity hardware, we believe that a similar effect can be achieved using OpenFlow meters (at the expense of being stateful measures).
 
-%?? Here is where I would put my ramblings about system architecture...
-We present a description...
+We use OpenFlow groups to simplify control messages: premade tables with permitted levels of packetdrop.
+This saves some overhead compared to using experimenter/extension headers.
+Flows are automatically given a group with the default level of packet drop (according to the chosen agent design), meaning that switches don't need to refer to a controller or the agent VF.
 
-\subsection{Stats API}
-?? API between agent and switches/other agents? Push/Pull API on stats? How do they share experience? Could broadcasts aid both?
-
-?? How do stats get from switcehs to the agent?
-
-?? What does experience transfer look like? Why?
+%?? What do our modifications to openflow look like? How do we get around the lack of floating point math?
 
 \begin{figure}
 	\centering
@@ -920,7 +866,7 @@ We present a description...
 		\node[below right, inner sep=2pt] at (avf.north west) {\small Agent VF};
 		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, below=0.15] (avfsa) at ($(avf.north) + (0.2,0)$) {\begin{varwidth}{1.5 cm}\small \centering Stats API\end{varwidth}};
 		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, below=0.9] (avfdb) at (avfsa.south west) {\begin{varwidth}{1.5 cm}\small \centering Flowstate\\Database\end{varwidth}};
-		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, right=0.1] (avfsched) at (avfdb.east) {\begin{varwidth}{1.5 cm}\small \centering TRSE\\Scheduler\end{varwidth}};
+		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, right=0.1] (avfsched) at (avfdb.east) {\begin{varwidth}{1.5 cm}\small \centering TRS\\Scheduler\end{varwidth}};
 		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, below=2.3] (avfcore) at (avfsa.south) {\begin{varwidth}{1.5 cm}\small \centering Core\end{varwidth}};
 		\node[fill=white!90!uofgpumpkin, draw, rectangle, rounded corners=0.05cm, right=0.8] (avfrl) at (avfcore.east) {\begin{varwidth}{1.5 cm}\small \centering RL\end{varwidth}};
 		
@@ -950,7 +896,10 @@ We present a description...
 		\draw[thick, ->] (avfsa.east) to [out=0, in=45] (avfrl.north);
 		\node[right=0.3] at (avfsa.east) {\tiny Experience};
 	\end{tikzpicture}}
-	\caption{System architecture  for our RL-driven DDoS defence system.}
+	\caption{
+		System architecture  for our RL-driven DDoS defence system.
+		\label{fig:sys-arch}
+	}
 \end{figure}
 
 \section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
@@ -1160,7 +1109,7 @@ Host allocations at the beginning of each episode were generated pseudorandomly 
 
 All experiments were executed on Ubuntu 18.04.2 LTS (GNU/Linux 4.4.3-040403-generic x86\_64), using a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
 %All code underpinning these findings is available on a public repository\footnote{\url{https://github.com/FelixMcFelix/rln-dc-ddos-paper}}.
-All code underpinning these findings is available on a public repository.\footnote{Private until publication.}
+%All code underpinning these findings is available on a public repository.\footnote{Private until publication.}
 
 \subsection{Single Destination}\label{sec:single-dest}
 %?? Move description of tree topol to here.
