@@ -441,6 +441,7 @@ To cope with a continuous state and/or action space, one technique to obtain thi
 	
 	\caption{
 		An example of tile coding for 2-dimensional state and 4 actions, using 2 tilings, 3 tiles per dimension, and a bias tile.
+		\vspace{-1em}
 		\label{fig:tilecode}
 	}
 \end{figure}
@@ -520,46 +521,43 @@ We hypothesise that per-flow agent designs will offer better accuracy than curre
 We describe and justify our approach, our algorithmic improvements, and present two action models, one of which draws on domain knowledge introduced by SPIFFY \cite{DBLP:conf/ndss/KangGS16}.
 
 \subsection{System Design and Assumptions}
-A deployment environment is a network, with a set of \emph{ingress/egress points} from its domain of control through which traffic can flow, and a set of protected \emph{destination nodes}.
+Agents are deployed in a network, with a set of \emph{ingress/egress points} from its domain of control through which traffic can flow, and a set of protected \emph{destination nodes}.
 These destination nodes may be services, servers, or in the case of Autonomous Systems (ASes) and transit networks, egress points leading to other networks.
 Agents are co-located with each egress switch, and control the proportion of upstream packets from each external host to discard.
 Each destination node $s$ has a maximum capacity, $U_s$.
 
 \subsection{Algorithm}
-To make decisions and learn cheaply with low latency, we use \emph{semi-gradient Sarsa with tile coding} \ref{eqn:sg-sarsa} (\cref{sec:reinforcement-learning}), rather than make use of neural networks.
+To make decisions and learn cheaply with low latency, we use \emph{semi-gradient Sarsa with tile coding} \ref{eqn:sg-sarsa} (\cref{sec:reinforcement-learning}).
 Exploration is introduced by making use of $\epsilon$-greedy action selection, linearly annealing $\epsilon$ to 0 over time.
 Each agent has its own internal parameter vector $\wvec{}$.
 
-While classical RL methods likely have lower accuracy, there are reasons to favour them; faster decisions, lower energy usage, reduced model complexity (and training time), and the availability of compatible hardware.
-This aligns with our goal of quick online learning, and potentially faster adaptation to aggregate changes in traffic without introducing dedicated tensor processing hardware to networks.
-Approaches like this have simpler decision boundaries, reducing the risk of overfitting and unexpected behaviour. 
-Simpler methods of computing policies may also aid in interpreting anomalous action choices.
+While classical RL methods likely have lower accuracy than more complex approximators like neural networks, there are reasons to favour them; faster decisions, lower energy usage, reduced model complexity (and training time), and the availability of compatible hardware.
+This aligns with the goal of quick online learning and fast adaptation to traffic changes, without introducing dedicated tensor processing hardware.
+Approaches like this also have simpler decision boundaries, reducing the risks of overfitting and unexpected behaviour, while possibly aiding in interpreting anomalous action choices.
 
 \subsubsection{Action rate}
-We chose to adapt the algorithm to prioritise rapid response to changes in network state and to visit as many state-to-state transitions as possible to facilitate effective learning.
-To this end, we allow agents to make many decisions per timestep.
-We maintain the last state-action pair associated with each source IP and destination, and calculate any actions for the flows which still exist.
-Finally, we update $\wvec{}$ using each available trace and the reward signal from the relevant destination.
-As exploration still occurs for each action, this approach reduces $\epsilon$ multiple notches every timestep.
+The algorithm is adapted to prioritise rapid response to changes in network state and to visit as many state-to-state transitions as possible to learn quickly.
+Agents thus make many decisions per timestep.
+We update $\wvec{}$ using each decision made and the reward signal from the relevant destination.
+As exploration still occurs for each action, $\epsilon$ must be reduced multiple notches every timestep.
 In turn, we increase the annealing window for $\epsilon$ by a factor of \num{2.67} so as to preserve exploration over time, by accounting for the greater volume of decisions being made.
 
 \subsubsection{Per-tile updates}
-While the standard formulation of \cref{eqn:sg-sarsa} updates the value of all tiles identically (by a scalar $\alpha \delta_t$), we found it more effective to compute a different temporal difference value \emph{for each tiling}.
-This adjusts the value of each activated tile with a different magnitude and direction, correcting tilings which contribute too much or too little value without disturbing estimates which are already close to correct.
+To adjust the value of each activated tile with a different magnitude and direction, we found it effective to compute a different temporal difference value \emph{for each tiling}.
+This corrects tilings which contribute too much or too little value without disturbing estimates which are already close to correct.
 While we make use of the sum of all tiles' action value estimates when making decisions, each tiling is updated using only its own contribution, allowing us to set $\alpha$ to a higher value without divergence.
-A crucial observation is that value updates to each tile can move by different values in different directions, converging on effective estimates sooner.
+Compared to the standard algorithm, convergence on effective estimates occurs sooner.
 
 \subsubsection{Decision narrowings}
-When learning control on the basis of a high-dimensional, tile-coded state space, assignment of credit for each decision is difficult (because all tiles have identical gradient).
-Rephrasing this, assigning credit to the \emph{features} which drove each decision is difficult.
+When learning a high-dimensional tile-coding, assignment of credit for each decision is difficult because all tiles have identical gradient--i.e., assigning credit to the \emph{features} which drove each decision is difficult.
 To combat this, with probability $\epsilon$ an agent will mark a flow as being governed by a subset of the state space for the next five decisions.
-Each agent chooses actions on that source/destination pair using one element of local state, the global state, and the bias tile---we include the latter two to strike a balance between and accuracy and correct credit assignment.
+Each agent chooses actions for that flow using \emph{one element of local state}, the global state, and the bias tile---we include the latter two to strike a balance between and accuracy and correct credit assignment.
 
 \subsection{Feature Space}\label{sec:feature-space}
 
 \begin{figure}
 	\centering
-	\resizebox{0.7\linewidth}{!}{
+	\resizebox{0.65\linewidth}{!}{
 		\begin{tikzpicture}[
 		texts/.style = {text=black},
 		labeltexts/.style = {text=gray},
@@ -606,28 +604,29 @@ Each agent chooses actions on that source/destination pair using one element of 
 	\caption{
 		Global state selection for a flow between an external host and server $s_0$ which passes over Agent 1.
 		Nodes in the path taken are filled in blue, and link load measurements which are used for decisions are indicated with a thick blue line.
+		\vspace{-1em}
 		\label{fig:global-state-path}
 	}
 \end{figure}
 
-Our state space combines elements of global state (network link load observations) with per-flow measurements.
+Our state space combines global state (network link loads) with per-flow measurements.
 Each is tile-coded with 8 tilings and 6 tiles per dimension, using the windows described in \cref{tab:codings}.
 
 %?? How is global state acquired? See \cref{fig:global-state-path}. Why take paths in the way that we do? Mention deterministic ECMP routing etc...
-Global state is a vector of load values in $\mathbb{R}^4$ (\si{\mega\bit\per\second}) depending upon the bandwidth measurements regularly received from monitors in the environment.
+Global state is a vector of load values in $\mathbb{R}^4$ (\si{\mega\bit\per\second}): the bandwidth measurements regularly received from monitors in the environment.
 For any flow, an agent then computes the path it would take through the network.
-The incoming load recorded along the first hop, last hop, and tertiles of the path may then be tile-coded together.
+The incoming load along the first hop, last hop, and tertiles of the path may then be tile-coded together.
 In the event that the path from an agent to its destination is shorter than 4 hops, we duplicate (in order of preference) a middle hop or the last hop.
 \Cref{fig:global-state-path} illustrates the process.
 
-We build global state in this way to offer compatibility with multipath, multi-destination networks, offering support for diverse deployment environments from endpoint servers to transit ASes.
+Global state built in this way is compatible with multipath, multi-destination networks, offering support for diverse deployment environments from endpoint servers up to transit ASes.
 Computing the path from agent to destination is not computationally expensive.
-Multipath routing is often fast since typical \emph{equal-cost multipath} (ECMP) routing algorithms simply hash a packet's flow key, and are deterministic to provide consistent quality-of-service to hosts.
+Multipath routing is fast since typical ECMP routing algorithms simply hash a packet's flow tuple and are deterministic to provide consistent quality-of-service.
 
 %?? Path computation fast and efficient due to deterministic routing based on hashes (ECMP)
 %?? Works for any arbitrary topology, even 
 
-We describe and analyse each of the per-flow features included in the state vector throughout \cref{sec:rethinking-the-state-space}.
+We describe and analyse the per-flow features in the state vector throughout \cref{sec:rethinking-the-state-space}.
 Each feature is tiled separately, with the exception of packet in/out count (per-window and total), mean in/out packet size, and $\Delta$ in/out rate, which are combined with the last action taken.
 
 \subsection{Reward Function}
@@ -644,12 +643,11 @@ Each feature is tiled separately, with the exception of packet in/out count (per
 %\fakepara{Reward function directionality}
 %The reward functions, as defined, do not take traffic direction into account.
 %We redefine these to identify overload states using both upstream and downstream loads, while allowing customisation of which direction is chosen for protection.
+We denote the upstream, downstream and combined loads at a node $s$ as $\uload{s}, \dload{s}, \bload{s}$ respectively.
 Each destination node $s$ generates a reward signal, $R_{s,t}$, at every timestep $t$.
-Assume, for now, that each destination has access to some classification function $g(\cdot)$ which estimates the volume of legitimate traffic received, and expects to receive $\mathit{traffic}_s$.
-Denoting the upstream, downstream and combined loads $\uload{s}, \dload{s}, \bload{s}$ at this node:
-
+Assuming each destination has access to some classification function $g(\cdot)$ which estimates the volume of legitimate traffic received, and expects to receive $\mathit{traffic}_s$, we may compute the reward:
 \begin{subequations}
-	\vspace{-0.5cm}
+%	\vspace{-0.5cm}
 	\newcommand{\load}[1]{\operatorname{load}_{t}(#1)}
 	\begin{gather}
 	\cond{s} = [\max(\uload{s}, \dload{s}) > U_s],\\
@@ -657,13 +655,14 @@ Denoting the upstream, downstream and combined loads $\uload{s}, \dload{s}, \blo
 	\end{gather}
 	replacing $\arrload{s}{-}$ in \cref{eqn:reward} with whichever directional load is prioritised according to the traffic characteristics of the deployment environment, where $\cond{s}$ represents the ``overloaded'' condition at destination $s$.\label{eqn:reward}
 \end{subequations}
-We choose $\uload{\cdot}$ for our UDP-based models and $\dload{\cdot}$ for HTTP, though we expect that $\bload{\cdot}$ would be the most suitable for general deployment or heterogeneous traffic patterns.
-These choices reflect where the bulk of transmitted bytes in each traffic model are observed (and the lack of this knowledge in the general case).
+We choose $\uload{\cdot}$ for our UDP-based models and $\dload{\cdot}$ for HTTP, and suggest $\bload{\cdot}$ for general deployment or heterogeneous traffic.
+These choices reflect where the bulk of transmitted bytes in each traffic model are observed (or the lack of this knowledge).
 
 While our use and definition of $g(\cdot)$ appears nebulous, there are many ways to infer this quantity in practice.
 End-host servers may make use of canary flows or other active measurement schemes, or employ existing quality-of-experience metrics in the case of VoIP services such as lost packets, reorderings, and jitter.
 ASes and transit networks may make use of reports received from downstream networks, i.e. over the \emph{DDoS Open Threat Signalling} (DOTS) protocol \cite{ietf-dots-use-cases-17}.
-Even if such heuristics or perfect knowledge aren't available in deployment, a sufficiently well-trained agent needs only to follow the policy it has learned from training in a greedy manner, allowing pre-training by a simulated environment (with perfect knowledge) to transfer to reality.
+We leave the use of such QoE metrics as future work.
+Even without online rewards, a well-trained agent needs only to follow the greedy policy it has learned from offline (simulated) training to transfer to reality.
 
 If a network is believed to be vulnerable to indirect attacks, such as link-flooding attacks, we may use the following reward:
 \begin{equation}
@@ -672,44 +671,42 @@ If a network is believed to be vulnerable to indirect attacks, such as link-floo
 where the collaboration parameter $\beta \in [0,1]$ models the expected degree of interference between flows, and $s, s'$ are protected destination nodes in the network.
 The key insight underpinning LFAs is that flows can affect a target \emph{without communicating with that target}.
 $\beta$ then acts as a tunable parameter which can incentivise agents to remove flows which harm overall system health, by including the performance of the worst-performing destination.
-However, such attacks (and the effectiveness of $R_{s,t}^{\mathit{Cross}}$) are not examined by our work.
+However, we do not examine such attacks (and the effectiveness of $R_{s,t}^{\mathit{Cross}}$) at present.
 
 \subsection{Action Space}
-When monitoring a source-destination pair, an agent uses its state vector to decide which proportion of that flow's \emph{inbound} traffic should be dropped.
+When monitoring a flow, an agent uses its state vector to decide which portion of its \emph{inbound} traffic should be dropped.
 %?? Why pdrop? Allows for discrete action space, don't have to account for buckets/fairness/burstiness.
-This is implemented by installing an action via OpenFlow, instructing its host switch to drop each relevant packet with probability $p$.
 We choose to drop packets rather than impose traffic limits as it offers us a discrete action space without prior knowledge of traffic characteristics or measurement.
-Furthermore, we need not consider burstiness, fairness or implementation costs (such as per-flow bucket sizes) which could limit scalability.
+Furthermore, we need not consider burstiness, fairness or implementation costs (such as bucket sizes and tuning) which could limit scalability.
 We offer two models, which differ only on how to choose $p$.
 The intuition behind these designs is that an agent may be able to directly choose the level of packet drop at the expense of a larger action space (\emph{Instant control}), or that we may be able to reduce the action set (and learn a policy within fewer actions) by making use of domain knowledge (\emph{Guarded control}).
 
 \subsubsection{Instant control}
-Each agent directly chooses $p \in \left\{ 0.0, 0.1, \ldots, 0.9 \right\}$, giving a discrete, static action set which cannot completely filter traffic.
-These choices primarily ensure that the rate reduction imposed on a source IP may never be permanent or irreversible.
+Each agent directly chooses $p \in \left\{ 0.0, 0.1, \ldots, 0.9 \right\}$, giving a discrete, static action set.
+These choices ensure that the rate reduction imposed on a source IP may never be permanent or irreversible.
 Since this model requires no forward planning, we found it best to set the discount factor $\gamma=0$ (making agents purely opportunistic/myopic).
 
 \subsubsection{Guarded control}
-The measurements of \textcite{DBLP:conf/ndss/KangGS16} suggest that bot attack flows cannot scale up to match an increase in available bandwidth.
-We apply their observations within the RL paradigm by constraining how an agent treats each flow using a simple finite state automaton: we restrict $p \in \left\{ 0.00, 0.05, 0.25, 0.50, 1.0 \right\}$.
+\Textcite{DBLP:conf/ndss/KangGS16} suggest that bot attack flows cannot scale up to match an increase in available bandwidth.
+We apply their observations by constraining how an agent treats each flow via simple finite state automata: we restrict $p \in \left\{ 0.00, 0.05, 0.25, 0.50, 1.0 \right\}$.
 The action set is then simply to \emph{maintain}, \emph{increase}, or \emph{decrease} $p$ for a flow in single steps.
 
 We choose these potential values for $p$ to add complete filtering to a steady progression of rate-limiters (\SI{25}{\percent} increments for UDP traffic).
 The outlier, $p=0.05$, corresponds to roughly a \SI{50}{\percent} rate reduction for TCP flows in our test topology.
 This uneven spread of choices for $p$ allows light and heavy rate reduction to be applied to both congestion-aware and congestion-unaware traffic as required.
-
-To enable temporary bandwidth expansion in all deployments, every flow is initially placed under light packet drop ($p=0.05$); this is chosen above the equivalent for UDP due to TCP's higher prevalence.
-Most importantly, an agent must now choose to punish a flow multiple times in succession to cause rapid degradation, reducing variance while allowing an agent to see how a host reacts to structured changes in the environment.
-
 As each agent now requires the capability to plan ahead, we require a discount factor $\gamma \ne 0$, allowing the value of future states to influence state-action value updates.
 We found the setting $\gamma = 0.8$ to be the most effective choice for this hyperparameter during exploratory testing.
+
+To enable temporary bandwidth expansion in all deployments, every flow is initially placed under light packet drop ($p=0.05$), set this low due to TCP's higher prevalence.
+An agent must now choose to punish a flow multiple times in succession to remove its effects, reducing variance while allowing an agent to see how a host reacts to controlled conditions.
 While beneficial for legitimate flows who behave similarly to attack traffic, this introduces a lag of an extra two actions in blocking illegitimate flows.
 
 \subsubsection{Risks}
-Our mode of action means that each agent is in control of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a}, and so carries a risk of introducing collateral damage into the network.
+Our mode of action means that each agent carries a heavy risk of introducing collateral damage into the network.
 This is particularly severe when handling TCP traffic: the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97} states that TCP bandwidth is proportional to $1/\sqrt{p}$ (noting that $p$ is nonzero in any real network) while constant bitrate (CBR) UDP traffic is proportional to $1 - p$.
 %It's worth noting that there are various ways that this could be implemented, and that the application of \emph{programmable data planes} to this end are suggested as future work.
-This weakness still presents itself in modern flavours of TCP, such as TCP Cubic which in turn has bandwidth proportional to $1/p^{0.75}$ \cite{rfc8312}.
-This is of particular importance due to the prevalence of TCP and other congestion-aware protocols within the Internet.
+This weakness remains in modern flavours of TCP---TCP Cubic has bandwidth proportional to $1/p^{0.75}$ \cite{rfc8312}.
+The prevalence of congestion-aware protocols within the Internet makes carefulness critical.
 Our own analysis of CAIDA datasets \cite{caida-2018-passive} shows that congestion-aware traffic makes up at least \SIrange{73}{82}{\percent} of packets, corresponding to \SIrange{77}{84}{\percent} of data volume\footnote{Repository link removed for double-blind reviewing.}.
 %Our own analysis of CAIDA datasets \cite{caida-2018-passive} shows that congestion-aware traffic makes up at least \SIrange{73}{82}{\percent} of packets, corresponding to \SIrange{77}{84}{\percent} of data volume\footnote{\url{https://github.com/FelixMcFelix/caida-stats}}.
 QUIC, a future congestion-aware protocol, comprises \SIrange{2.6}{9.1}{\percent} of traffic observed on backbone links, depending on location and typical workload \cite{DBLP:conf/pam/RuthPDH18}.
@@ -719,12 +716,12 @@ When considering that many hosts have an especially adverse reaction to our main
 \section{System Architecture}\label{sec:system-architecture}
 
 %?? Here is where I would put my ramblings about system architecture...
-We present our design of a system which operates and support the effective real-world deployment of RL-based agents, acting to mitigate DDoS attacks.
+We present our design of a system which supports the effective real-world deployment of RL-based DDoS mitigation.
 \Cref{fig:sys-arch} displays this visually, separating system elements which are local to each agent from those which reside elsewhere in the network.
-In particular, we assume that each agent operates as a \emph{virtual function} (VF) adjacent to a software-defined switch.
+We assume that each agent operates as a \emph{virtual function} (VF) adjacent to a software-defined switch.
 Software-defined networks allow a controller (or other authorised hosts) to install complex actions, forwarding rules and logic into a switch at runtime.
 Furthermore, networks of this kind more naturally enable the future relocation and easy installation of learners.
-Agents communicate with their co-hosted OpenFlow-enabled switches---running a modified version of \emph{Open vSwitch} (OVS) \cite{open-vswitch}---to install probabilistic packet-drop rules.
+Agents communicate with their co-hosted OpenFlow-enabled switches to install probabilistic packet-drop rules.
 We describe the main purpose and operation of each module within an agent's VF, and discuss techniques to make deployment more efficient using existing technologies.
 
 \subsection{Core and RL Executor}\label{sec:core-and-rl-executor}
@@ -802,7 +799,7 @@ Flows are automatically given a group with the default level of packet drop (acc
 
 \begin{figure}
 	\centering
-	\resizebox{\linewidth}{!}{\begin{tikzpicture}
+	\resizebox{0.9\linewidth}{!}{\begin{tikzpicture}
 		\node(remote){Remote};
 		
 		%%%
@@ -902,8 +899,9 @@ Flows are automatically given a group with the default level of packet drop (acc
 	\includegraphics[width=0.9\linewidth]{../plots/ftprep-cap-box}
 	\vspace{-1cm}
 	\caption{
-		Learned performance of Instant Control agents when benign traffic is UDP-like, using only a single feature as a basis for decisions.
-		Mean IAT, inbound packet sizes, and global state offer the best predictive performance, while most features offer marginal advantage over the unprotected baseline.
+		Learned performance of Instant Control agents when benign traffic is UDP-like, using only a single feature.
+		Mean IAT, inbound packet sizes, and global state offer the best predictive performance.
+		\vspace{-1em}
 		\label{fig:udp-feature-plots}
 	}
 \end{figure}
@@ -923,9 +921,10 @@ Flows are automatically given a group with the default level of packet drop (acc
 	\includegraphics[width=0.9\linewidth]{../plots/ftprep-tcp-cap-box}
 	\vspace{-1cm}
 	\caption{
-		Learned performance of Instant Control agents when benign traffic is TCP-like, using only a single feature as a basis for decisions.
+		Learned performance of Instant Control agents when benign traffic is TCP-like, using only a single feature.
 		All of the chosen features can offer a marked improvement over no protection at all.
-		Global state and Mean IAT still offer the greatest improvement above baseline, but packet-level statistics are considerably less effective for this class of traffic.
+		Global state and Mean IAT still offer the greatest improvement above baseline.
+		\vspace{-1em}
 		\label{fig:tcp-cap-feature-plots}
 	}
 \end{figure}
@@ -935,7 +934,7 @@ Flows are automatically given a group with the default level of packet drop (acc
 	\includegraphics[width=0.9\linewidth]{../plots/ftprep-tcp-laf-cap-box}
 	\vspace{-1cm}
 	\caption{
-		Learned performance of Instant Control agents when benign traffic is TCP-like, combining each feature with the last action taken as a basis for decisions.
+		Learned performance of Instant Control agents when benign traffic is TCP-like, combining each feature with the last action taken.
 		This combination causes a significant improvement in the effectiveness of packet-level and per-window statistics.
 		\label{fig:tcp-laf-feature-plots}
 	}
@@ -990,6 +989,7 @@ Our aim was to design around this constraint as a form of future-proofing.
 	\centering
 	\caption{Tile coding windows for each feature.\label{tab:codings}}
 	
+	\resizebox{0.5\linewidth}{!}{
 	\begin{tabular}{@{}ll@{}}
 		\toprule
 		New Feature (unit) & Range \\
@@ -1007,6 +1007,8 @@ Our aim was to design around this constraint as a form of future-proofing.
 		Mean In/Out Packet Size (\si{\byte}) & $[0, 1560]$ \\
 		\bottomrule
 	\end{tabular}
+	}
+	\vspace{-1em}
 \end{table}
 
 All of the above features, save for global state, are 1-dimensional.
@@ -1173,6 +1175,7 @@ This is a slight simplification of the \textquote{online} experiment as presente
 		Network topology diagram, showing how the server and its core switch's $k$ teams are structured, with $\ell$ intermediate routers per team, connected to $m$ agents which each moderate $n$ hosts beyond a single external switch.
 		%	Empty nodes are considered to be internal.
 		Red nodes are external, and each blue node hosts an agent.
+		\vspace{-1em}
 		\label{fig:marl-topol}
 	}
 \end{figure}
@@ -1211,28 +1214,29 @@ These parameter choices match those of the original study to enable direct compa
 \section{Results and Discussion}
 \label{sec:the-results-of-doing-so}
 
-We now examine the performance of our two new models (\emph{Instant}, \emph{Guarded}) as compared against existing RL work (\emph{Marl}) under different traffic behaviour and topologies, varying the host-to-learner ratio $n$ and environment.
+We now examine the performance of our two new models (\emph{Instant}, \emph{Guarded}) compared against existing RL work (\emph{Marl}) with different traffic and topologies, varying the host-to-learner ratio $n$.
 %?? Probably best just to look at top level stuff, and THEN a simplified comparison for each intended improvement (like banded rewards).
 %Additionally, we examine the performance effects of environmental characteristics and potential improvements: negative reinforcement, the case where one agent makes all decisions, and pre-training on individual features.
-We present the average rewards for all combinations of these factors in \crefrange{tab:av-vals}{tab:av-ecmp-vals}---these provide a rough idea of expected performance, giving the highest-performing model in bold.
-Average rewards take into account any portions of time that an agent allows illegal system states.
-Several plots augment this, illustrating peak performance or the amount of time which an agent requires to learn.
+We present the average rewards for all combinations of these factors in \crefrange{tab:av-vals}{tab:av-ecmp-vals}---these provide a rough idea of expected performance, with the highest-performing model in bold.
+We include plots which paint a different picture, showing peak performance and the amount of time an agent needs to learn.
 
 \begin{table}
 	\centering
 	\caption{Average reward for combinations of model, host density and traffic class with a single destination.\label{tab:av-vals}}
 	
-	\resizebox{\linewidth}{!}{
+	\resizebox{0.9\linewidth}{!}{
 		\expandableinput ../tables/infocom-tree-avg-reward.tex
 	}
+\vspace{-1em}
 \end{table}
 \begin{table}
 	\centering
 	\caption{Average reward for combinations of model, host density and traffic class with multiple destinations.\label{tab:av-ecmp-vals}}
 	
-	\resizebox{\linewidth}{!}{
+	\resizebox{0.9\linewidth}{!}{
 		\expandableinput ../tables/infocom-ecmp-avg-reward.tex
 	}
+\vspace{-1em}
 \end{table}
 
 \subsection{Congestion-unaware traffic}
@@ -1261,16 +1265,17 @@ Several plots augment this, illustrating peak performance or the amount of time 
 %\end{figure}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.95\linewidth]{../plots/tnsm-udp-box-separate}
+	\includegraphics[width=0.9\linewidth]{../plots/tnsm-udp-box-separate}
 	
 	\caption{
 		Online performance for Opus benign traffic in a single-destination network, multi-agent mode.
 %		Marl++ offers a marked improvement (a peak $\sim$\SI{30}{\percent} more benign traffic arrives unimpeded) at small $n$, and remains marginally ahead of its predecessor by $n=16$, though both have undergone a significant drop in effectiveness.
 		\emph{Instant} outperforms Marl for $n \in \{4, 8\}$ (with higher variance), but performs similarly to Marl at $n\in \{2, 16\}$.
-		\emph{Guarded} always underperforms compared to the other agent designs in this problem variant.
+		Here, \emph{Guarded} always underperforms compared to the other agent designs.
 %		SPF, remarkably, slightly outperforms Marl++ (with lower variance) for this more difficult topology despite being worse for smaller $n$.
 %		Both of the new models take longer to train, but achieve better peak and average performance than Marl.
 %		?? REWORK/MAKE ACCURATE
+		\vspace{-1em}
 		\label{fig:udp-tree-box}
 	}
 \end{figure}
@@ -1338,13 +1343,14 @@ These difficulties may be further worsened by the competitive nature of multi-ag
 %\end{figure}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.95\linewidth]{../plots/tnsm-tcp-box-single}
+	\includegraphics[width=0.9\linewidth]{../plots/tnsm-tcp-box-single}
 	
 	\caption{
 		Online performance for HTTP benign traffic in a single-destination network, single-agent mode.
-		\emph{Instant} and \emph{Guarded} exhibit essentially identical efficacy at $n~=~2$, protecting less traffic than Marl.
+%		\emph{Instant} and \emph{Guarded} exhibit essentially identical efficacy at $n~=~2$, protecting less traffic than Marl.
 		Only \emph{Guarded}'s performance rapidly increases with $n$, achieving considerably better median performance and lower variance than the other models.
-		The longer tails of outliers typically indicate the longer training time the new models require---we observe that \emph{Guarded} typically has considerably lower variance once it has converged on a stable policy.
+		Longer tails of outliers typically indicate longer training times---we observe that \emph{Guarded} has considerably lower variance once it has converged on a stable policy.
+		\vspace{-1em}
 		\label{fig:tcp-tree-box}
 	}
 \end{figure}
@@ -1360,14 +1366,15 @@ These difficulties may be further worsened by the competitive nature of multi-ag
 %\end{figure}
 \begin{figure}
 	\centering
-	\includegraphics[width=0.95\linewidth]{../plots/tnsm-tcp-16-single}
+	\includegraphics[width=0.9\linewidth]{../plots/tnsm-tcp-16-single}
 	
 	\caption{
-		Online performance of standard and single-agent models in a single-destination network with $n=16$ hosts per egress point and HTTP benign traffic.
-		At this level of host density, \emph{Guarded} reaches higher peak performance sooner and is considerably more consistent throughout the episode.
-		\emph{Guarded} benefits greatly from information sharing, converging to protect around \SI{75}{\percent} of TCP traffic within \SI{100}{\second}.
-		The \emph{Instant} model converges to Marl's level of performance.
+		Online performance of standard and single-agent models over time in a single-destination network with $n=16$ hosts per egress point and HTTP benign traffic.
+%		At this level of host density, \emph{Guarded} reaches higher peak performance sooner and is considerably more consistent throughout the episode.
+%		\emph{Guarded} benefits greatly from information sharing, converging to protect around \SI{75}{\percent} of TCP traffic within \SI{100}{\second}.
+%		The \emph{Instant} model converges to Marl's level of performance.
 %		With a single agent, Marl++ shows worse performance, while SPF improves significantly and continues to learn well past annealing $\epsilon \rightarrow 0$.
+		\vspace{-1em}
 		\label{fig:tcp-tree-16}
 	}
 \end{figure}
@@ -1456,44 +1463,42 @@ They create a tree overlay topology subdivided into teams, where each agent appl
 Their technique suffers at high host density and when congestion-aware traffic dominates.
 These effects are not present in their results, suggesting an evaluation driven purely by traces.
 
-\emph{SPIFFY} \cite{DBLP:conf/ndss/KangGS16} aims to remedy transit-link attacks by observing how flows from each source respond to a sudden increase in available bandwidth.
+\emph{SPIFFY} \cite{DBLP:conf/ndss/KangGS16} remedies transit-link attacks by observing how flows from each source respond to a sudden increase in available bandwidth.
 Bots participating in an attack are often unable to match any bandwidth expansion in an AS due to having already saturated the capacity of their local outbound links.
 %Attackers must either be detected or reduce the throughput of each bot, increasing the cost of launching an attack.
 Unlike our approach, SPIFFY is intended to be deployed within ASes.
-A weakness of their approach is that computing a route with enough spare bandwidth can be costly, and that low expansion factors in real network can require more ``rounds'' of testing. 
+Its weakness is that computing a route with enough spare bandwidth can be costly, and that low expansion factors in real network can require more ``rounds'' of testing. 
 Traffic response to such bandwidth expansion may not extend to HTTP DASH traffic or constant bitrate traffic (e.g., UDP VoIP traffic), which make up a sizeable portion of network traffic.
 
-\emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} is a generalised SDN framework for intrusion detection, but shows the use of a \emph{k-nearest neighbours} classifier to detect individual attack flows.
-Although heavyweight (and proven to be effective compared with \textcite{DBLP:conf/lcn/BragaMP10}), their comparison against SPIFFY lacks the some evidence needed to understand how the system compares.
+\emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} is a generalised SDN framework for intrusion detection, using a \emph{k-nearest neighbours} classifier to detect individual attack flows.
+Although heavyweight (and effective compared with \textcite{DBLP:conf/lcn/BragaMP10}), their comparison against SPIFFY lacks the evidence needed to understand how the systems compare.
 
-\Textcite{DBLP:conf/sp/SmithS18} present techniques based on AS-level routing to tackle both transit-link and flooding-based attacks.
+\Textcite{DBLP:conf/sp/SmithS18} use AS-level routing to tackle both transit-link and flooding-based attacks.
 This view is taken due to the perceived cost of per-stream classification and inherent sensitivity to adversarial examples or crafted input.
-The approach uses upon BGP \emph{fraudulent route reverse poisoning} to preserve traffic to a target AS, but unlike SPIFFY the approach doesn't actually \emph{remove} the congestion.
-Because of this, traditional flooding-based attacks aren't fully alleviated.
+The approach uses BGP advertisements to preserve traffic to a target AS, but unlike SPIFFY the approach doesn't actually \emph{remove} the congestion.
+Because of this, volume-based attacks aren't fully alleviated.
 
 %?? Abuses of RL 
 \fakepara{RL in Networks}
-Application of RL towards the challenge of intrusion detection/prevention has seen comparatively little examination.
-Past work uses the approach as a traditional classifier for anomaly detection \cite{shamshirband2014anomaly} and DDoS prevention \cite{DBLP:conf/mates/ServinK08}.
+RL has seen comparatively little examination in the challenge of intrusion detection/prevention.
+Past works use the approach as a traditional classifier \cite{shamshirband2014anomaly,DBLP:conf/mates/ServinK08}.
 Given that one of the main strengths of RL techniques is the ability to control (and adapt through) ongoing interaction, these works don't apply the paradigm at its fullest potential.
 
-A past example which embodies a different use learns when it is best to \emph{communicate} and share knowledge between \emph{hidden Markov model} anomaly detectors \cite{DBLP:conf/paisi/XuSH07}.
+An effective use has been to learn when it is best to \emph{communicate} and share knowledge between anomaly detectors \cite{DBLP:conf/paisi/XuSH07}.
 %The position of this work is weakened by its reliance on the problematic `DARPA99' dataset \cite{DARPA-IDD, DBLP:conf/cisda/TavallaeeBLG09, DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
 %The position of this work is weakened by its reliance on the problematic `DARPA99' dataset \cite{DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
-Outside of anomaly/intrusion detection, there has been growing interest in the use of reinforcement learning in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
-Work by \textcite{DBLP:conf/sigcomm/MaoNA17} employs client-side observations of network state and video player performance to optimise adaptive bitrate selection for multimedia streaming by RL methods.
+Outside of this, there has been growing interest in the use of RL in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
+Work by \textcite{DBLP:conf/sigcomm/MaoNA17} employs client-side observations of network state and video player performance to optimise adaptive bitrate selection for multimedia streaming.
 
 \emph{AuTO} \cite{DBLP:conf/sigcomm/ChenL0L18} employs deep RL to perform traffic optimisation.
 Crucially, they find that the vast majority of flows are short-lived, requiring effective decisions in less than a millisecond.
-To overcome the high latency of action computation via a neural network, two agents are trained, handling aspects of short and long flows respectively.
-The first learns to optimise the flow size thresholds which define priority allocation at each switch (and accordingly learn how best to demarcate long and short flows); these short flows are routed by ECMP.
-The second agent makes bespoke decisions about routing, prioritisation etc.\ for each of the remaining long flows, who are likely to live long enough that any actions will have a significant impact.
+To overcome the high latency of action computation via a neural network, two agents are trained, handling aspects of short (priority thresholds) and long flows (bespoke allocations) respectively.
 
 %These works emphasise the necessity of ingenuity in effectively handling how states and actions are represented.
 
 \section{Conclusions and Future Work}
-Through this paper, we have discussed the paradigm of reinforcement learning and its relevance to network intrusion prevention.
-Our belief is that the potential to learn feedback-loop-like control online and against non-stationary problems makes it particularly suited to the problems endemic to the field.
+Through this paper, we have introduced reinforcement learning and its relevance to network intrusion prevention.
+We believe that the ability to learn network control as an online feedback loop makes it particularly effective in modern networks.
 
 We have put forth an RL agent design which acts per-flow, describing the algorithmic modifications and engineering choices needed to make its deployment feasible.
 Supporting this, we've demonstrated the value of the features these agents use as evidence.
