@@ -260,56 +260,69 @@ We show that the new agents offer a significant increase in throughput of legiti
 %\end{IEEEkeywords}
 
 \section{Introduction}
-?? Redo intro to be more system focussed? Needs to be suitably different. Perhaps reduce focus on evolving, make it way more about "protocol-agnostic"...
+%?? Redo intro to be more system focussed? Needs to be suitably different. Perhaps reduce focus on evolving, make it way more about "protocol-agnostic"...
+%?? Just focus on DDoS, not anomaly detection writ-large
 
-Network anomaly detection and intrusion detection/prevention are continually evolving problems, compounded by the partial, non-\emph{independent and identically distributed} (IID) view of data at each point in the network.
-Attacks and anomalous behaviours evolve, becoming more sophisticated or employing new vectors to harm a network or system's confidentiality, integrity, and availability without being detected \cite{DBLP:journals/comsur/BhuyanBK14}.
-These attacks and anomalies have measurable consequences and symptoms which allow a skilled analyst to infer new signatures for detection by misuse-based classifiers, but unseen attacks may only be defended against after-the-fact.
-This issue is inherent to \emph{misuse-} or \emph{signature-based} intrusion detectors, and it has been long-hoped that \emph{anomaly-based} detectors would surpass this by making effective use of statistical measures \cite{DBLP:journals/comsur/BhuyanBK14}.
+%?? DDoS attacks are bad...
+Distributed Denial-of-Service (DDoS) attacks are a constant threat to online services.
+Botnets like Mirai \cite{DBLP:conf/uss/AntonakakisABBB17} have been the primary driver of attacks against businesses like GitHub \cite{github-ddos-2018} (\SI{1.2}{\tera\bit\per\second}) and Dyn \cite{dyn-ddos-2016} (\SI{1.35}{\tera\bit\per\second}) in the past few years, bringing them offline by completely swamping the capacity of their servers and transit links.
+%Memcrashed UDP amplification, 51000 factor for GitHub.
+Existing DDoS defences typically rely on protocol behaviours and signatures, or upon proprietary middleboxes and traffic scrubbing services.
+%?? What happens when we roll out new protocols? Particularly those which focus on obfuscation? Behaviours become completely opaque, and ossification works against us.
+These defence strategies are effective around their time of invention, but rely upon network ossification to remain relevant.
 
-While \emph{machine learning} (ML) approaches seem like a sensible fit for this problem, in \citeyear{DBLP:conf/sp/SommerP10} \citeauthor{DBLP:conf/sp/SommerP10} identified the `failure to launch' of ML-based anomaly detection systems---a distinct lack of real-world system deployments \cite{DBLP:conf/sp/SommerP10}.
-To quite a large extent, this remains the case today.
-These authors posit that their application is made difficult due to significant operational differences from standard ML tasks, including: the high cost of errors and extraordinarily low tolerance for false positives inherent to network intrusion detection \cite{DBLP:conf/ccs/Axelsson99}; a general lack of recent, openly available (and high-quality) training data; and diversity of network traffic across varying timescales combined with significant burstiness \cite{DBLP:journals/ccr/LelandWTW95}.
-Above the aggregate level, the constant deployment of new services and new protocols means that traffic is \emph{non-stationary} and displays an evolving notion of normality.
-Learning is made harder still by the challenges encountered when learning from unlabelled (often partial) data.
-All of these factors greatly inflate the difficulty of the detection problem.
+However, the internet is always in flux.
+The constant deployment of new services and protocols means that traffic is \emph{non-stationary} and evolving.
+This ranges from subtle variation, such as new TCP congestion control algorithms \cite{rfc8312}, to the rapid rollout \cite{DBLP:conf/pam/RuthPDH18} of future protocols like QUIC \cite{DBLP:conf/sigcomm/LangleyRWVKZYKS17}.
+%?? What happens when we roll out new protocols? Particularly those which focus on obfuscation? Behaviours become completely opaque, and ossification works against us.
+Reliance on a fixed network is at odds with reality, when QUIC causes a large proportion of (traditionally) constant bitrate UDP traffic to become congestion-aware.
+Behaviours and signatures become harder still to extract if the main purpose of a protocol is obfuscation (again, as in QUIC).
+%?? Also attacks evolve.
+DDoS attacks themselves also evolve in both short and long timescales (i.e., a sequence of attack strategies vs.\@ unseen attacks) \cite{DBLP:conf/spw/KangGS16}.
+Thus, we must look at defence models which can identify characteristics and behaviours of DDoS traffic \emph{automatically}.
 
-%?? Make it clearer here what problem I specifically want to solve: principally a particular class of DDoS attacks; volume-based DDoS attacks. Amplification attacks are just a specialisation, this can be made more obvious. I think I need to be clearer about the \emph{intended deployment environment} of service hosts (i.e., not ISPs).
+%Network anomaly detection and intrusion detection/prevention are continually evolving problems, compounded by the partial, non-\emph{independent and identically distributed} (IID) view of data at each point in the network.
+%Attacks and anomalous behaviours evolve, becoming more sophisticated or employing new vectors to harm a network or system's confidentiality, integrity, and availability without being detected \cite{DBLP:journals/comsur/BhuyanBK14}.
+%These attacks and anomalies have measurable consequences and symptoms which allow a skilled analyst to infer new signatures for detection by misuse-based classifiers, but unseen attacks may only be defended against after-the-fact.
+%This issue is inherent to \emph{misuse-} or \emph{signature-based} intrusion detectors, and it has been long-hoped that \emph{anomaly-based} detectors would surpass this by making effective use of statistical measures \cite{DBLP:journals/comsur/BhuyanBK14}.
 
-For certain classes of problem e.g., volume-based \emph{distributed denial of service} (DDoS) attacks, \emph{reinforcement learning} (RL) offers another perspective.
+%?? Then talk about ML. And its costs, say that its ADS/IDS weaknesses extend to DDoS prevention.
+While \emph{machine learning} (ML) approaches seem suitable for this problem, there is a distinct lack of real-world deployments in the broader field of intrusion detection/prevention.
+\Textcite{DBLP:conf/sp/SommerP10} posit that this stems from greater risks than other ML tasks: the high cost of errors, low tolerance for false positives; a lack of recent, high-quality training data; and traffic diversity and evolution.
+It is immediately clear that these challenges also apply to DDoS prevention.
+Learning is made harder still by the challenges encountered when learning from unlabelled/partial data.
+%DDoS prevention exhibits many of these issues.
+%?? Then Bam! Introduce RL.
+
+\emph{Reinforcement learning} (RL) offers another perspective.
 %?? Unclear explanation of RL here?
-RL agents operate by following a \emph{policy} to interact with or control a system, while at the same time using observed performance metrics and deliberate exploration to dynamically improve this policy.
-In this way the role of a RL agent differs from that of a standard classifier, adaptively reacting to threats by assuming the role of a feedback loop for network optimisation, typically to safeguard service guarantees.
-In a sense, this allows us to ``overcome'' some of the difficulties of the detection problem by monitoring \emph{performance characteristics and consequences} in real-time; by looking for (and controlling) the effect rather than the cause.
-Long-term, we expect that the value of RL-based defence systems will be to augment what existing misuse-based solutions can provide, by automatically alerting, recording and controlling what are believed to be illegal system states.
-The goal of this work is much less general; we aim to prevent volume-based DDoS attacks with the aid of RL-based techniques (an important goal in its own right), while bringing to light the flexibility and applicability of these techniques in the security domain.
+RL agents follow a \emph{policy} to interact with or control a system, while at the same time using observed performance to improve this policy online.
+An agent then adaptively reacts to threats by acting as a feedback loop for network optimisation---this allows us to overcome some of these difficulties by monitoring the consequences of each action in real-time.
+We aim to prevent volume-based DDoS attacks with the aid of RL-based techniques, while bringing to light the flexibility of these techniques in the security domain.
 %Whether it takes direct control of the network, or is used indirectly to optimise a key part of another system, more powerful `deep' RL techniques (and well-founded action spaces) aren't yet well explored for network IDS/IPS.
 %These range from more modern training algorithms \cite{DBLP:journals/corr/SchulmanWDRK17, DBLP:conf/icml/SchulmanLAJM15}, to evolutionary strategies \cite{DBLP:journals/corr/SalimansHCS17, DBLP:journals/corr/abs-1802-08842}, hierarchical action composition \cite{DBLP:journals/corr/abs-1710-09767}, and competitive multi-agent learning \cite{DBLP:journals/corr/abs-1710-03748}.
-
-To date, there have been few applications of this class of algorithms towards intrusion detection and prevention which make use of their full potential for online control, rather than using them as the basis for a classifier.
-We aim to take steps to redress this and establish their proper capabilities, beyond simple ``blind application''.
-%?? Expand as required
-What approaches do exist are aimed towards the task of adaptive online DDoS mitigation, and rely upon learning to control probabilistic packet drop.
-%?? THAT IS A MAJOR CONTRIB, MENTION IT EVERYWHERE YOU CAN
+%?? This raises the question: how do we do this effectively? Agents need state and reward info, which can be a lot of data transfer. THis gets worse (hint: we have the answer...)
+This introduces a new set of problems: what effective state/action spaces should look like, how state and reward information should be efficiently propagated, and how this can be achieved on commodity hardware.
 
 %?? Discuss the most important conclusions before the outline.
-We find that the existing work for this task fails to account for congestion-aware traffic (i.e., TCP) and deployment environments with high host density per egress point, achieving poor results due to an overly coarse view of the network.
-The approach we identify to remedy this is to make throttling decisions on a per-source basis, and we present the engineering decisions this mandates: updating RL agents from multiple traces per timestep, timed random sequential action computation and a supporting \emph{software-defined network} (SDN) architecture.
-In tandem with the development and evaluation of an effective state space and model, we provide the design of a second model inspired by past work on algorithmic DDoS prevention, as an example of the integration of domain-specific knowledge.
-Our introduction of per-source decisions improves substantially upon the state-of-the-art when acting upon most internet traffic (i.e., congestion-aware protocols), and we show that our second model achieves excellent performance for high host density in this case.
-Crucially, both models remain protocol- and content-agnostic to offer future-proofing against the rollout of future protocols like QUIC \cite{DBLP:conf/sigcomm/LangleyRWVKZYKS17}.
+We find that the existing RL work for this task fails to account for congestion-aware traffic (i.e., TCP, QUIC) and environments with high host density at ingress points.
+To remedy this, our agents make throttling decisions per-source, and show how an action model built on domain-specific knowledge can increase performance.
+This requires additional engineering: updating RL agents from multiple traces per timestep, smart work scheduling, and an architecture featuring (but minimising) the use of software-defined networks (SDN).
+%In tandem with the development and evaluation of an effective state space and model, we provide the design of a second model inspired by past work on algorithmic DDoS prevention, as an example of the integration of domain-specific knowledge.
+This improves substantially upon the state-of-the-art when acting upon most internet traffic (i.e., congestion-aware protocols), and we show that the use of domain knowledge achieves excellent performance at high host density.
+Crucially, the models are protocol- and content-agnostic to offer future-proofing against the rollout of future protocols.
 %?? Also algorithmic enhancements such as multiple actions per timestep, 
 %?? PROTOCOL-AGNOSTIC -- HOW WILL THESE THINGS COPE WITH QUIC ET AL.?!?!
 Briefly, this paper contributes:
 \begin{itemize}
 %	\item A DDoS mitigation system based on direct-control reinforcement learning, designed for deployment in real-world software-defined networks (\cref{sec:environment-and-rl-algorithm,sec:acting-on-individual-sources}).
 %	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}. We offer a deconstruction and empirical study on their formulation, flaws, and risk factors concerning different traffic distributions---in addition, we demonstrate modifications enabling deployment in real-world software-defined networks (\cref{sec:performance-in-an-emulated-environment}).
-	\item Two source-level granularity approaches to RL-driven DDoS prevention (\emph{Instant} and \emph{Guarded} action models), improving upon past aggregate-based models (\cref{sec:ddos-mitigation-with-per-flow-reinforcement-learning}).
+	\item Two source-level granularity models for RL-driven DDoS prevention (\emph{Instant} and \emph{Guarded} action models) (\cref{sec:ddos-mitigation-with-per-flow-reinforcement-learning}).
 	\item A description of the system architecture which supports the real-world deployment of such agents (\cref{sec:system-architecture}).
-	\item An investigation into suitable features for an automatic DDoS mitigation system (\cref{sec:rethinking-the-state-space}).
+	\item An investigation of suitable features for this task (\cref{sec:rethinking-the-state-space}).
 %	\item Reactive simulations of HTTP and VoIP web-server traffic, designed to test system characteristics that packet trace playback fails to capture (\cref{sec:a-new-normal}).
-	\item A comparison of the effectiveness of different RL algorithms in these agents (\cref{sec:the-results-of-doing-so}).
-	\item An empirical evaluation of our new models against the state-of-the-art in RL-based DDoS mitigation (\cref{sec:the-results-of-doing-so}).
+	\item A comparison of the effectiveness of different RL algorithms in these agents, and against the state-of-the-art in RL-based DDoS mitigation (\cref{sec:the-results-of-doing-so}).
+%	\item An empirical evaluation of our new models against the state-of-the-art in RL-based DDoS mitigation (\cref{sec:the-results-of-doing-so}).
 \end{itemize}
 
 \section{Background}
