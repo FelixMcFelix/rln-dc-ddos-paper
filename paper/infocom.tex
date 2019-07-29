@@ -156,6 +156,7 @@ uniquelist=false]{biblatex}
 % make math easy
 \newcommand{\acval}[3]{\ensuremath{\operatorname{\hat{q}}(#1, #2, #3)}}
 \newcommand{\wvec}[1]{\ensuremath{\bm{w}_{#1}}}
+\DeclareMathOperator*{\argmax}{argmax}
 
 %thm environments
 \newtheorem{thm}{Theorem}
@@ -290,7 +291,7 @@ Thus, we must look at defence models which can identify characteristics and beha
 While \emph{machine learning} (ML) approaches seem suitable for this problem, there is a distinct lack of real-world deployments in the broader field of intrusion detection/prevention.
 \Textcite{DBLP:conf/sp/SommerP10} posit that this stems from greater risks than other ML tasks: the high cost of errors, low tolerance for false positives; a lack of recent, high-quality training data; and traffic diversity and evolution.
 It is immediately clear that these challenges also apply to DDoS prevention.
-Learning is made harder still by the challenges encountered when learning from unlabelled/partial data.
+Learning is made harder still by the challenges encountered when learning from unlabelled or partial data.
 %DDoS prevention exhibits many of these issues.
 %?? Then Bam! Introduce RL.
 
@@ -320,7 +321,7 @@ Briefly, this paper contributes:
 	\item Two source-level granularity models for RL-driven DDoS prevention (\emph{Instant} and \emph{Guarded} action models) and suitable features (\cref{sec:ddos-mitigation-with-per-flow-reinforcement-learning}).
 	\item A description of the system architecture which supports the real-world deployment of such agents (\cref{sec:system-architecture}).
 %	\item An investigation of suitable features for this task (\cref{sec:rethinking-the-state-space}).
-%	\item Reactive simulations of HTTP and VoIP web-server traffic, designed to test system characteristics that packet trace playback fails to capture (\cref{sec:a-new-normal}).
+	\item Reactive simulations of HTTP and VoIP web-server traffic (\cref{sec:a-new-normal}).
 	\item A performance comparison of different RL algorithms within these agents, and against the state-of-the-art in RL-based DDoS mitigation (\cref{sec:the-results-of-doing-so}).
 %	\item An empirical evaluation of our new models against the state-of-the-art in RL-based DDoS mitigation (\cref{sec:the-results-of-doing-so}).
 \end{itemize}
@@ -357,7 +358,7 @@ To cope with a continuous state and/or action space, one technique to obtain thi
 
 \begin{figure}
 	\centering
-	\begin{subfigure}{0.45\linewidth}
+	\begin{subfigure}{0.4\linewidth}
 		\resizebox{\linewidth}{!}{
 		\begin{tikzpicture}
 		\node at (0,0.3){$s = \begin{pmatrix}
@@ -397,7 +398,7 @@ To cope with a continuous state and/or action space, one technique to obtain thi
 		}
 		\caption{Tile Coding\label{fig:tilecode-code}}
 	\end{subfigure}%
-	\begin{subfigure}{0.45\linewidth}
+	\begin{subfigure}{0.4\linewidth}
 		\resizebox{\linewidth}{!}{
 		\begin{tikzpicture}
 		% Top half
@@ -482,6 +483,14 @@ Given a learning rate $\alpha \in \mathbb{R}$ and initialising $\wvec{0}=\bm{0}$
 
 Computing the approximate value of every action available in the current state forms the basis of a policy.
 To encourage early exploration, actions with maximal value can be chosen each time except when taking random actions with probability $\epsilon$---an \emph{$\epsilon$-greedy policy}).
+Each action $a \in \operatorname{A}(s)$ has probability $\pi(a|s,\wvec{})$ of being chosen:
+\begin{equation}
+	\pi(a|s,\wvec{}) =
+	\begin{cases}
+	1 - \epsilon + \epsilon/{|}{\operatorname{A}(s)}{|} & \text{if $a = \operatorname*{argmax}\limits_{a'} \acval{s}{a'}{\wvec{}}$} \\
+	\epsilon/{|}{\operatorname{A}(s)}{|} & \text{otherwise}
+	\end{cases}
+\end{equation}
 \Cref{fig:tilecode-select} shows how the value of each action is computed (and which action would be chosen by a greedy policy).
 
 This combination of algorithm and coding strategy is well-optimised, if actions are discrete.
@@ -513,7 +522,7 @@ Agents are co-located with each egress switch, and control the proportion of ups
 Each destination node $s$ has a maximum capacity, $U_s$.
 
 \subsection{Algorithm}
-To make decisions and learn cheaply with low latency, we use \emph{semi-gradient Sarsa with tile coding} \ref{eqn:sg-sarsa} (\cref{sec:reinforcement-learning}).
+To make decisions and learn cheaply with low latency, we use \emph{semi-gradient Sarsa with tile coding} (\cref{eqn:sg-sarsa}).
 Exploration is introduced by making use of $\epsilon$-greedy action selection, linearly annealing $\epsilon$ to 0 over time.
 Each agent has its own internal parameter vector $\wvec{}$.
 
@@ -535,7 +544,7 @@ While we make use of all tiles' action value estimates when making decisions, ea
 Compared to the standard algorithm, effective policies are reached sooner.
 
 \subsubsection{Decision narrowings}
-When learning a high-dimensional tile-coding, assignment of credit for each decision is difficult because all tiles have identical gradient--i.e., assigning credit to the \emph{features} which drove each decision is difficult.
+When learning a high-dimensional tile-coding, assignment of credit for each decision is difficult because all tiles have identical gradient---i.e., assigning credit to the \emph{features} which drove each decision is difficult.
 To combat this, with probability $\epsilon$ an agent will mark a flow as being governed by a subset of the state space for the next five decisions.
 Each agent chooses actions for that flow using \emph{one element of local state}, the global state, and the bias tile---we include the latter two to strike a balance between and accuracy and correct credit assignment.
 
@@ -613,7 +622,7 @@ Computing a flow's path is not computationally expensive: multipath routing is f
 
 \Cref{fig:udp-feature-plots} shows the effectiveness of per-flow features for UDP (resp.\ \cref{fig:tcp-cap-feature-plots} for TCP), on a single-destination topology (\cref{sec:single-dest}) with $n=2$ hosts per egress point averaged over 10 episodes.
 The plots demonstrate that different protocols and traffic classes are best defended by different features---every feature presented has value in a complete model.
-Packet-level and per-window statistics are at their based when combined with the last action for both UDP-like and TCP-like traffic (omitted).
+Packet-level and per-window statistics are at their best when combined with the last action for both UDP-like and TCP-like traffic (omitted).
 All features converge to their highest-observed performance within around \num{4000} timesteps.
 In general, some of the most effective features are global state, mean IAT, mean inbound packet size and $\Delta$ rates.
 The exclusion of features such as source/destination ports or protocol numbers is a deliberate choice.
@@ -650,7 +659,7 @@ These choices reflect where the bulk of transmitted bytes in each traffic model 
 
 While our use and definition of $g(\cdot)$ appears nebulous, there are many ways to infer this quantity in practice.
 End-host servers may make use of canary flows or active measurement schemes, and can employ quality-of-experience metrics in the case of VoIP services such as lost packets, reorderings, and jitter.
-ASes and transit networks may make use of reports received from downstream, i.e. over the \emph{DDoS Open Threat Signalling} (DOTS) protocol \cite{ietf-dots-use-cases-17}.
+ASes and transit networks may make use of reports received from downstream networks, i.e. over the \emph{DDoS Open Threat Signalling} (DOTS) protocol \cite{ietf-dots-use-cases-17}.
 We leave the use of such data as future work.
 Even without online rewards, a well-trained agent needs only to follow the greedy policy it has learned from offline (simulated) training.
 
@@ -666,7 +675,7 @@ However, we do not examine such attacks (and the effectiveness of $R_{s,t}^{\mat
 \subsection{Action Space}
 When monitoring a flow, an agent uses its state vector to decide which portion of its \emph{inbound} traffic should be dropped.
 %?? Why pdrop? Allows for discrete action space, don't have to account for buckets/fairness/burstiness.
-We choose to drop packets ()rather than impose traffic limits) to have a discrete action space without prior knowledge of traffic characteristics.
+We choose to drop packets (rather than impose traffic limits) to have a discrete action space without prior knowledge of traffic characteristics.
 Furthermore, we need not consider burstiness, fairness and parameters such as bucket sizes which could require tuning.
 We offer two models, which differ only on how to choose $p$.
 The intuition behind these designs is that an agent may directly choose the level of packet drop at the expense of a larger action space (\emph{Instant control}), or that we may reduce the action set (and learn a policy within fewer actions) by making use of domain knowledge (\emph{Guarded control}).
@@ -688,7 +697,7 @@ As each agent now requires the capability to plan ahead, we require a discount f
 We found the setting $\gamma = 0.8$ to be the most effective choice during exploratory testing.
 
 To enable temporary bandwidth expansion in all deployments, every flow is initially placed under light packet drop ($p=0.05$), chosen due to TCP's higher prevalence.
-An agent must now choose to punish a flow multiple times in succession to remove it, reducing variance while allowing an agent to see how a host reacts to controlled conditions.
+An agent must now choose to punish a flow multiple times in succession to block it, reducing variance while allowing an agent to see how a host reacts to controlled conditions.
 While beneficial for legitimate flows who behave similarly to attack traffic, this introduces a lag of an extra two actions in blocking illegitimate flows.
 
 \subsubsection{Risks}
@@ -697,7 +706,7 @@ This is particularly severe when handling TCP traffic: the Mathis equation \cite
 This weakness remains in modern flavours of TCP---TCP Cubic has bandwidth proportional to $1/p^{0.75}$ \cite{rfc8312}.
 Our own analysis of CAIDA datasets \cite{caida-2018-passive} shows that congestion-aware traffic makes up at least \SIrange{73}{82}{\percent} of packets and \SIrange{77}{84}{\percent} of data volume\footnote{Repository link removed for double-blind reviewing.}.
 %Our own analysis of CAIDA datasets \cite{caida-2018-passive} shows that congestion-aware traffic makes up at least \SIrange{73}{82}{\percent} of packets, corresponding to \SIrange{77}{84}{\percent} of data volume\footnote{\url{https://github.com/FelixMcFelix/caida-stats}}.
-QUIC, a future congestion-aware protocol, comprises \SIrange{2.6}{9.1}{\percent} of traffic observed on backbone links, depending on location and typical workload \cite{DBLP:conf/pam/RuthPDH18}.
+QUIC now comprises \SIrange{2.6}{9.1}{\percent} of traffic observed on backbone links, depending on location and typical workload \cite{DBLP:conf/pam/RuthPDH18}.
 Furthermore, applying a single rule to many flows (as in \textcite{DBLP:journals/eaai/MalialisK15}) increases the likelihood of collateral damage.
 When considering that many hosts have an especially adverse reaction to our main means of control, flow-level granularity becomes an obvious choice.
 
@@ -709,7 +718,7 @@ We present our design of a system which supports the effective real-world deploy
 We operate each agent as a \emph{virtual function} (VF) adjacent to a software-defined switch.
 Software-defined networks allow a controller (or authorised hosts) to install actions, forwarding rules and logic into a switch at runtime.
 Moreover, networks of this kind more naturally enable the future relocation and easy installation of learners.
-Agents communicate with these co-hosted switches to install probabilistic packet-drop rules.
+Agent VFs communicate with these co-hosted switches to install probabilistic packet-drop rules.
 We describe the main purpose and operation of each module within an agent's VF, and discuss techniques to make deployment more efficient using existing technologies.
 
 \subsection{Core and RL Executor}\label{sec:core-and-rl-executor}
@@ -718,7 +727,7 @@ At each timestep, the core receives information about which flows have arrived a
 The core then retrieves the current and previous state vector associated with each flow from the \emph{Flowstate Database}, passing them into the RL algorithm alongside the last action chosen for that flow (if available).
 
 The RL algorithm then returns an action.
-Each action is passed to the database, which computes and returns a packet drop rate according to the agent model (instant/guarded) while updating flow state.
+Each action is passed to the database, which computes and returns a packet drop rate according to the agent model (\emph{Instant/Guarded}) while updating flow state.
 This is then converted into an OpenFlow message carrying packet drop rules; these are batched to the agent's switch using the same groupings produced by the scheduler.
 Finally, timing information is passed back into the scheduler to refine its estimates about how much work should be scheduled in the next timestep.
 
@@ -746,7 +755,7 @@ Transferring state to agents and experience sharing can both be made more effici
 Depending on the capabilities of switches in the network, the estimator can either send benign traffic estimates or parameters for use in a reward function.
 
 Gathering and transmission of load/flow statistics would be difficult to perform quite as often as an emulated environment allows.
-However, the measurements acquired in such a scenario are far more likely to be less noisy (by being collected over longer periods of time), which could aid effective training.
+However, the measurements acquired in such a scenario are likely to be less noisy (by being collected over longer periods of time), which could aid effective training.
 
 \subsection{Flowstate Database}
 For each flow 5-tuple, we hold two state vectors containing the features described in \cref{sec:feature-space}---the current state, and the state which induced the last action.
@@ -763,7 +772,7 @@ The scheduler begins with a shuffled work list of active flows.
 When requested, the scheduler estimates the cost of an action computation using the timing information received from the core, proceeding down the list to send a set of 5-tuples to the core which can be handled in a set time limit.
 The scheduler continues until the list is empty, at which point it is repopulated and reshuffled with active flows.
 
-Following \citeauthor{DBLP:conf/sigcomm/ChenL0L18}'s observations of short flows \cite{DBLP:conf/sigcomm/ChenL0L18}, we maintain a deadline of \SI{1}{\milli\second}--- an agent is typically able to process around 3 flows in this time.
+Following \citeauthor{DBLP:conf/sigcomm/ChenL0L18}'s observations on handling short flows \cite{DBLP:conf/sigcomm/ChenL0L18}, we maintain a deadline of \SI{1}{\milli\second}---an agent is typically able to process around 3 flows in this time.
 We expect deadlines should be tuned based on the frequency at which statistics arrive.
 The amount of processed flows per deadline depends on the agent design (FLOP count, policy size), but also on the amount of flow telemetry data needing processed---our current implementation is written in python, restricting this handling to a single thread.
 An implementation in a systems language such as Rust or C++ would allow faster concurrent processing.
@@ -776,9 +785,9 @@ This removes the guarantee that all flows will be visited often, but if updates 
 %?? How do we do stat collection?
 Our agent switches operate a modified version of Open vSwitch, implementing an action which requests that each matched packet be dropped with a certain probability.
 To get around the lack of floating-point support in many environments, we represent this probability using a 32-bit unsigned integer (scaling \num{1.0} to $2^{32}-1$).
-On commodity hardware, we believe that a similar effect can be achieved using OpenFlow meters (at the expense of being stateful measures).
+On commodity hardware, we believe that a similar effect can be achieved using OpenFlow meters (at the expense of these being stateful measures).
 
-We use OpenFlow groups to simplify control messages: premade tables with permitted levels of packetdrop.
+We use OpenFlow groups to simplify control messages: premade tables with permitted levels of packet drop.
 This saves some overhead compared to using experimenter/extension headers.
 Flows are automatically given a group with the default level of packet drop (according to the chosen agent design), meaning that switches don't need to refer to a controller or the agent VF.
 
@@ -1050,7 +1059,7 @@ Benign hosts repeatedly request resources from the server via libcurl.
 Both use the TCP Cubic \cite{rfc8312} flavour of TCP.
 A host's download rate is limited to match its assigned maximum bandwidth, and requests several files known to exist within a website, followed by dependencies for each (stylesheets, images, etc.).
 This presents a balanced distribution of flow duration and size, with large files included to model bulk transfer.
-On completion, a host changes its IP to generate separate statistics per-flow.
+On completion, a host changes its IP to generate separate statistics per flow.
 
 \subsection{UDP (Opus) Traffic Model}
 VoIP traffic is heavily different to the above model; packet arrivals are highly periodic due to real-time requirements, flows are constant bitrate, and do not react substantially to lost packets.
@@ -1269,7 +1278,7 @@ We include plots which paint a different picture, showing peak performance and t
 %\end{figure}
 
 In a single-destination network, we observe that Marl's performance degrades as $n$ increases.
-Typically, \emph{Instant} agents achieves the best performance in multi-agent mode, reducing collateral damage above the current state-of-the-art, but sharply degrade at low $n$ when agents share experience.
+Typically, \emph{Instant} agents achieve the best performance in multi-agent mode, reducing collateral damage above the current state-of-the-art, but sharply degrade at low $n$ when agents share experience.
 We see a reversal of this trend for the \emph{Guarded} model, which improves as $n$ increases and in single-agent mode---when $n\ge4$, the single-agent variant offers consistent improvement.
 %Across all choices of $n$, we see that Marl++ exhibits reduced collateral damage compared to Marl, with SPF starting poorly yet becoming more effective for larger $n$ (\cref{tab:av-vals}, \emph{Capped}, UDP).
 \Cref{fig:udp-tree-box} shows the preserved traffic in multi-agent mode.
@@ -1435,7 +1444,7 @@ Their technique suffers at high host density and when congestion-aware traffic d
 Bots participating in an attack cannot often match any bandwidth expansion due to having already saturated the capacity of their local outbound links.
 %Attackers must either be detected or reduce the throughput of each bot, increasing the cost of launching an attack.
 Unlike our approach, SPIFFY is intended to be deployed within ASes.
-Its weakness is that computing a route with enough spare bandwidth can be costly, and that low expansion factors in real network can require more rounds of testing. 
+Its weakness is that computing a route with enough spare bandwidth can be costly, and that low expansion factors in real networks can require more rounds of testing. 
 Traffic response to bandwidth expansion may not extend to HTTP DASH traffic or constant bitrate traffic (e.g., UDP VoIP traffic), which make up a sizeable portion of network traffic.
 
 \emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} is a general SDN framework for intrusion detection, using a \emph{k-nearest neighbours} classifier to detect individual attack flows.
