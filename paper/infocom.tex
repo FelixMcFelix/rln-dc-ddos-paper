@@ -306,14 +306,10 @@ Crucially, the models are protocol- and content-agnostic to offer future-proofin
 %?? PROTOCOL-AGNOSTIC -- HOW WILL THESE THINGS COPE WITH QUIC ET AL.?!?!
 Briefly, this paper contributes:
 \begin{itemize}
-%	\item A DDoS mitigation system based on direct-control reinforcement learning, designed for deployment in real-world software-defined networks (\cref{sec:environment-and-rl-algorithm,sec:acting-on-individual-sources}).
-%	\item Important weaknesses and flaws in the past design and evaluation of similar techniques \cite{DBLP:journals/eaai/MalialisK15}. We offer a deconstruction and empirical study on their formulation, flaws, and risk factors concerning different traffic distributions---in addition, we demonstrate modifications enabling deployment in real-world software-defined networks (\cref{sec:performance-in-an-emulated-environment}).
 	\item Two source-level granularity models for RL-driven DDoS prevention (\emph{Instant} and \emph{Guarded} action models) and suitable features (\cref{sec:ddos-mitigation-with-per-flow-reinforcement-learning}).
 	\item A description of the system architecture which supports the real-world deployment of such agents (\cref{sec:system-architecture}).
-%	\item An investigation of suitable features for this task (\cref{sec:rethinking-the-state-space}).
 	\item Reactive simulations of HTTP and VoIP web-server traffic (\cref{sec:a-new-normal}).
 	\item A performance comparison of different RL algorithms within these agents, and against the state-of-the-art in RL-based DDoS mitigation (\cref{sec:the-results-of-doing-so}).
-%	\item An empirical evaluation of our new models against the state-of-the-art in RL-based DDoS mitigation (\cref{sec:the-results-of-doing-so}).
 \end{itemize}
 
 \section{Background}
@@ -1361,17 +1357,19 @@ Effective uses have lain in learning when it is best to \emph{communicate} and s
 \section{Conclusions}
 In this paper we have put forth RL agent designs which act per-flow, describing the algorithmic modifications and engineering choices needed to make their deployment feasible.
 Supporting this, we've demonstrated the value of the features these agents use as evidence.
+We've shown that RL algorithms can be modified to suit the learning environment, and how an architecture featuring the (minimal) use of SDNs can aid deployment in diverse networks.
 Our evaluation against realistic normal traffic shows that our new agent designs considerably advance the state-of-the-art in RL-based DDoS prevention, protecting \SI{2.5}{$\!\times$} more TCP traffic than past RL work, with \emph{Guarded} agents showing the most promise for future evaluation.
 
 The most direct improvements to be made lie in the correct protection of legitimate UDP traffic, which our agent designs have difficulty safeguarding.
 Outside of this, there is scope to test these new techniques against link-flooding attacks in large-scale topologies using reward functions such as \cref{eqn:lfa-reward}.
 Simulation is the most likely avenue for such evaluation.
 The remaining weaknesses invite many further improvements worth investigation: the design of reward functions derived from QoE metrics, agent operation via \emph{programmable data planes} \cite{DBLP:conf/ancs/JouetP17}, and evaluation against evolving DDoS attacks \cite{DBLP:conf/spw/KangGS16}.
+Even now, our approach offers distinct advantages above existing works, such as protocol-agnostic DDoS flow detection, more flexible deployment, and automatically learned low-overhead decision-making on the most prevalent class of traffic.
 
-We hope it is clear that RL holds promise and can inspire further innovation.
-It allows us to offer distinct advantages above existing works, such as protocol-agnostic DDoS flow detection, more flexible deployment, and automatically learned low-overhead decision-making---without requiring many of the same network resources or capabilities that other techniques discussed in \cref{sec:related-work} rely upon.
-Our proposed approach offers substantial improvements for the defence of congestion-aware traffic, which remains the most prevalent class of traffic on the internet today, while offering future-proofing against the introduction of new transports.
-It's hoped that more research in this direction will open the door to works which capture the complex and fluid nature of modern networks; evolving topologies, traffic and protocol distributions, and attacks.
+%We hope it is clear that RL holds promise and can inspire further innovation.
+%It allows us to offer distinct advantages above existing works, such as protocol-agnostic DDoS flow detection, more flexible deployment, and automatically learned low-overhead decision-making---without requiring many of the same network resources or capabilities that other techniques discussed in \cref{sec:related-work} rely upon.
+%Our proposed approach offers substantial improvements for the defence of congestion-aware traffic, which remains the most prevalent class of traffic on the internet today, while offering future-proofing against the introduction of new transports.
+%It's hoped that more research in this direction will open the door to works which capture the complex and fluid nature of modern networks; evolving topologies, traffic and protocol distributions, and attacks.
 
 \section*{Acknowledgements}
 %Our thanks go to Colin Perkins, Mircea Iordache, Qianru Zhou and Cristian Urlea for their advice, comments and technical assistance.
