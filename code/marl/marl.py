@@ -945,11 +945,13 @@ def marlExperiment(
 				total = 0.0
 				i = 0
 				found_sm = False
-				while (not found_sm) && i < len(mix_model):
+				while (not found_sm) and i < len(mix_model):
+					(p, m) = mix_model[i]
 					total += p
 					if draw < total:
 						sm = m["submodel"]
 						found_sm = True
+					i += 1
 
 			hosts.append(
 				(new_host, good, bw, link, ip, extern_no, sm)
@@ -1032,7 +1034,7 @@ def marlExperiment(
 		if hosts_upper is None:
 			hosts_upper = hosts_per_learner
 
-		for (host, _, _, link, _, _) in hosts:
+		for (host, _, _, link, _, _, _) in hosts:
 			host.stop()#deleteIntfs=True)
 			#link.delete()
 
