@@ -1773,7 +1773,7 @@ def marlExperiment(
 							"../opus-voip-traffic/target/release/opus-voip-traffic",
 							"--server",
 						]
-					cmds.push(cmd)
+					cmds.append(cmd)
 
 				for cmd in cmds:
 					server_procs.append(dest.popen(

@@ -170,6 +170,10 @@ class SmartishRouter(app_manager.RyuApp):
 
 		t = 3
 
+		if dpid not in self.ecmp_routes:
+			print("Switch {} does not appear in the routing directory---no paths use it. Try upping the host count?".format(dpid))
+			return
+
 		g_dict = self.ecmp_routes[dpid]
 		for ip, ports in g_dict.items():
 			g += 1
