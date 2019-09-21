@@ -10,7 +10,7 @@ runExpt() {
 
 ./purger.sh
 
-for model in `seq 0 2`;
+for model in `seq 0 3`;
 do
 	for i in $(seq 0 $(expr $(getCount $model) - 1));
 	do

@@ -8,6 +8,7 @@ results_dir = "../../results/"
 # prefix, spiffy_mode, discount
 models = [
 	"m", # MARL
+	"spiffy", # Real SPIFFY
 	"mpp", # MARL++
 	"spf", # SPF
 ]
@@ -54,7 +55,7 @@ topols = [
 ]
 
 def total_per_model(model):
-	return len(discounts) * len(algos) * len(host_ps) * len(traffic_types) * (1 if model == 0 else len(single_learners)) * len(maths) * len(topols)
+	return len(discounts) * len(algos) * len(host_ps) * len(traffic_types) * (1 if model < 2 else len(single_learners)) * len(maths) * len(topols)
 
 if __name__ == "__main__":
 	# If <2 args, return the upper bound of expts per model.
@@ -73,6 +74,7 @@ if __name__ == "__main__":
 		return source[(experiment/fold_len) % len(source)]
 
 	params = {
+		#"P_good": 1.0,
 		"n_teams": 2,
 		"n_inters": 2,
 		"n_learners": 3,
@@ -116,6 +118,16 @@ if __name__ == "__main__":
 		del params["feature_max"]
 		del params["split_codings"]
 		del params["trs_maxtime"]
+	elif model_prefix == "spiffy":
+		old_marl = True
+		params["spiffy_but_bad"] = True
+		params["spiffy_act_time"] = 5.0
+		params["spiffy_max_experiments"] = 16
+		params["spiffy_min_experiments"] = 16
+		params["spiffy_pick_prob"] = 0.1
+		params["spiffy_traffic_dir"] = "in"
+		params["spiffy_mbps_cutoff"] = 0.01
+		params["spiffy_expansion_factor"] = 3.0
 	elif model_prefix == "mpp":
 		pass
 	elif model_prefix == "spf":
@@ -185,6 +197,13 @@ if __name__ == "__main__":
 	topol = expt_part(topols, deps)
 	params["topol"] = topol
 	deps.append(topols)
+
+	if model_prefix == "spiffy":
+		spiffy_count = int(0.1 * float(host_p * 12))
+		if topol == "ecmp":
+			spiffy_count *= 3
+		params["spiffy_max_experiments"] = spiffy_count
+		params["spiffy_min_experiments"] = spiffy_count
 
 	results = marlExperiment(**params)
 	(rewards, good_traffic_percents, total_loads, store_sarsas, rng, action_comps) = results

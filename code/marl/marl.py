@@ -150,11 +150,15 @@ def marlExperiment(
 		reward_band = 1.0,
 
 		spiffy_but_bad = False,
-		spiffy_act_time = 2,
+		spiffy_act_time = 5.0,
 		# 24--192 hosts, pick accordingly.
 		spiffy_max_experiments = 16,
+		spiffy_min_experiments = 1,
 		spiffy_pick_prob = 0.2,
 		spiffy_drop_rate = 0.15,
+		spiffy_traffic_dir = "in",
+		spiffy_mbps_cutoff = 0.1,
+		spiffy_expansion_factor = 5.0,
 
 		broken_math = False,
 		num_drop_groups = 20,
@@ -750,7 +754,7 @@ def marlExperiment(
 		ac = default_machine.action()
 
 		if spiffy_but_bad:
-			ac = spiffy_drop_rate
+			ac = 0.0#spiffy_drop_rate
 
 		p_drop_num = pdrop(1-ac)
 
@@ -774,6 +778,39 @@ def marlExperiment(
 		# send group+bucket instantiations,
 		# also the base rules (internal dst -> G0, external -> outwards port=2)
 		for msg in flow_arp_upcall + flow_upstream_t1_msg + flow_outbound_flood + flow_miss_next_table:
+			if alive:
+				updateOneRoute(switch, cmd_list, msg)
+			else:
+				route_commands[0].append((switch, cmd_list, msg))
+
+	def prepSpiffyBridge(switch, mac_of_interest, out_port=1, ac_prob=0.0):
+		if switch.controlled:
+			return
+
+		cmd_list = []
+
+		# Need to add a high-prio match for the switch's MAC address too...
+		# Otherwise the ARP replies from the main body of the network get caught in
+		# limbo.
+		msgs = [
+			# put the MAC matcher in here
+			ofpb.ofp_flow_mod(
+				None, 0, 0, 0, ofp.OFPFC_ADD,
+				0, 0, 1, None, None, None, 0, 1,
+				ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+					ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0806, None),
+					#ofpm.build(None, ofp.OFPXMT_OFB_ETH_DST, False, 0, mac_of_interest, None),
+					ofpm.build(None, ofp.OFPXMT_OFB_ARP_OP, False, 0, 2, None),
+				]),
+				ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+					ofpb.ofp_action_output(None, 16, out_port, 65535)
+				])
+			)
+		]
+
+		msgs += flow_upstream_msg + flow_outbound_msg
+
+		for msg in msgs: 
 			if alive:
 				updateOneRoute(switch, cmd_list, msg)
 			else:
@@ -961,7 +998,7 @@ def marlExperiment(
 	def makeTeam(parent, inter_count, learners_per_inter, new_topol_shape, sarsas=[], graph=None,
 			ss_label=None, port_dict=None):
 
-		(monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
+		(monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map, spiffy_dest_switches) = new_topol_shape
 
 		def link_in_new_topol(node1, node2, node1_label, node2_label, critical=False):
 			link_name = "{}{}-eth1".format(
@@ -1027,7 +1064,7 @@ def marlExperiment(
 				extern_switches.append(new_extern)
 				externals.append(new_extern)
 
-		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map)
+		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map, spiffy_dest_switches)
 		return ((leader, intermediates, learners, extern_switches, hosts, sarsas), new_topol_shape)
 
 	def makeHosts(hosts, externs, hosts_per_learner, hosts_upper=None):
@@ -1044,6 +1081,104 @@ def marlExperiment(
 			new_hosts += addHosts(extern, i, hosts_per_learner, hosts_upper)
 
 		return new_hosts
+
+	def controlSwitch(switch, msgs, cmd_list=[]):
+		for msg in msgs:
+			if alive:
+				updateOneRoute(switch, cmd_list, msg)
+			else:
+				route_commands[0].append((switch, cmd_list, msg))
+
+	def isolateSpiffyFlow(spiffy_dest_switches, flow_ip, dest_ip, isolate_port=3):
+		(close_switch, far_switch) = spiffy_dest_switches[dest_ip]
+		subnet = "255.255.255.255"
+
+		# on close, match on dest = flow_ip => port 3
+		controlSwitch(close_switch, [ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 2, None, None, None, 0, 0,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(flow_ip, subnet), socket.inet_aton(subnet))
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				ofpb.ofp_action_output(None, 16, isolate_port, 65535)
+			])
+		)])
+
+		# on far, match on src = flow_ip => port 3
+		controlSwitch(far_switch, [ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_ADD,
+			0, 0, 2, None, None, None, 0, 0,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_SRC, True, 0, netip(flow_ip, subnet), socket.inet_aton(subnet))
+			]),
+			ofpb.ofp_instruction_actions(ofp.OFPIT_WRITE_ACTIONS, None, [
+				ofpb.ofp_action_output(None, 16, isolate_port, 65535)
+			])
+		)])
+
+	def okaySpiffyFlow(spiffy_dest_switches, flow_ip, dest_ip):
+		(close_switch, far_switch) = spiffy_dest_switches[dest_ip]
+		subnet = "255.255.255.255"
+
+		# on close, match on dest = flow_ip => port 3
+		controlSwitch(close_switch, [ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_DELETE,
+			0, 0, 2, None, None, None, 0, 0,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(flow_ip, subnet), socket.inet_aton(subnet))
+			]),
+			None
+		)])
+
+		# on far, match on src = flow_ip => port 3
+		controlSwitch(far_switch, [ofpb.ofp_flow_mod(
+			None, 0, 0, 0, ofp.OFPFC_DELETE,
+			0, 0, 2, None, None, None, 0, 0,
+			ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+				ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+				ofpm.build(None, ofp.OFPXMT_OFB_IPV4_SRC, True, 0, netip(flow_ip, subnet), socket.inet_aton(subnet))
+			]),
+			None
+		)])
+
+	def blockSpiffyFlow(spiffy_dest_switches, flow_ip, dest_ip, ingress_switch=None):
+		(close_switch, far_switch) = spiffy_dest_switches[dest_ip]
+		# FIXME: Unsure whether I should drop here or at network ingress...
+		# ingress might be nicer from the perspective of net emulation?
+		# but I'm lazy atm...
+		subnet = "255.255.255.255"
+
+		# Add an explicit match for the flow, with an empty action list.
+		block_messages = [
+			ofpb.ofp_flow_mod(
+				None, 0, 0, 0, ofp.OFPFC_ADD,
+				0, 0, 2, None, None, None, 0, 0,
+				ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+					ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+					ofpm.build(None, ofp.OFPXMT_OFB_IPV4_SRC, True, 0, netip(flow_ip, subnet), socket.inet_aton(subnet))
+				]),
+				ofpb.ofp_instruction_actions(ofp.OFPIT_CLEAR_ACTIONS, None, None)
+			),
+			ofpb.ofp_flow_mod(
+				None, 0, 0, 0, ofp.OFPFC_ADD,
+				0, 0, 2, None, None, None, 0, 0,
+				ofpb.ofp_match(ofp.OFPMT_OXM, None, [
+					ofpm.build(None, ofp.OFPXMT_OFB_ETH_TYPE, False, 0, 0x0800, None),
+					ofpm.build(None, ofp.OFPXMT_OFB_IPV4_DST, True, 0, netip(flow_ip, subnet), socket.inet_aton(subnet))
+				]),
+				ofpb.ofp_instruction_actions(ofp.OFPIT_CLEAR_ACTIONS, None, None)
+			)
+		]
+
+		controlSwitch(close_switch, block_messages)
+		controlSwitch(far_switch, block_messages)
+		if ingress_switch is not None:
+			#controlSwitch(ingress_switch, block_messages)
+			updateUpstreamRoute(ingress_switch, ac_prob=1, target_ip=(flow_ip, dest_ip))
 
 	def buildTreeNet(n_teams, team_sarsas=[]):
 		# names of all internal links
@@ -1062,6 +1197,8 @@ def marlExperiment(
 		vertex_map = {}
 		# go from (label, label) -> index into link names
 		link_map = {}
+		# spiffy destinations
+		spiffy_dest_switches = {}
 
 		server = newNamedHost()
 		server_switch = newNamedSwitch()
@@ -1069,30 +1206,59 @@ def marlExperiment(
 
 		port_dict = {}
 
-		core_link = trackedLink(server, server_switch, extras=linkopts_core)#, port_dict=port_dict)
+		# If we're using SPIFFY-like, we need to put an invisible extra 2 nodes between the server switch and
+		# the server (i.e., these do not affect the routing graph).
+		if spiffy_but_bad:
+			close_switch = newNamedSwitch()
+			far_switch = newNamedSwitch()
+			close_switch.controlled = False
+			far_switch.controlled = False
+
+			# this makes the default path across here in port numbers 1 and 2,
+			# and places the TBE link on port 3 for both close/far switches
+			last_hop = trackedLink(server, close_switch, extras=linkopts_core)
+			normal_link = trackedLink(close_switch, far_switch, extras=linkopts_core)
+			core_link = trackedLink(far_switch, server_switch, extras=linkopts_core)
+			tbe_link = trackedLink(close_switch, far_switch, extras=linkopts_core)
+
+			core_links.append(normal_link)
+			core_links.append(tbe_link)
+
+			# Need to prime close/far to do their job
+			mac_of_interest = server.MAC()
+
+			prepSpiffyBridge(close_switch, mac_of_interest)
+			prepSpiffyBridge(far_switch, mac_of_interest)
+			link_name = "{}-eth1".format(close_switch.name)
+		else:
+			core_link = trackedLink(server, server_switch, extras=linkopts_core)#, port_dict=port_dict)
+			core_links.append(core_link)
+
+			link_name = "{}-eth1".format(server_switch.name)
+		monitored_links.append(link_name)
+
 		updateUpstreamRoute(server_switch)
 		assignIP(server)
 		map_link(port_dict, server, server_switch)
 
+		if spiffy_but_bad:
+			spiffy_dest_switches[server.IP()] = (close_switch, far_switch)
 		make_sarsas = len(team_sarsas) == 0
 
 		G = nx.Graph()
 		server_label = ((server.IP(), server.MAC()), None)
 		switch_label = (None, server_switch.dpid)
 		G.add_edge(server_label, switch_label)
-		link_name = "{}-eth1".format(server_switch.name)
 
 		dests.append(server_label)
-		core_links.append(core_link)
 		vertex_map[server_label] = server
 		vertex_map[switch_label] = server_switch
-		monitored_links.append(link_name)
 		link_map[(server_label, switch_label)] = len(monitored_links) - 1
 		link_map[(switch_label, server_label)] = len(monitored_links) - 1
 
 		dest_links[server_label] = [(server_label, switch_label)]
 
-		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map)
+		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map, spiffy_dest_switches)
 
 		teams = []
 		for i in xrange(n_teams):
@@ -1106,7 +1272,7 @@ def marlExperiment(
 			teams.append(t)
 			if make_sarsas: team_sarsas.append(t[-1])
 			new_topol_shape = n_s
-
+		print monitored_links
 		return (server, server_switch, core_link, teams, team_sarsas, G, port_dict, new_topol_shape)
 
 	def buildEcmpNet(n_teams, team_sarsas=[]):
@@ -1126,6 +1292,8 @@ def marlExperiment(
 		vertex_map = {}
 		# go from (label, label) -> index into link names
 		link_map = {}
+		# spiffy destinations
+		spiffy_dest_switches = {}
 
 		# FIXME: allow full offline training again, one day...
 		make_sarsas = True
@@ -1140,12 +1308,12 @@ def marlExperiment(
 			server = newNamedHost()
 			servers.append(server)
 
-		def link_in_new_topol(node1, node2, node1_label, node2_label, critical=False):
+		def link_in_new_topol(node1, node2, node1_label, node2_label, critical=False, override_link_name=None):
 			link_name = "{}{}-eth{}".format(
 				"!" if critical else "",
 				node2.name,
 				len(node2.ports)-1,
-			)
+			) if override_link_name is None else override_link_name
 			index = len(monitored_links)
 
 			vertex_map[node1_label] = node1
@@ -1176,7 +1344,29 @@ def marlExperiment(
 
 			# connect up the edge switch to its intended children
 			for dest in servers[i*e_k_2:min(len(servers), (i+1)*e_k_2)]:
-				core_link = trackedLink(dest, edge_switch, extras=linkopts_core)#, port_dict=port_dict)
+				# same trick as in the other topol: insert some dumb-routed nodes between a server and the real
+				# (routed) part of the network.
+				override_name = None
+				if spiffy_but_bad:
+					# slight issue, "server_switch" doesn't exist in this topol. is it edge_switch?
+					close_switch = newNamedSwitch()
+					far_switch = newNamedSwitch()
+					close_switch.controlled = False
+					far_switch.controlled = False
+
+					# this makes the default path across here in port numbers 0 and 1,
+					# and places the TBE link on port 3 for both close/far switches
+					last_hop = trackedLink(dest, close_switch, extras=linkopts_core)
+					normal_link = trackedLink(close_switch, far_switch, extras=linkopts_core)
+					core_link = trackedLink(far_switch, edge_switch, extras=linkopts_core)
+					tbe_link = trackedLink(close_switch, far_switch, extras=linkopts_core)
+
+					core_links.append(normal_link)
+					core_links.append(tbe_link)
+				else:
+					core_link = trackedLink(dest, edge_switch, extras=linkopts_core)#, port_dict=port_dict)
+					#core_link = trackedLink(server, server_switch, extras=linkopts_core)#, port_dict=port_dict)
+					core_links.append(core_link)
 
 				# can't assign IP without a link...
 				assignIP(dest)
@@ -1187,8 +1377,17 @@ def marlExperiment(
 				map_link(port_dict, dest, edge_switch)
 				switch_label = add_to_graph(server_label, edge_switch)
 
-				core_links.append(core_link)
-				link_in_new_topol(dest, edge_switch, server_label, switch_label)
+				if spiffy_but_bad:
+					mac_of_interest = dest.MAC()
+
+					# Need to prime close/far to do their job
+					prepSpiffyBridge(close_switch, mac_of_interest)
+					prepSpiffyBridge(far_switch, mac_of_interest)
+
+					spiffy_dest_switches[dest.IP()] = (close_switch, far_switch)
+					override_name = "{}-eth1".format(close_switch.name)
+
+				link_in_new_topol(dest, edge_switch, server_label, switch_label, override_link_name=override_name)
 				dest_links[server_label] = [(server_label, switch_label)]
 
 		def normal_link(n1, n2, n1_l, critical=False, link=True, **kw_args):
@@ -1256,7 +1455,7 @@ def marlExperiment(
 					# link node and core
 					normal_link(node, core, (None, node.dpid))
 
-		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map)
+		new_topol_shape = (monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map, spiffy_dest_switches)
 		return (None, edge_nodes[0], None, None, None, G, port_dict, new_topol_shape)
 
 	if topol == "tree":
@@ -1297,7 +1496,7 @@ def marlExperiment(
 		# build the network model...
 		# EVERY TIME, because scorched-earth is the only language mininet speaks
 		(server, server_switch, core_link, teams, team_sarsas, graph, port_dict, new_topol_shape) = buildNet(n_teams, team_sarsas=store_sarsas)
-		(monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map) = new_topol_shape
+		(monitored_links, dests, dest_links, core_links, actors, externals, vertex_map, link_map, spiffy_dest_switches) = new_topol_shape
 
 		dest_from_ip = {}
 		for dest in dests:
@@ -1509,7 +1708,7 @@ def marlExperiment(
 		executeRouteQueue()
 
 		# Spool up the monitoring tool.
-		#print monitored_links
+		print monitored_links
 		mon_cmd = server_switch.popen(
 			["../marl-bwmon/marl-bwmon"]
 			+ (["-s"] if bw_mon_socketed else [])
@@ -1911,32 +2110,44 @@ def marlExperiment(
 				# then delete from the first two tables
 				to_delete = []
 
-				for ip in spiffy_measurements[0]:
-					(rate, timestamp, unlimited, node) = spiffy_measurements[0][ip]
+				# ip_pair = (src_ip, dst_ip)
+				inspect = False # TEMP
+				for ip_pair in spiffy_measurements[0]:
+					(src_ip, dst_ip) = ip_pair
+					(rate, timestamp, unlimited, node) = spiffy_measurements[0][ip_pair]
 					if not unlimited:
 						unlimited = True
-						updateUpstreamRoute(node, ac_prob=0, target_ip=ip)
+						#updateUpstreamRoute(node, ac_prob=0, target_ip=ip)
+						# Note: I only have source ip here?
+						isolateSpiffyFlow(spiffy_dest_switches, src_ip, dst_ip)
 
-					if curr_time - timestamp >= spiffy_act_time and ip in spiffy_measurements[1]:
-						curr_rate = spiffy_measurements[1][ip]
+					if curr_time - timestamp >= spiffy_act_time and ip_pair in spiffy_measurements[1]:
+						curr_rate = spiffy_measurements[1][ip_pair]
+						# FIXME: needs to stack up against some notion of expected tbe. 
 						tbe = float(curr_rate)/max(float(rate), 0.0001)
-						bad_flow = tbe < 1/(1-spiffy_drop_rate)
-						spiffy_verdict[ip] = bad_flow
+						bad_flow = tbe < spiffy_expansion_factor#1/(1-spiffy_drop_rate)
+						spiffy_verdict[ip_pair] = bad_flow
 
+						okaySpiffyFlow(spiffy_dest_switches, src_ip, dst_ip)
 						if bad_flow:
-							updateUpstreamRoute(node, ac_prob=1, target_ip=ip)
+							#updateUpstreamRoute(node, ac_prob=1, target_ip=ip)
+							blockSpiffyFlow(spiffy_dest_switches, src_ip, dst_ip, ingress_switch=node)
 
-						to_delete.append(ip)
-						print ip, rate, curr_rate, tbe, 1/(1-spiffy_drop_rate), bad_flow, "should have been", (ip%2 == 1)
+						to_delete.append(ip_pair)
+						print socket.inet_ntoa(struct.pack("I", src_ip)), rate, curr_rate, tbe, spiffy_expansion_factor, bad_flow, "should have been", (src_ip%2 == 1)
+						#inspect = True
 					else:
-						spiffy_measurements[0][ip] = (rate, timestamp, unlimited, node)
+						spiffy_measurements[0][ip_pair] = (rate, timestamp, unlimited, node)
+
+				if inspect:
+					net.interact()
 
 				for ip in to_delete:
-					for el in spiffy_measurements:
+					for el_i, el in enumerate(spiffy_measurements):
 						if ip in el:
 							del el[ip]
 
-			if i == 100:
+			if i == 1000:
 				#net.interact()
 				#quit()
 				pass
@@ -2248,10 +2459,27 @@ def marlExperiment(
 							if spiffy_but_bad:
 								# if already under scrutiny or if there's enough space to add, then (maybe) act
 								# also, don't act if we already made a verdict...
-								total_s_bw = observed_rate_in + observed_rate_out
+								total_s_bw = observed_rate_in #+ observed_rate_out
+								if spiffy_traffic_dir == "out":
+									total_s_bw = observed_rate_out
+								elif spiffy_traffic_dir == "inout":
+									total_s_bw += observed_rate_out
+								#print "spiffy says", ip_pair, "is pushing", (observed_rate_in, observed_rate_out), total_s_bw
+
+								# don't apply this to flows under a certain traffic rate? Pick a sensible threshold
+								if spiffy_mbps_cutoff is not None and total_s_bw < spiffy_mbps_cutoff and total_s_bw > 0.0:
+									#pass
+									spiffy_verdict[ip_pair] = False
+									#print "spiffy pardoned flow [small]", ip_pair
+
+								expt_count = max(spiffy_min_experiments, min(spiffy_max_experiments, int(spiffy_pick_prob * float(len(flows_seen)))))
+								#print "aiming to run:", expt_count, "have:", len(spiffy_measurements[0])
+
+								# FIXME: make this limit apply per-destination...
 								if ip_pair in spiffy_measurements[0]:
 									spiffy_measurements[1][ip_pair] = total_s_bw
-								elif ip_pair not in spiffy_verdict and len(spiffy_measurements[0]) < spiffy_max_experiments and np.random.random() < spiffy_pick_prob:
+								elif ip_pair not in spiffy_verdict and total_s_bw > 0.0 and len(spiffy_measurements[0]) < expt_count and np.random.random() < spiffy_pick_prob:
+									print "spiffy observing flow", ip_pair
 									spiffy_measurements[0][ip_pair] = (total_s_bw, time.time(), False, node)
 
 					# FIXME: ensure that all the code if prepared to take ip_pair, NOT ip.
