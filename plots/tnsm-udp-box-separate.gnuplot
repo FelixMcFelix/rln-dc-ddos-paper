@@ -26,19 +26,23 @@ set datafile separator ","
 set ylabel "Ratio Legit Traffic Preserved"
 
 set yrange [0.0:1.0]
-set xrange [-1.0:14.5]
-set xtics ("Marl" 0.0, \
-	"Instant" 1.0, \
-	"Guarded" 2.0, \
-	"Marl" 4.0, \
-	"Instant" 5.0, \
-	"Guarded" 6.0, \
-	"Marl" 8.0, \
-	"Instant" 9.0, \
-	"Guarded" 10.0, \
-	"Marl" 12.0, \
-	"Instant" 13.0, \
-	"Guarded " 14.0, \
+set xrange [-1.0:19.5]
+set xtics ("SPIFFY" 0.0, \
+	"Marl" 1.0, \
+	"Instant" 2.0, \
+	"Guarded" 3.0, \
+	"SPIFFY" 5.0, \
+	"Marl" 6.0, \
+	"Instant" 7.0, \
+	"Guarded" 8.0, \
+	"SPIFFY" 10.0, \
+	"Marl" 11.0, \
+	"Instant" 12.0, \
+	"Guarded" 13.0, \
+	"SPIFFY" 15.0, \
+	"Marl" 16.0, \
+	"Instant" 17.0, \
+	"Guarded " 18.0, \
 	) scale 0.0
 #set key inside bottom right
 set boxwidth 1
@@ -50,17 +54,21 @@ set label "$n=4$" at graph 0.317,-0.22
 set label "$n=8$" at graph 0.573,-0.22
 set label "$n=16$" at graph 0.83,-0.22
 
-plot '../results/tnsm-tree-2-opus-m-separate.avg.csv' u (0.0):3:(1.0) ls 1 ps .1, \
-     '../results/tnsm-tree-2-opus-mpp-separate.avg.csv' u (1.0):3:(1.0) ls 1 ps .1, \
-     '../results/tnsm-tree-2-opus-spf-separate.avg.csv' u (2.0):3:(1.0) ls 1 ps .1, \
-     '../results/tnsm-tree-4-opus-m-separate.avg.csv' u (4.0):3:(1.0) ls 3 ps .1, \
-     '../results/tnsm-tree-4-opus-mpp-separate.avg.csv' u (5.0):3:(1.0) ls 3 ps .1, \
-     '../results/tnsm-tree-4-opus-spf-separate.avg.csv' u (6.0):3:(1.0) ls 3 ps .1, \
-     '../results/tnsm-tree-8-opus-m-separate.avg.csv' u (8.0):3:(1.0) ls 5 ps .1, \
-     '../results/tnsm-tree-8-opus-mpp-separate.avg.csv' u (9.0):3:(1.0) ls 5 ps .1, \
-     '../results/tnsm-tree-8-opus-spf-separate.avg.csv' u (10.0):3:(1.0) ls 5 ps .1, \
-     '../results/tnsm-tree-16-opus-m-separate.avg.csv' u (12.0):3:(1.0) ls 7 ps .1, \
-     '../results/tnsm-tree-16-opus-mpp-separate.avg.csv' u (13.0):3:(1.0) ls 7 ps .1, \
-     '../results/tnsm-tree-16-opus-spf-separate.avg.csv' u (14.0):3:(1.0) ls 7 ps .1, \
+plot '../results/tnsm-tree-2-opus-spiffy-separate.avg.csv' u (0.0):3:(1.0) ls 1 ps .1, \
+     '../results/tnsm-tree-2-opus-m-separate.avg.csv' u (1.0):3:(1.0) ls 1 ps .1, \
+     '../results/tnsm-tree-2-opus-mpp-separate.avg.csv' u (2.0):3:(1.0) ls 1 ps .1, \
+     '../results/tnsm-tree-2-opus-spf-separate.avg.csv' u (3.0):3:(1.0) ls 1 ps .1, \
+     '../results/tnsm-tree-4-opus-spiffy-separate.avg.csv' u (5.0):3:(1.0) ls 3 ps .1, \
+     '../results/tnsm-tree-4-opus-m-separate.avg.csv' u (6.0):3:(1.0) ls 3 ps .1, \
+     '../results/tnsm-tree-4-opus-mpp-separate.avg.csv' u (7.0):3:(1.0) ls 3 ps .1, \
+     '../results/tnsm-tree-4-opus-spf-separate.avg.csv' u (8.0):3:(1.0) ls 3 ps .1, \
+     '../results/tnsm-tree-8-opus-spiffy-separate.avg.csv' u (10.0):3:(1.0) ls 5 ps .1, \
+     '../results/tnsm-tree-8-opus-m-separate.avg.csv' u (11.0):3:(1.0) ls 5 ps .1, \
+     '../results/tnsm-tree-8-opus-mpp-separate.avg.csv' u (12.0):3:(1.0) ls 5 ps .1, \
+     '../results/tnsm-tree-8-opus-spf-separate.avg.csv' u (13.0):3:(1.0) ls 5 ps .1, \
+     '../results/tnsm-tree-16-opus-spiffy-separate.avg.csv' u (15.0):3:(1.0) ls 7 ps .1, \
+     '../results/tnsm-tree-16-opus-m-separate.avg.csv' u (16.0):3:(1.0) ls 7 ps .1, \
+     '../results/tnsm-tree-16-opus-mpp-separate.avg.csv' u (17.0):3:(1.0) ls 7 ps .1, \
+     '../results/tnsm-tree-16-opus-spf-separate.avg.csv' u (18.0):3:(1.0) ls 7 ps .1, \
 
 set out
