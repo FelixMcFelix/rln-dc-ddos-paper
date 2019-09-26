@@ -283,7 +283,7 @@ All of these factors greatly inflate the difficulty of the detection problem.
 
 %?? Make it clearer here what problem I specifically want to solve: principally a particular class of DDoS attacks; volume-based DDoS attacks. Amplification attacks are just a specialisation, this can be made more obvious. I think I need to be clearer about the \emph{intended deployment environment} of service hosts (i.e., not ISPs).
 
-For certain classes of problem e.g., volume-based \emph{distributed denial of service} (DDoS) attacks, \emph{reinforcement learning} (RL) offers another perspective.
+For certain classes of problem e.g., volumetric \emph{distributed denial of service} (DDoS) attacks, \emph{reinforcement learning} (RL) offers another perspective.
 %?? Unclear explanation of RL here?
 RL agents operate by following a \emph{policy} to interact with or control a system, while at the same time using observed performance metrics and deliberate exploration to dynamically improve this policy.
 In this way the role of a RL agent differs from that of a standard classifier, adaptively reacting to threats by assuming the role of a feedback loop for network optimisation, typically to safeguard service guarantees.
@@ -825,7 +825,7 @@ We found the setting $\gamma = 0.8$ to be the most effective choice for this hyp
 Our mode of action means that each agent is in control of pushback \cite{DBLP:journals/ccr/MahajanBFIPS02a}, and so carries a risk of introducing collateral damage into the network.
 This is particularly severe when handling TCP traffic: the Mathis equation \cite{DBLP:journals/ccr/MathisSMO97} states that TCP bandwidth is proportional to $1/\sqrt{p}$ (noting that $p$ is nonzero in any real network) while constant bitrate (CBR) UDP traffic is proportional to $1 - p$.
 %It's worth noting that there are various ways that this could be implemented, and that the application of \emph{programmable data planes} to this end are suggested as future work.
-This weakness still presents itself in modern flavours of TCP, such as TCP Cubic which in turn has bandwidth proportional to $1/p^{0.75}$ \cite{rfc8312}.
+This weakness is still present in modern TCP flavours, such as TCP Cubic which in turn has bandwidth proportional to $1/p^{0.75}$ \cite{rfc8312}.
 This is of particular importance due to the prevalence of TCP and other congestion-aware protocols within the Internet.
 Our own analysis of CAIDA datasets \cite{caida-2018-passive} shows that congestion-aware traffic makes up at least \SIrange{73}{82}{\percent} of packets, corresponding to \SIrange{77}{84}{\percent} of data volume\footnote{\url{https://github.com/FelixMcFelix/caida-stats}}.
 QUIC, a future congestion-aware protocol, comprises \SIrange{2.6}{9.1}{\percent} of traffic observed on backbone links, depending on location and typical workload \cite{DBLP:conf/pam/RuthPDH18}.
@@ -1344,7 +1344,7 @@ Our new agent designs become more effective as $n$ increases, while Marl's effec
 		The longer tails of outliers typically indicate the longer training time the new models require---we observe that \emph{Guarded} typically has considerably lower variance once it has converged on a stable policy.
 		\label{fig:tcp-tree-box}
 	}
-\vspace{-0.5cm}
+\vspace{-0.6cm}
 \end{figure}
 %\begin{figure}
 %	\centering
@@ -1358,9 +1358,9 @@ Our new agent designs become more effective as $n$ increases, while Marl's effec
 %\end{figure}
 \begin{figure}
 	\centering
-	\vspace{-0.6cm}
+	\vspace{-0.8cm}
 	\includegraphics[width=0.75\linewidth]{../plots/tnsm-tcp-16-single}
-	\vspace{-0.3cm}
+	\vspace{-0.35cm}
 	\caption{
 		Online performance of standard and single-agent models in a single-destination network with $n=16$ hosts per egress point, HTTP traffic.
 		At this level of host density, \emph{Guarded} reaches higher peak performance sooner and is considerably more consistent throughout the episode.
@@ -1369,7 +1369,7 @@ Our new agent designs become more effective as $n$ increases, while Marl's effec
 %		With a single agent, Marl++ shows worse performance, while SPF improves significantly and continues to learn well past annealing $\epsilon \rightarrow 0$.
 		\label{fig:tcp-tree-16}
 	}
-\vspace{-0.5cm}
+%\vspace{-0.5cm}
 \end{figure}
 
 %\begin{figure}
@@ -1542,8 +1542,8 @@ The only necessary change for such a scenario is that a load measurement which h
 
 %?? Is the state space interpretable? Yes!
 Machine learning algorithms have earned a reputation for eluding human interpretation, while being vulnerable to evasion and poisoning.
-Given the risks associated with introducing such techniques in the context of security, it is natural to be concerned with the interpretability of the models we have proposed.
-With the exception of global state, the tile-coding parameters we make use of ensure that the set of all outputs for each new feature we add is relatively enumerable: for $n$ tilings and $c$ tiles per dimension there are $nc^{\dim{f}}$ individual action value vectors per feature $f$ (\num{48} for the new features we introduce, \num{10368} for global state), though considerably more combinations thereof ($c^{n \cdot \dim{f}}$).
+Given the security risks associated with introducing such techniques, it is natural to be concerned with the interpretability of the models we have proposed.
+With the exception of global state, the tile coding parameters we make use of ensure that the set of outputs for each feature we add is relatively enumerable: for $n$ tilings and $c$ tiles per dimension there are $nc^{\dim{f}}$ individual action value vectors per feature $f$ (\num{48} for the new features we introduce, \num{10368} for global state), though considerably more combinations thereof ($c^{n \cdot \dim{f}}$).
 %\Cref{fig:intern-16-tcp-iat,fig:intern-16-tcp-something} show how we may visualise the portion of a policy for each feature, and describe what information can be gained from doing so.
 Furthermore, system state which is dependent on many signals drawn from across a wide network (such as our global state) is difficult to exert precise control over.
 These signals' topological separation, in concert with their burstiness and unpredictability, may have substantial effects on an attacker's capabilities.
@@ -1603,12 +1603,10 @@ Our results show that their technique underperforms at high host density and whe
 A weakness of their approach is that computing a route to measure bandwidth expansion on real networks can be costly (up to \SI{14}{\second} for the Cogent topology), and that the low expansion factors in real network can require more ``rounds'' of filtering.
 \cbstart
 By contrast, our approach takes a constant time to compute an action for a flow regardless of topology size.
-Their assumptions about traffic response to such bandwidth expansion do not hold for constant bitrate flows (e.g., VoIP) and may not extend to HTTP DASH flows, both of which make up a sizeable proportion of network traffic.
-\cbend
+Their assumptions about traffic response to such bandwidth expansion do not hold for constant bitrate flows (e.g., VoIP) and may not extend to HTTP DASH flows, both of which make up a sizeable proportion of network \cbend traffic.
 
 \emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} is a generalised SDN framework for intrusion detection, but has shown the use of a \emph{k-nearest neighbours} classifier to detect individual attack flows.
 Although heavyweight (and proven to be effective compared with \textcite{DBLP:conf/lcn/BragaMP10}), their comparison against SPIFFY lacks the quantitative evidence required to understand how the system compares.
-
 \Textcite{DBLP:conf/sp/SmithS18} use AS-level routing to tackle both transit-link and flooding-based attacks.
 This view is taken due to the perceived cost of per-stream classification and inherent sensitivity to adversarial examples.
 The approach is creative, relying upon BGP \emph{fraudulent route reverse poisoning} to preserve traffic to a target AS, but unlike SPIFFY the approach doesn't actually \emph{remove} the congestion.
@@ -1624,19 +1622,17 @@ For categorising how RL fits into solving problems, we label works as direct- or
 A \emph{direct-control} RL problem is one where the RL agent(s) learn optimal control over a set of actions as the \emph{primary} defence or decision-maker---requiring measurements, reward functions and action sets tailored for this purpose.
 %We feel there is a shortage of work in this category at present, at least in the field of networks.
 To date, the best-fitting example we have encountered is that of \textcite{DBLP:journals/eaai/MalialisK15}.
-
 An \emph{indirect-control} RL problem is one where agents act in service to \emph{another technique} responsible for decision-making, optimising or generalising aspects of its operation beyond that of hand-coded heuristics.
-A past example includes learning when best to \emph{communicate} and share knowledge between \emph{hidden Markov model} anomaly detectors \cite{DBLP:conf/paisi/XuSH07}.
+A past example includes learning when best to share knowledge between \emph{hidden Markov model} anomaly detectors \cite{DBLP:conf/paisi/XuSH07}.
 %The position of this work is weakened by its reliance on the problematic `DARPA99' dataset \cite{DARPA-IDD, DBLP:conf/cisda/TavallaeeBLG09, DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
 This work is weakened by its reliance on the problematic `DARPA99' dataset \cite{DBLP:conf/sp/SommerP10}, but the idea itself is well-treated.
-Outside of intrusion detection, there has been growing interest in the use of RL in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for resource-constrained process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
-Work by \textcite{DBLP:conf/sigcomm/MaoNA17} employs client-side observations of network state and video performance to optimise adaptive bitrate selection for multimedia streaming by RL methods.
-
+Outside of intrusion detection, there has been growing interest in the use of RL in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and resource-constrained process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
+\textcite{DBLP:conf/sigcomm/MaoNA17} employ client-side observations of network state and video performance with RL to optimise bitrate selection for multimedia streaming.
 \emph{AuTO} \cite{DBLP:conf/sigcomm/ChenL0L18} employs deep RL to perform traffic optimisation.
 Crucially, they find that the vast majority of flows are short-lived, requiring effective decisions in less than a millisecond.
 To overcome the high latency of action computation via a neural network, two agents are trained, handling aspects of short and long flows respectively.
-The first learns to optimise the flow size thresholds which define priority allocation at each switch (and accordingly learn how best to demarcate long and short flows); these short flows are routed by ECMP.
-The second agent makes bespoke decisions about routing, prioritisation etc.\ for each of the remaining long flows, who are likely to live long enough that any actions will have a significant impact.
+The first learns to optimise the flow size thresholds to demarcate long and short flows; these short flows are routed by ECMP.
+The second agent makes bespoke decisions about routing, prioritisation etc.\ for each of the remaining long flows.
 
 %These works emphasise the necessity of ingenuity in effectively handling how states and actions are represented.
 
@@ -1660,7 +1656,7 @@ Simulation is the most likely avenue for such evaluation.
 %?? IDEA: try out average reward, TD($\lambda$) methods as future work...
 %A natural research direction to enhance this work would be the combination of the classic function approximation techniques we make use of alongside the improved algorithms that the RL community has introduced in the past few years.
 %Actor-critic methods, or algorithms based on eligibility traces are good candidates for investigation. 
-The remaining weaknesses invite many further improvements worth investigation.
+The remaining weaknesses invite many improvements worth investigation.
 %?? What might we do for a reward function in the absence of heuristic estimates and/or explicit a priori knowledge? I think a good candidate is the sum of up and down throughputs (normalised by capacity sum), so long as \emph{neither exceeds the link capacity}. We can extend the team-based formulations similarly. This, in theory, promotes traffic diversity since it's not like flooding-based DDoS attacks are going to submit meaningful work to a server. The intuition, I suppose, is that certain classes of flow will have a small footprint in one direction which causes a sizeable increase in the other! Alternatively, monitor the health of canary flows which cross the team boundary (i.e. only one in-out link).
 A problem we raised (without a clear solution) was the design of reward functions which do not rely upon heuristic estimates or a priori knowledge of benign traffic content.
 If true online learning is desired (i.e., coping with a non-stationary environment), then such reward functions are sorely needed.
@@ -1698,7 +1694,7 @@ This work was supported in part by the Engineering and Physical Sciences Researc
 
 \renewcommand*{\bibfont}{\footnotesize}
 \printbibliography
-\enlargethispage{1cm}
+%\enlargethispage{-1cm}
 \vspace{-1.1cm}
 \vskip -6pt plus -1fil
 \begin{IEEEbiography}
@@ -1712,7 +1708,7 @@ This work was supported in part by the Engineering and Physical Sciences Researc
 \vskip 0pt plus -1fil
 \begin{IEEEbiography}
 	[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{authorpics/sdr}}]{Simon Rogers}
-	received the PhD degree from University of Bristol in 2006. Now he is a Senior Lecturer in the School of Computing Science at the University of Glasgow. Before starting a permanent  post in Glasgow he did a couple of Post Doctoral positions (under Mark Girolami).
+	received the PhD degree from University of Bristol in 2006. Now he is a Senior Lecturer in the School of Computing Science at the University of Glasgow. Before starting a permanent post in Glasgow he did a couple of Post Doctoral positions (under Mark Girolami).
 	
 	Dr.\ Simon Rogers’s research involves the development of machine learning and statistical techniques to help with the analysis of complex datasets, particularly within the field of metabolomics, human-computer interaction and information retrieval.
 \end{IEEEbiography}
