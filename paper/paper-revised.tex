@@ -276,9 +276,9 @@ This issue is inherent to \emph{misuse-} or \emph{signature-based} intrusion det
 
 While \emph{machine learning} (ML) approaches seem like a sensible fit for this problem, in \citeyear{DBLP:conf/sp/SommerP10} \citeauthor{DBLP:conf/sp/SommerP10} identified the `failure to launch' of ML-based anomaly detection systems---a distinct lack of real-world system deployments \cite{DBLP:conf/sp/SommerP10}.
 To quite a large extent, this remains the case today.
-These authors posit that their application is made difficult due to significant operational differences from standard ML tasks, including: the high cost of errors and extraordinarily low tolerance for false positives inherent to network intrusion detection \cite{DBLP:conf/ccs/Axelsson99}; a general lack of recent, openly available (and high-quality) training data; and diversity of network traffic across varying timescales combined with significant burstiness \cite{DBLP:journals/ccr/LelandWTW95}.
-Above the aggregate level, the constant deployment of new services and new protocols means that traffic is \emph{non-stationary} and displays an evolving notion of normality.
-Learning is made harder still by the challenges encountered when learning from unlabelled (often partial) data.
+They posit that their use is made difficult due to significant operational differences from standard ML tasks, including: the high cost of errors and extraordinarily low tolerance for false positives inherent to network intrusion detection \cite{DBLP:conf/ccs/Axelsson99}; a general lack of recent, openly available (and high-quality) training data; and diversity of network traffic across varying timescales combined with significant burstiness \cite{DBLP:journals/ccr/LelandWTW95}.
+Above the aggregate level, the constant deployment of new services and protocols means that traffic is \emph{non-stationary} and displays an evolving notion of normality.
+Learning is made harder still by the challenges encountered with unlabelled (often partial) data.
 All of these factors greatly inflate the difficulty of the detection problem.
 
 %?? Make it clearer here what problem I specifically want to solve: principally a particular class of DDoS attacks; volume-based DDoS attacks. Amplification attacks are just a specialisation, this can be made more obvious. I think I need to be clearer about the \emph{intended deployment environment} of service hosts (i.e., not ISPs).
@@ -339,11 +339,11 @@ Malicious hosts send many small requests, spoofed to appear as though they origi
 \emph{Transit-link/link-flooding attacks} have been the subject of recent attention, wherein malicious traffic is forwarded across core links needed to reach a target (but not to the target itself) \cite{DBLP:conf/sp/KangLG13, DBLP:conf/esorics/StuderP09}.
 
 \subsection{Reinforcement Learning}\label{sec:reinforcement-learning}
-\emph{Reinforcement learning} (RL) is a variant of machine learning principally concerned with training an agent to choose an optimal sequence of actions in the pursuit of a given task \cite{RL2E}.
-We assume the agent has a certain amount of knowledge whenever a decision must be made: at any point in time $t$, it knows which \emph{state} it is in ($S_t \in \mathcal{S}$), the set of \emph{actions} which are available to it ($\operatorname{A}(S_t) \subseteq \mathcal{A}$) and, if available, a numeric \emph{reward} obtained from the last action chosen ($R_t \in \mathbb{R}, A_{t-1} \in \operatorname{A}(S_{t-1})$).
-This model of system interaction is best described as a \emph{Markov Decision Process} (MDP).
+\emph{Reinforcement learning} (RL) is a variant of machine learning principally concerned with training an agent to choose an optimal sequence of actions in pursuit of a given task \cite{RL2E}.
+We assume the agent has a certain amount of knowledge whenever a decision must be made: at any point in time $t$, it knows which \emph{state} it is in ($S_t \in \mathcal{S}$), the set of \emph{actions} which are available to it ($\operatorname{A}(S_t) \subseteq \mathcal{A}$) and a numeric \emph{reward} obtained from the last action chosen ($R_t \in \mathbb{R}, A_{t-1} \in \operatorname{A}(S_{t-1})$).
+This model of system interaction is a \emph{Markov Decision Process} (MDP).
 RL methods combine this information with a current \emph{policy} $\pi$ to determine which action should be taken: such a choice need not be optimal if an agent needs to further explore some region of the state space.
-The policy is then further refined by updating value estimates for state-action pairs or via policy gradient methods, meaning that RL-based approaches learn adaptively and online if reward functions are available in the environment they are deployed in.
+The policy is refined by updating value estimates for state-action pairs or via policy gradient methods, meaning that RL-based approaches learn adaptively and online if reward functions are available in the environment they are deployed in.
 In practice, this means that agents are able to automatically adapt to evolving problems without operator intervention or a new, custom-built training corpus.
 
 From any point in a sequence of decisions, we may describe the sum of rewards yet to come as the \emph{discounted return}, $G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \ldots$, choosing the discount factor $\gamma \in [0,1)$ to determine how crucial future rewards are vis-\`{a}-vis the current state.
@@ -920,8 +920,8 @@ Naturally, this implies that an agent must carry work forward (and coalesce stat
 \vspace{-0.6cm}
 \end{figure}
 
-The main element required to move to a per-source model is a feature set which offers high predictive power, so that behavioural differences are apparent to an agent.
-Elaborating further on the statistics discussed in \cref{sec:motivation} which others have shown to be effective, we believe the following features to be useful (and humanly justifiable), and offer an investigation into their use alongside different traffic types:
+The main element required by a per-source model is a feature set with high predictive power, so that behavioural differences are apparent to an agent.
+Elaborating on the statistics discussed in \cref{sec:motivation} which others have shown to be effective, we believe the following features to be useful (and humanly justifiable), and investigate their use alongside different traffic types:
 %?? We use these features, and why...
 
 \fakepara{Global state}
@@ -929,9 +929,9 @@ This is the vector of load measurements along a flow's path introduced in \cref{
 These values indicate the overall health of the network, and crucially are all measurements which an agent directly controls.
 
 \fakepara{Source IP address}
-While ordinarily trivial to spoof (and thus of limited use for many classes of attack), reflectors are themselves legitimate services being abused by spoofing attackers.
+While trivial to spoof (and thus of limited use for many classes of attack), reflectors are themselves legitimate services being abused by spoofing attackers.
 As a result, they communicate with attack victims using their own IP address.
-In real-world scenarios the addresses of a set of reflector nodes might exhibit similarity due to network uncleanliness \cite{DBLP:conf/imc/CollinsSFJWSK07}, e.g., similarly unhardened services exposed by a single organisation.
+In real-world scenarios the addresses of reflector nodes might exhibit similarity due to network uncleanliness \cite{DBLP:conf/imc/CollinsSFJWSK07}, e.g., unhardened services exposed by a single organisation.
 
 \fakepara{Last action taken}
 This encodes an agent's current belief in the maliciousness of a flow.
@@ -992,10 +992,10 @@ Our aim was to design around this constraint as a form of future-proofing.
 \end{table}
 
 All of the above features, save for global state, are 1-dimensional.
-\Cref{fig:udp-feature-plots} shows the effectiveness of each feature for UDP (resp.\ \cref{fig:tcp-cap-feature-plots} for TCP), using a single-destination topology (\cref{sec:single-dest}) with $n=2$ hosts per egress point averaged over 10 episodes.
-\Cref{fig:tcp-laf-feature-plots} demonstrates how feature accuracy varies when tiled alongside \emph{last action}, with similar trends being observed when the same technique is applied with UDP traffic (omitted).
+\Cref{fig:udp-feature-plots} shows the effectiveness of each feature for UDP (resp.\ \cref{fig:tcp-cap-feature-plots} for TCP), on a single-destination topology (\cref{sec:single-dest}) with $n=2$ hosts per egress point averaged over 10 runs.
+\Cref{fig:tcp-laf-feature-plots} demonstrates how feature accuracy varies when tiled alongside \emph{last action}, with similar trends observed when applied to UDP traffic (omitted).
 %?? Core findings---different protocols need different features, so everything we proposed above has a use!
-The plots demonstrate that different protocols and traffic classes are best defended by different features---as such, every feature presented has value in a complete model.
+The plots show that different protocols and traffic classes are best defended by different features---as such, every feature presented has value in a complete model.
 All features converge to their highest-observed performance within around \num{4000} timesteps.
 In general, some of the most effective features are the global state, mean IAT, mean inbound packet size and $\Delta$ rates.
 %?? How do they do when combined after individual training? Pretty well, especially for TCP.
@@ -1077,12 +1077,12 @@ We compare our work most naturally against MARL, introduced by \textcite{DBLP:jo
 We are most interested in seeing how their approach contrasts with ours across different topologies and workloads.
 Different network environments will also impose different levels of host density, where popular web servers may have orders of magnitude more clients than egress points from their network---we aim to see how these characteristics affect performance and learning rate.
 \cbstart
-Marl is already known to outperform the AIMD \cite{DBLP:journals/ton/YauLLY05} approach to DDoS mitigation, although the state of the art has long since moved on.
-To paint a more current picture, we compare our work against an effective modern-day approach, SPIFFY \cite{DBLP:conf/ndss/KangGS16}.
-SPIFFY tests a proportion of flows by routing them through an alternate path with higher bandwidth, and observing how their speed has changed some time later.
-We compare ourselves against this approach to position our new RL agent designs against the modern state of the art, observing that SPIFFY has a similar mode of interaction to RL-based systems (taking action, observing an effect, and acting once again) and does not rely on protocol characteristics or signatures.
+Marl is known to outperform the AIMD \cite{DBLP:journals/ton/YauLLY05} strategy, yet the state of the art has long since moved on.
+To paint a more current picture, we compare our work against an effective modern approach, SPIFFY \cite{DBLP:conf/ndss/KangGS16}.
+SPIFFY tests a proportion of flows by routing them through an alternate path with higher bandwidth, observing how their speed changes some time later.
+This comparison lets us position our new agent designs against the state of the art, observing that SPIFFY has a similar mode of interaction to RL-based systems (taking action, observing an effect, and acting once again) and does not rely on protocol characteristics or signatures.
 We make the simplifying assumption that a suitable unused path exists (with identical bandwidth to the server's link).
-We test \SI{10}{\percent} of active flows at a time (according to the authors' observation that there is a factor of \num{10} difference between the ideal and achieved bandwidth expansion factor), excluding flows below \SI{50}{\kilo\bit\per\second} and requiring a \SI{3}{$\times$} bandwidth expansion from legitimate flows, making a judgement after \cbend \SI{5}{\second}.
+We test \SI{10}{\percent} of active flows at a time (according to the authors' observation that there is a factor of \num{10} difference between the ideal and achieved bandwidth expansion), excluding flows below \SI{50}{\kilo\bit\per\second} and requiring a \SI{3}{$\! \times$} expansion from legitimate flows, making a judgement after \cbend \SI{5}{\second}.
 
 To test this, we made use of both traffic models introduced in \cref{sec:a-new-normal} (OPUS and TCP), both topologies discussed below (1-dest vs Fat-Tree), and vary the amount of hosts typically communicating over each agent's ingress/egress node.
 Additionally, we evaluated our new models in multi-agent mode (\emph{separate}, no model sharing), and in single-agent mode (\emph{single}, 0-cost perfect information sharing).
@@ -1229,7 +1229,7 @@ Several plots augment this, illustrating peak performance or the amount of time 
 		\expandableinput ../tables/tnsm-ecmp-avg-reward-spiffy.tex
 	}
 	\cbend
-\vspace{-0.25cm}
+\vspace{-0.5cm}
 \end{table}
 
 \subsection{Congestion-unaware traffic}
@@ -1339,8 +1339,8 @@ Our new agent designs become more effective as $n$ increases, while Marl's effec
 	\vspace{-0.3cm}
 	\caption{
 		Online performance for HTTP benign traffic in a single-destination network, single-agent mode.
-		\emph{Instant} and \emph{Guarded} exhibit essentially identical efficacy at $n~=~2$, protecting less traffic than Marl.
-		Only \emph{Guarded}'s performance rapidly increases with $n$, achieving considerably better median performance and lower variance than the other models.
+		\emph{Instant} and \emph{Guarded} exhibit similar efficacy at $n=2$, protecting less traffic than Marl.
+		Only \emph{Guarded}'s performance rapidly increases with $n$, achieving a considerably better median and lower variance than the other models.
 		The longer tails of outliers typically indicate the longer training time the new models require---we observe that \emph{Guarded} typically has considerably lower variance once it has converged on a stable policy.
 		\label{fig:tcp-tree-box}
 	}
@@ -1572,15 +1572,15 @@ We expect that agents will be able to share policies for all features, which may
 Regardless, it will take longer to achieve enough state-state transitions to converge on a good policy.
 
 \cbstart
-One limit of SDN-capable hardware is that OpenFlow rules occupy \SI{6}{$\! \times$} the space of traditional rules---the cost of TCAM mean that commercial switches only have space for \SIrange{2}{20}{\kilo} rules \cite{DBLP:journals/comsur/NguyenSBT16}.
-Our approach consumes a rule for each active flow (i.e., the host density), and by the end of an experiment a switch may have accrued around \num{900} rules.
-While we use a default action as a fallback to maintain connectivity, eviction of high-value decisions (those which filter the highest-bandwidth attackers) poses a significant risk.
-Given that most flows are small (with the majority of bytes coming from a few large ``heavy-hitters'') \cite{DBLP:journals/ccr/PanBPS03}, it may suffice to only apply RL-based analysis to larger flows.
+One limit of SDN-capable hardware is that OpenFlow rules occupy \SI{6}{$\! \times$} the space of standard rules---commercial switches only have TCAM space for \SIrange{2}{20}{\kilo} rules \cite{DBLP:journals/comsur/NguyenSBT16}.
+Our approach consumes a rule for each active flow (the host density), and by the end of an experiment a switch can accrue around \num{900} rules.
+While we use a default fallback action to maintain connectivity, eviction of high-value decisions which filter high-bandwidth attackers poses a significant risk.
+Given that most flows are small (with the majority of bytes coming from a few ``heavy-hitters'') \cite{DBLP:journals/ccr/PanBPS03}, it may suffice to only apply RL-based analysis to larger flows.
 %?? What could we do in the meantime? I propose manually assigning elephant flows a high importance rule, while increasing the importance of "block" decisions even higher.
 OpenFlow rules have an \emph{importance}, controlling which rules may be evicted by a new entry (preventing entries from evicting those with higher importance).
 If an agent is to act on all flows, a solution is to assign an importance of 0 to mice flows, 1 to elephant flows, and 2 to total filtering (leaving agents to time out and remove elephant flow rules to prevent bloat).
 Given the high churn and prevalence of mice flows, eviction here is most likely to affect flows which are complete.
-In both cases, extra rules can be made available by upgrading rules which completely filter a flow into an upstream blackholing request (as in collaborative approaches \cite{DBLP:conf/acsac/RamanathanMYZ18}), having the agent remove this rule once blackholing is active.
+In both cases, extra rules can be made available by upgrading rules which completely filter a flow into upstream blackholing (as in collaborative approaches \cite{DBLP:conf/acsac/RamanathanMYZ18}), having the agent remove this rule once blackholing is active.
 \cbend
 
 \section{Related Work}\label{sec:related-work}
@@ -1588,8 +1588,8 @@ In both cases, extra rules can be made available by upgrading rules which comple
 %?? Try and compare my work here when possible?
 
 \fakepara{DDoS Prevention}
-\Textcite{DBLP:conf/lcn/BragaMP10} have examined the detection of flooding DDoS attacks through \emph{self-organising maps}, making use of SDN to gather statistics effectively.
-Many of their features aren't overly relevant, as their focus is not active defence or discovering \emph{which} hosts are contributing to an attack.
+\Textcite{DBLP:conf/lcn/BragaMP10} examine the detection of flooding DDoS attacks through \emph{self-organising maps}, using SDN to gather statistics effectively.
+Many of their features aren't overly relevant, as their focus is not active defence or discovering \emph{which} hosts contribute to an attack.
 %?? Actually talk about Marl (???) to appease reviewer \#1.
 The closest available approach within this field is that of \textcite{DBLP:journals/eaai/MalialisK15} (whom we have positioned our work against), and their contribution in applying RL to the task of intrusion prevention is significant: their work helps to show the viability of live, adaptive, feedback-loop-like control of the network to detect and prevent DDoS attacks.
 They create a tree overlay topology (subdivided into teams), where each agent applies packet drop to \emph{all} flows inbound to a protected server.
@@ -1597,7 +1597,7 @@ They create a tree overlay topology (subdivided into teams), where each agent ap
 Our results show that their technique underperforms at high host density and when congestion-aware traffic dominates---that their results do not demonstrate this suggests an evaluation driven purely by traces (rather than live application dynamics).
 
 \emph{SPIFFY} \cite{DBLP:conf/ndss/KangGS16} aims to remedy transit-link attacks by observing how flows from each source respond to a sudden increase in available bandwidth.
-\Citeauthor{DBLP:conf/ndss/KangGS16} realise that bots participating in an attack are often unable to match this bandwidth expansion due to having already saturated the capacity of their outbound links, while legitimate flows typically speed up to match the new fair-share rate.
+\Citeauthor{DBLP:conf/ndss/KangGS16} realise that bots participating in an attack are often unable to match this bandwidth expansion (having already saturated the capacity of their outbound links), while legitimate flows typically speed up to match the new fair-share rate.
 %Attackers must either be detected or reduce the throughput of each bot, increasing the cost of launching an attack.
 %Unlike our approach (and due to the class of attacks it is designed to defend against), SPIFFY is intended to be deployed within ASes, although .
 A weakness of their approach is that computing a route to measure bandwidth expansion on real networks can be costly (up to \SI{14}{\second} for the Cogent topology), and that the low expansion factors in real network can require more ``rounds'' of filtering.
@@ -1616,21 +1616,21 @@ Because of this, flooding-based attacks aren't fully alleviated.
 
 %?? Abuses of RL 
 \fakepara{RL in Networks}
-Earnest, well-considered application of RL towards the challenge of intrusion detection/prevention has seen comparatively little examination.
-Past work exhibits treatment of the paradigm as a traditional classifier for anomaly detection \cite{shamshirband2014anomaly} and DDoS prevention \cite{DBLP:conf/mates/ServinK08}.
-Given that one of the main strengths of RL techniques is the ability to control ongoing interaction and to adapt by observing the concrete effects of actions taken, such works don't apply the rich literature on the subject to its fullest potential.
+Earnest, well-considered application of RL towards the challenge of intrusion prevention has seen comparatively little examination.
+Past work treats the paradigm as a traditional classifier for anomaly detection \cite{shamshirband2014anomaly} and DDoS prevention \cite{DBLP:conf/mates/ServinK08}.
+Given that the main strengths of RL techniques are the ability to control ongoing interaction and adapt by observing the concrete effects of actions, such works don't apply the rich literature on the subject to its fullest potential.
 
 For categorising how RL fits into solving problems, we label works as direct- or indirect-control RL.
 A \emph{direct-control} RL problem is one where the RL agent(s) learn optimal control over a set of actions as the \emph{primary} defence or decision-maker---requiring measurements, reward functions and action sets tailored for this purpose.
 %We feel there is a shortage of work in this category at present, at least in the field of networks.
 To date, the best-fitting example we have encountered is that of \textcite{DBLP:journals/eaai/MalialisK15}.
 
-An \emph{indirect-control} RL problem is one where the role played by the agents is to act in service to \emph{another technique} responsible for decision-making, further optimising or generalising aspects of its operation beyond that of hand-coded heuristics.
+An \emph{indirect-control} RL problem is one where agents act in service to \emph{another technique} responsible for decision-making, optimising or generalising aspects of its operation beyond that of hand-coded heuristics.
 A past example includes learning when best to \emph{communicate} and share knowledge between \emph{hidden Markov model} anomaly detectors \cite{DBLP:conf/paisi/XuSH07}.
 %The position of this work is weakened by its reliance on the problematic `DARPA99' dataset \cite{DARPA-IDD, DBLP:conf/cisda/TavallaeeBLG09, DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
-The position of this work is weakened by its reliance on the problematic `DARPA99' dataset \cite{DBLP:conf/sp/SommerP10}, but the idea itself is well-treated and this acts as a driver for improvements in this direction.
-Outside of anomaly/intrusion detection, there has been growing interest in the use of reinforcement learning in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for resource-constrained process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
-Work by \textcite{DBLP:conf/sigcomm/MaoNA17} employs client-side observations of network state and video player performance to optimise adaptive bitrate selection for multimedia streaming by RL methods.
+This work is weakened by its reliance on the problematic `DARPA99' dataset \cite{DBLP:conf/sp/SommerP10}, but the idea itself is well-treated.
+Outside of intrusion detection, there has been growing interest in the use of RL in data-driven networking, such as for intra-AS route optimisation \cite{DBLP:conf/hotnets/ValadarskySST17} and for resource-constrained process allocation \cite{DBLP:conf/hotnets/MaoAMK16}.
+Work by \textcite{DBLP:conf/sigcomm/MaoNA17} employs client-side observations of network state and video performance to optimise adaptive bitrate selection for multimedia streaming by RL methods.
 
 \emph{AuTO} \cite{DBLP:conf/sigcomm/ChenL0L18} employs deep RL to perform traffic optimisation.
 Crucially, they find that the vast majority of flows are short-lived, requiring effective decisions in less than a millisecond.
@@ -1642,9 +1642,9 @@ The second agent makes bespoke decisions about routing, prioritisation etc.\ for
 
 \section{Conclusions and Future Work}
 Through this paper, we have discussed reinforcement learning and its relevance to network intrusion prevention.
-Our belief is that the potential to learn feedback-loop-like control online and against non-stationarity makes it particularly suited to the problems endemic to the field.
-We have identified weaknesses in past approaches, recommending an RL agent design which acts per-flow, and have outlined the algorithmic modifications and engineering choices needed to make its deployment feasible.
-Supporting this, we've presented an in-depth examination of the design of our feature space, offering quantitative and qualitative justification for our choices.
+We believe the potential to learn feedback loop-like control online and against non-stationarity makes it particularly suited to the problems endemic to the field.
+We identified weaknesses in past work, recommending an RL agent which acts per flow, and have outlined the algorithmic and engineering choices needed to make its deployment feasible.
+Supporting this, we've presented an in-depth examination of our feature space, offering quantitative and qualitative justification for our choices.
 Our evaluation shows that our new agent designs considerably advance the state-of-the-art in RL-based DDoS prevention, with \emph{Guarded} agents showing the most promise for future evaluation.
 
 The most direct improvements to be made lie in the correct protection of legitimate UDP traffic, which our agent designs have difficulty safeguarding.
@@ -1698,8 +1698,9 @@ This work was supported in part by the Engineering and Physical Sciences Researc
 
 \renewcommand*{\bibfont}{\footnotesize}
 \printbibliography
-\vspace{-4.5cm}
-\vskip 0pt plus -1fil
+\enlargethispage{1cm}
+\vspace{-1.1cm}
+\vskip -6pt plus -1fil
 \begin{IEEEbiography}
 	[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{authorpics/kyle}}]{Kyle A. Simpson}
 	received the MSci degree in computing science from the University of Glasgow in 2017.
@@ -1724,5 +1725,6 @@ This work was supported in part by the Engineering and Physical Sciences Researc
 	Professor Pezaros has published widely (over 80 peer-reviewed contributions to top-tier international conferences and journals) in the areas of computer communications, network and service management, and resilience of future networked infrastructures, and has received significant funding for his research in the above areas from public funding agencies and the industry. He is a Chartered Engineer, and a senior member of the IEEE and the ACM.
 	
 \end{IEEEbiography}
+\vskip 0pt plus -1fil
 
 \end{document}
