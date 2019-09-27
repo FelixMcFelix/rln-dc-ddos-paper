@@ -639,7 +639,7 @@ Our system design applies to both software-defined and traditional networks of a
 Only the ingress/egress nodes from a network need to be OpenFlow-enabled, as it is advantageous to perform filtering as close to a flow's source as possible.
 In a traditional network, each agent has exclusive control over its switch's tables.
 In a fully software-defined network, these agents require exclusive control over the first table, forwarding legitimate packets to subsequent tables managed by the network's controller.
-The main difference is that a traditional network needs this additional hardware, and does not allow an operator to dynamically determine where the "edge" of their network lies through vNF relocation.
+The main difference is that a traditional network needs this additional hardware, and does not allow an operator to dynamically determine where the ``edge'' of their network lies through vNF relocation.
 \cbend
 
 \subsection{Algorithm}
@@ -867,7 +867,7 @@ State vector combination is done by summing deltas and packet counts, updating m
 Following \citeauthor{DBLP:conf/sigcomm/ChenL0L18}'s observations concerning short flows \cite{DBLP:conf/sigcomm/ChenL0L18}, we maintain a deadline of \SI{1}{\milli\second}---in tests, an agent is typically able to process around 3 flows in this time.
 We expect this should be tuned based on the frequency at which statistics arrive.
 \cbstart
-Naturally, this implies that an agent must carry work forward (and coalesce state updates) when the \emph{host density} $n>3$ (\cref{sec:evaluation}); this behaviour is not explicitly a property of network size.
+Naturally, this implies that an agent must carry work forward (and coalesce state updates) when \emph{host density} is $n>3$ (\cref{sec:evaluation}); this behaviour is not explicitly a property of network size.
 \cbend
 
 \section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
@@ -1087,7 +1087,7 @@ We test \SI{10}{\percent} of active flows at a time (according to the authors' o
 To test this, we made use of both traffic models introduced in \cref{sec:a-new-normal} (OPUS and TCP), both topologies discussed below (1-dest vs Fat-Tree), and vary the amount of hosts typically communicating over each agent's ingress/egress node.
 Additionally, we evaluated our new models in multi-agent mode (\emph{separate}, no model sharing), and in single-agent mode (\emph{single}, 0-cost perfect information sharing).
 In each case, the algorithm's performance was averaged over \num{10} episodes of length \num{10000} timesteps (setting each agent's $\wvec{}=\bm{0}$ between episodes).
-Host allocations at the beginning of each episode were generated pseudorandomly to ensure fairness between episodes---a host is malicious with probability $\operatorname{P}(\mathit{malicious})$, and is benign otherwise.
+Host allocations at the beginning of each episode were generated pseudorandomly to ensure fairness between \cbstart episodes---a host is malicious with probability $\operatorname{P}(\mathit{malicious})$, and is benign \cbend otherwise.
 Benign hosts generate traffic from either \cref{sec:tcp-http-traffic-model,sec:udp-opus-traffic-model} depending on the experiment, while malicious hosts generate traffic according to \cref{sec:attack-traffic-model} (both at experiment-dependent rates).
 
 All experiments were executed on Ubuntu 18.04.2 LTS (GNU/Linux 4.4.3-040403-generic x86\_64), using a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
@@ -1202,10 +1202,10 @@ These parameters match those of the original study to enable direct comparison, 
 \section{Results}
 \label{sec:the-results-of-doing-so}
 
-We now examine the performance of our two new models (\emph{Instant}, \emph{Guarded}) as compared against existing RL work (\emph{Marl}) and \emph{SPIFFY} under different traffic behaviour and topologies, varying the host-to-learner ratio $n$ and environment.
+We now examine the performance of our two new models (\emph{Instant}, \emph{Guarded}) as compared against existing RL work (\emph{Marl}) and \cbstart \emph{SPIFFY} under different traffic behaviour and topologies, varying the host-to-learner ratio $n$ and environment.
 %?? Probably best just to look at top level stuff, and THEN a simplified comparison for each intended improvement (like banded rewards).
 %Additionally, we examine the performance effects of environmental characteristics and potential improvements: negative reinforcement, the case where one agent makes all decisions, and pre-training on individual features.
-We present the average rewards for all combinations of these factors in \crefrange{tab:av-vals}{tab:av-ecmp-vals}---providing a rough idea of expected performance, with the highest-performing model in bold and the best RL-based model underlined.
+We present the average rewards for all combinations of these factors in \crefrange{tab:av-vals}{tab:av-ecmp-vals}---providing a rough idea of expected performance, with the highest-performing model in bold and the best RL-based model \cbend underlined.
 Average rewards take into account any portions of time that an agent allows illegal system states.
 Several plots augment this, illustrating peak performance or the amount of time which an agent requires to learn.
 
