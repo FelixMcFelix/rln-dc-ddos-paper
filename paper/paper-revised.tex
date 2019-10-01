@@ -310,6 +310,7 @@ Crucially, both models remain protocol- and content-agnostic to offer future-pro
 
 \subsection{Contributions}
 \cbstart
+{\color{uofgcobalt}
 This paper contributes two source-level granularity approaches to RL-driven DDoS prevention (\emph{Instant} and \emph{Guarded} action models), improving upon past aggregate-based models (\cref{sec:ddos-mitigation-with-per-flow-reinforcement-learning}).
 These are designed to make effective decisions irrespective of protocol, and act on individual flows at the edge of any network topology.
 We offer an in-depth investigation into suitable features for automatic DDoS mitigation, with qualitative and quantitative justification (\cref{sec:rethinking-the-state-space}).
@@ -319,7 +320,7 @@ Our study is the first attempt to quantify the individual efficacy of each in an
 We implement reactive simulations of HTTP and VoIP web-server traffic, designed to test system characteristics that packet trace playback fails to capture (\cref{sec:a-new-normal}).
 To our knowledge, this is the first attempt to study or replicate Opus-based VoIP traffic, which has become commonplace since the codec's release in 2012.
 These new traffic models inform an empirical evaluation of our new models against the state-of-the-art in RL-based DDoS mitigation using (\cref{sec:the-results-of-doing-so}), alongside a discussion of security concerns and real-world deployment (\cref{sec:discussion}).
-We additionally compare our work against SPIFFY \cite{DBLP:conf/ndss/KangGS16}, reuniting two divergent strands of research and grounding the study of RL-based DDoS \cbend defences.
+We additionally compare our work against SPIFFY \cite{DBLP:conf/ndss/KangGS16}, reuniting two divergent strands of research and grounding the study of RL-based DDoS \cbend defences.}
 
 \section{Background and Threat Model}
 %?? Introduce RL, related definitions etc.
@@ -626,7 +627,7 @@ We describe and justify our approach, our algorithmic improvements, and present 
 \subsection{System Design and Assumptions}
 A deployment environment is a network with a set of \emph{ingress/egress points} from its domain of control, through which traffic can flow, and a set of protected \emph{destination nodes}.
 These nodes may be services, servers, or in the case of Autonomous Systems (ASes) and transit networks, egress points leading to other networks.
-\cbstart Agents are co-located with each egress switch (i.e., $k$ ingress points from other ASes require $k$ agents), all employ the same action model/design, and control the proportion of upstream packets from each external host to discard.
+{\color{uofgcobalt}\cbstart Agents are co-located with each egress switch (i.e., $k$ ingress points from other ASes require $k$ agents), all employ the same action model/design}, and control the proportion of upstream packets from each external host to discard.
 Each destination node $s$ has a maximum capacity, \cbend $U_s$.
 
 We assume that the deployment environment is a moderately complex software-defined network, because the paradigm offers features which can directly benefit RL agents acting within.
@@ -635,11 +636,12 @@ Furthermore, networks of this kind more naturally enable the future use of \emph
 Agents communicate with their co-hosted OpenFlow-enabled switches---running a modified version of \emph{Open vSwitch} (OVS) \cite{open-vswitch}---to install probabilistic packet-drop rules.
 
 \cbstart
+{\color{uofgcobalt}
 Our system design applies to both software-defined and traditional networks of arbitrary shape and size.
 Only the ingress/egress nodes from a network need to be OpenFlow-enabled, as it is advantageous to perform filtering as close to a flow's source as possible.
 In a traditional network, each agent has exclusive control over its switch's tables.
 In a fully software-defined network, these agents require exclusive control over the first table, forwarding legitimate packets to subsequent tables managed by the network's controller.
-The main difference is that a traditional network needs this additional hardware, and does not allow an operator to dynamically determine where the ``edge'' of their network lies through vNF relocation.
+The main difference is that a traditional network needs this additional hardware, and does not allow an operator to dynamically determine where the ``edge'' of their network lies through vNF relocation.}
 \cbend
 
 \subsection{Algorithm}
@@ -736,7 +738,7 @@ Each is tile-coded with 8 tilings and 6 tiles per dimension, using the windows d
 Global state is a vector of load values in $\mathbb{R}^4$ (\si{\mega\bit\per\second}) depending upon the bandwidth measurements regularly received from monitors in the environment.
 For any flow, an agent then computes the path it would take through the network.
 The incoming load recorded along the first hop, last hop, and tertiles of the path may then be tile-coded together.
-\cbstart In the event that the path from an agent to its destination is shorter than 4 hops, we duplicate (in order of preference) the load measurement of a middle hop or the last hop. \cbend
+\cbstart {\color{uofgcobalt}In the event that the path from an agent to its destination is shorter than 4 hops, we duplicate (in order of preference) the load measurement of a middle hop or the last hop.} \cbend
 \Cref{fig:global-state-path} illustrates the process.
 
 We build global state in this way to offer compatibility with multipath, multi-destination networks, offering support for diverse deployment environments from endpoint servers to transit ASes.
@@ -748,7 +750,7 @@ Multipath routing is often fast since typical \emph{equal-cost multipath} (ECMP)
 
 We describe and analyse each of the per-flow features included in the state vector throughout \cref{sec:rethinking-the-state-space}.
 Each feature is tiled separately, with the exception of packet in/out count (per-window and total), mean in/out packet size, and $\Delta$ in/out rate, which are combined with the last action taken.
-\cbstart Rather than having the network push the data to an agent, the agent requests this information about active flows periodically to isolate it from non-control-plane traffic and to eliminate the risk of resource exhaustion by excessive requests. \cbend
+\cbstart {\color{uofgcobalt}Rather than having the network push the data to an agent, the agent requests this information about active flows periodically to isolate it from non-control-plane traffic and to eliminate the risk of resource exhaustion by excessive requests.} \cbend
 
 \subsection{Reward Function}
 
@@ -867,7 +869,7 @@ State vector combination is done by summing deltas and packet counts, updating m
 Following \citeauthor{DBLP:conf/sigcomm/ChenL0L18}'s observations concerning short flows \cite{DBLP:conf/sigcomm/ChenL0L18}, we maintain a deadline of \SI{1}{\milli\second}---in tests, an agent is typically able to process around 3 flows in this time.
 We expect this should be tuned based on the frequency at which statistics arrive.
 \cbstart
-Naturally, this implies that an agent must carry work forward (and coalesce state updates) when \emph{host density} is $n>3$ (\cref{sec:evaluation}); this behaviour is not explicitly a property of network size.
+{\color{uofgcobalt}Naturally, this implies that an agent must carry work forward (and coalesce state updates) when \emph{host density} is $n>3$ (\cref{sec:evaluation}); this behaviour is not explicitly a property of network size.}
 \cbend
 
 \section{Rethinking the State Space}\label{sec:rethinking-the-state-space}
@@ -1039,9 +1041,9 @@ The controller is also responsible for computing how switches respond to ARP req
 To model legitimate TCP traffic, server nodes run an nginx v1.10.3 HTTP daemon, serving statically generated web pages alongside various large files and binaries.
 Benign hosts run a simple libcurl-based application written in Rust, repeatedly requesting resources from the server.
 Hosts and clients both use TCP Cubic \cite{rfc8312}.
-Each host's download rate is limited to match whatever maximum bandwidth was assigned to it, and requests several random files known to exist within a website, followed by any dependent resources for each (stylesheets, images, etc.).
+Each host's download rate is limited to match the maximum bandwidth assigned to it, and requests several random files known to exist within a website, followed by any dependent resources for each (stylesheets, images, etc.) \cbstart {\color{uofgcobalt}as a browser \cbend might.}
 On completion, a host changes its IP to generate separate statistics per-flow, while minimising downtime.
-This presents a more balanced distribution of flow duration and size, with large files included to model elephant flows.
+This presents a balanced distribution of flow duration and size, with large files included to model elephant flows.
 
 \subsection{UDP (Opus/VoIP) Traffic Model}\label{sec:udp-opus-traffic-model}
 VoIP traffic exhibits very different characteristics to the above model; packet arrivals are highly periodic due to real-time requirements, flows have a constant bitrate, and do not react substantially to lost packets.
@@ -1063,10 +1065,10 @@ To match the target upload rate assigned to each host, it runs enough individual
 %?? Malicious traffic: UDP flood traffic (hping3, MTU-size packets, ). Why not min-size packets? Because the traffic generator gets in a horrible rut if I do so...
 \subsection{Attack Traffic Model}\label{sec:attack-traffic-model}
 \cbstart
-Malicious traffic is generated by use of the \emph{hping3} program, generating UDP-flood traffic targeting random ports.
+{\color{uofgcobalt}Malicious traffic is generated by use of the \emph{hping3} program, generating UDP-flood traffic targeting random ports.
 We configure each instance of \emph{hping3} to generate ethernet MTU-sized packets (\SI{1500}{\byte}) with a random source and destination port towards a target server, and configure the output rate $r$ (in \si{\mega\bit\per\second}) by setting the inter-arrival time $t_{\mathit{attack}}=\frac{1500 \cdot 8}{r\cdot10^6}$.
 This fulfils certain characteristics of many types of amplification DDoS traffic: it is congestion-unaware \cite{DBLP:conf/ndss/Rossow14}, and packets are larger than the minimum frame size and identically-sized (e.g., NTP amplification traffic is fragmented at the application layer into \SI{482}{\byte} chunks \cite{cisco-ntp-amp}).
-We differ from NTP amplification in frame size so that inter-arrival times are larger, to keep emulation of the network feasible at high traffic rates.
+We differ from NTP amplification in frame size so that inter-arrival times are larger, to keep emulation of the network feasible at high traffic rates.}
 \cbend
 
 \section{Evaluation}\label{sec:evaluation}
@@ -1077,17 +1079,17 @@ We compare our work most naturally against MARL, introduced by \textcite{DBLP:jo
 We are most interested in seeing how their approach contrasts with ours across different topologies and workloads.
 Different network environments will also impose different levels of host density, where popular web servers may have orders of magnitude more clients than egress points from their network---we aim to see how these characteristics affect performance and learning rate.
 \cbstart
-Marl is known to outperform the AIMD \cite{DBLP:journals/ton/YauLLY05} strategy, yet the state of the art has long since moved on.
+{\color{uofgcobalt}Marl is known to outperform the AIMD \cite{DBLP:journals/ton/YauLLY05} strategy, yet the state of the art has long since moved on.
 To paint a more current picture, we compare our work against an effective modern approach, SPIFFY \cite{DBLP:conf/ndss/KangGS16}.
 SPIFFY tests a proportion of flows by routing them through an alternate path with higher bandwidth, observing how their speed changes some time later.
 This comparison lets us position our new agent designs against the state of the art, observing that SPIFFY has a similar mode of interaction to RL-based systems (taking action, observing an effect, and acting once again) and does not rely on protocol characteristics or signatures.
 We make the simplifying assumption that a suitable unused path exists (with identical bandwidth to the server's link).
-We test \SI{10}{\percent} of active flows at a time (according to the authors' observation that there is a factor of \num{10} difference between the ideal and achieved bandwidth expansion), excluding flows below \SI{50}{\kilo\bit\per\second} and requiring a \SI{3}{$\! \times$} expansion from legitimate flows, making a judgement after \cbend \SI{5}{\second}.
+We test \SI{10}{\percent} of active flows at a time (according to the authors' observation that there is a factor of \num{10} difference between the ideal and achieved bandwidth expansion), excluding flows below \SI{50}{\kilo\bit\per\second} and requiring a \SI{3}{$\! \times$} expansion from legitimate flows, making a judgement after \cbend \SI{5}{\second}.}
 
 To test this, we made use of both traffic models introduced in \cref{sec:a-new-normal} (OPUS and TCP), both topologies discussed below (1-dest vs Fat-Tree), and vary the amount of hosts typically communicating over each agent's ingress/egress node.
 Additionally, we evaluated our new models in multi-agent mode (\emph{separate}, no model sharing), and in single-agent mode (\emph{single}, 0-cost perfect information sharing).
 In each case, the algorithm's performance was averaged over \num{10} episodes of length \num{10000} timesteps (setting each agent's $\wvec{}=\bm{0}$ between episodes).
-Host allocations at the beginning of each episode were generated pseudorandomly to ensure fairness between \cbstart episodes---a host is malicious with probability $\operatorname{P}(\mathit{malicious})$, and is benign \cbend otherwise.
+Host allocations at the beginning of each episode were generated pseudorandomly to ensure fairness between \cbstart episodes---{\color{uofgcobalt}a host is malicious with probability $\operatorname{P}(\mathit{malicious})$, and is benign \cbend otherwise.}
 Benign hosts generate traffic from either \cref{sec:tcp-http-traffic-model,sec:udp-opus-traffic-model} depending on the experiment, while malicious hosts generate traffic according to \cref{sec:attack-traffic-model} (both at experiment-dependent rates).
 
 All experiments were executed on Ubuntu 18.04.2 LTS (GNU/Linux 4.4.3-040403-generic x86\_64), using a 4-core Intel Core i7-6700K (clocked at \SI{4.2}{\giga\hertz}) and \SI{32}{\gibi\byte} of RAM.
@@ -1191,9 +1193,9 @@ Benign hosts each occupied \SIrange{0}{1}{\mega\bit\per\second}, and hosts were 
 Malicious hosts each sent \SIrange{2.5}{6}{\mega\bit\per\second} when attacking UDP traffic, though this was increased to \SIrange{4}{7}{\mega\bit\per\second} when using TCP-like traffic (to meaningfully impact benign flows).
 Given $n$ and $\operatorname{P}(\mathit{malicious})$, we see an expected malicious bandwidth \numrange{1.27}{1.87} and \SIrange{2.03}{2.18}{$\! \times U_s$} respectively.
 %The expected fraction of $U_s$ consumed by each host is \SI{21.5}{\percent} for $n=2$, and \SI{2.84}{\percent} for $n=16$.
-\cbstart For our choices of $n$ in both topologies, we observe $N_{\mathit{hosts}} \in \left\{24, 48, 96, 192\right\}$, and an expected number of malicious hosts $\mathbb{E}\left[N_{\mathit{attackers}}\right] \in \left\{9.6, 19.2, 38.4, 76.8\right\}$.
+{\color{uofgcobalt}\cbstart For our choices of $n$ in both topologies, we observe $N_{\mathit{hosts}} \in \left\{24, 48, 96, 192\right\}$, and an expected number of malicious hosts $\mathbb{E}\left[N_{\mathit{attackers}}\right] \in \left\{9.6, 19.2, 38.4, 76.8\right\}$.
 For the largest choice of $n$, we see an expected total attack traffic $\mathbb{E}\left[V_{\mathit{attack}}\right] = 334.05$ and \SI{422.4}{\mega\bit\per\second} for Opus and HTTP traffic respectively.
-\cbend
+\cbend}
 
 $U_s$ was fixed at $N_{\mathit{hosts}}+2$ \si{\mega\bit\per\second} (to account for burstiness), and each link had a delay of \SI{10}{\milli\second}.
 All links had unbounded capacity, save for each server-switch.
@@ -1202,10 +1204,10 @@ These parameters match those of the original study to enable direct comparison, 
 \section{Results}
 \label{sec:the-results-of-doing-so}
 
-We now examine the performance of our two new models (\emph{Instant}, \emph{Guarded}) as compared against existing RL work (\emph{Marl}) and \cbstart \emph{SPIFFY} under different traffic behaviour and topologies, varying the host-to-learner ratio $n$ and environment.
+We now examine the performance of our two new models (\emph{Instant}, \emph{Guarded}) as compared against existing RL work (\emph{Marl}) and {\color{uofgcobalt} \cbstart \emph{SPIFFY} under different traffic behaviour and topologies, varying the host-to-learner ratio $n$ and environment.
 %?? Probably best just to look at top level stuff, and THEN a simplified comparison for each intended improvement (like banded rewards).
 %Additionally, we examine the performance effects of environmental characteristics and potential improvements: negative reinforcement, the case where one agent makes all decisions, and pre-training on individual features.
-We present the average rewards for all combinations of these factors in \crefrange{tab:av-vals}{tab:av-ecmp-vals}---providing a rough idea of expected performance, with the highest-performing model in bold and the best RL-based model \cbend underlined.
+We present the average rewards for all combinations of these factors in \crefrange{tab:av-vals}{tab:av-ecmp-vals}---providing a rough idea of expected performance, with the highest-performing model in bold and the best RL-based model \cbend underlined.}
 Average rewards take into account any portions of time that an agent allows illegal system states.
 Several plots augment this, illustrating peak performance or the amount of time which an agent requires to learn.
 
@@ -1316,7 +1318,7 @@ This trend reverses for the \emph{Guarded} model, which improves as $n$ increase
 %?? Discuss multi-dest topol once all results available.
 When defending multiple destinations, we see a sharp decrease in the effectiveness of all agent designs.
 Our new agent designs become more effective as $n$ increases, while Marl's effectiveness is roughly constant (aside from the outlier at $n=12$).
-\cbstart Interestingly, SPIFFY is unable to effectively protect constant bitrate traffic. \cbend
+\cbstart {\color{uofgcobalt}Interestingly, SPIFFY is unable to effectively protect constant bitrate traffic.} \cbend
 
 \subsection{Congestion-aware traffic}
 %\begin{figure}
@@ -1411,7 +1413,7 @@ However, \emph{Guarded} agents offer a remarkable improvement for this class of 
 %?? Discuss multi-dest topol once results available.
 We observe that the same trends present themselves in the multi-destination topology: \emph{Guarded} remains the best fit for TCP, in both training modes.
 Crucially, the rigid tree of learners and teams which define Marl, along with its lack of action granularity, seem to be a poor fit in this environment.
-In both cases, SPIFFY greatly outperforms the RL-based methods.
+{\color{uofgcobalt}In both cases, SPIFFY greatly outperforms the RL-based methods.}
 
 %\subsection{Single-agent performance}
 %Making all decisions with a single agent is roughly equivalent to having a zero-cost communication channel between each pair of agents, theoretically allowing faster training by giving each agent more experience.
@@ -1421,8 +1423,8 @@ In both cases, SPIFFY greatly outperforms the RL-based methods.
 
 \subsection{Increased Attack Volume}\label{sec:results-attack-volume}
 \cbstart
-To assess the effect of larger volumes of attack traffic, we increase an attacker's output by various factors, supposing $n=16$ with HTTP traffic (\emph{Guarded}, Single); \cref{tab:atk-vol} records the expected rate of attack and average performance.
-The initial increase in traffic volume causes the steepest reduction in performance (due to the increased cost of incorrect action), though performance levels out as attack traffic \cbend increases.
+{\color{uofgcobalt}To assess the effect of larger volumes of attack traffic, we increase an attacker's output by various factors, supposing $n=16$ with HTTP traffic (\emph{Guarded}, Single); \cref{tab:atk-vol} records the expected rate of attack and average performance.
+The initial increase in traffic volume causes the steepest reduction in performance (due to the increased cost of incorrect action), though performance levels out as attack traffic \cbend increases.}
 
 \begin{table}
 \cbstart
@@ -1432,6 +1434,7 @@ The initial increase in traffic volume causes the steepest reduction in performa
 \resizebox{0.45\linewidth}{!}{
 \begin{tabular}{@{}SSS@{}}
 	\toprule\multicolumn{1}{c}{Factor} & \multicolumn{1}{c}{$\mathbb{E}\left[V_{\mathit{attack}}\right]$ (\si{\mega\bit\per\second})} & \multicolumn{1}{c}{Reward} \\ \midrule
+	1.5 & 633.6 & 0.671 \\
 	2.0 & 844.8 & 0.625 \\
 	2.5 & 1056.0 & 0.620 \\
 	3.0 & 1267.2 & 0.619 \\
@@ -1453,8 +1456,8 @@ This is reassuring when measured alongside the insights from other work.
 %Most flows are short, and flow-size follows a heavy-tailed distribution.
 That our starting point falls significantly below this threshold allows us to safely consider more costly actions or larger state spaces, which would typically increase the computational cost.
 \cbstart
-This cost is constant and independent of network size.
-As discussed in \cref{sec:systems-considerations}, we are able to judge 3 flows before this deadline: the difference is primarily accounted for by serialisation/communication delays and single-threaded processing in the Python language.
+{\color{uofgcobalt}This cost is constant and independent of network size.
+As discussed in \cref{sec:systems-considerations}, we are able to judge 3 flows before this deadline: the difference is primarily accounted for by serialisation/communication delays and single-threaded processing in the Python language.}
 \cbend
 %?? TODO: update with modern numbers...
 
@@ -1487,13 +1490,13 @@ Moreover, benign UDP traffic shares many characteristics with attack traffic, su
 
 %Finally, it is crucial to note that the models and techniques presented here are an improvement , this work still trails behind existing (exact) DDoS flow detection mechanisms.
 \cbstart
-Most importantly, what we wish to impart is the knowledge that while the models and techniques we present here are a significant improvement over past RL-based work, this strand still trails behind existing (exact) DDoS flow detection mechanisms where TCP traffic is concerned.
+{\color{uofgcobalt}Most importantly, what we wish to impart is the knowledge that while the models and techniques we present here are a significant improvement over past RL-based work, this strand still trails behind existing (exact) DDoS flow detection mechanisms where TCP traffic is concerned.
 The ability to better protect VoIP traffic when compared against one of these approaches is a curious observation, which suggests that other (exact) protocol-agnostic approaches may carry hidden assumptions and is a promising direction for future investigation.
 Similar traffic makes up a significant fraction of network load today (\SIrange{18}{27}{\percent}).
 Although we have conducted work to map the territory, there are still more advancements to be made before RL-based DDoS defence is truly competitive.
 The benefits we have at present are, however, substantial.
 What we offer above many of the approaches we discuss in \cref{sec:related-work} are potentially more flexible deployments, low-overhead and fixed-cost decision-making, without requiring active measurement or the network resources and capabilities that the most effective techniques rely upon.
-Moreover, our decision making processes are entirely agnostic of the protocol or content of traffic, offering future-proofing against the introduction of new transports.
+Moreover, our decision making processes are entirely agnostic of the protocol or content of traffic, offering future-proofing against the introduction of new transports.}
 \cbend
 
 \fakepara{Security concerns and vulnerability}
@@ -1503,7 +1506,7 @@ The natural solution is to impose an upper bound on the amount of action computa
 This removes the guarantee that all flows will be visited fairly often, but if updates occur regularly then this random sampling may be sufficient to achieve good performance.
 
 \cbstart
-Can an attack on the controller can impact our approach?
+{\color{uofgcobalt}Can an attack on the controller can impact our approach?
 This question hinges upon whether the deployment environment is a traditional network or is fully SDN-enabled---each agent is, in a sense, \emph{a} controller alongside the network's controller.
 In a traditional network, only the agents act as controllers, but since they periodically request per-flow data (rather than continuously receiving it) no amount of flows generates more requests or messages to the agent.
 More work is generated, but we discuss how to handle this safely above.
@@ -1511,7 +1514,7 @@ Accordingly, agents can never be stalled by request volume: their only remote co
 The same logic holds for a fully software-defined network.
 Recalling that we do not employ the network's controller to install filtering rules on edge switches, an agent's ability to act is unimpeded.
 Thus, the controller is made no more vulnerable than in any other SDN.
-The only necessary change for such a scenario is that a load measurement which has not been updated (due to a timeout or missed deadline) should be set at $R_t=-1$.
+The only necessary change for such a scenario is that a load measurement which has not been updated (due to a timeout or missed deadline) should be set at $R_t=-1$.}
 \cbend
 %\begin{figure}
 %	\centering
@@ -1572,7 +1575,7 @@ We expect that agents will be able to share policies for all features, which may
 Regardless, it will take longer to achieve enough state-state transitions to converge on a good policy.
 
 \cbstart
-One limit of SDN-capable hardware is that OpenFlow rules occupy \SI{6}{$\! \times$} the space of standard rules---commercial switches only have TCAM space for \SIrange{2}{20}{\kilo} rules \cite{DBLP:journals/comsur/NguyenSBT16}.
+{\color{uofgcobalt}One limit of SDN-capable hardware is that OpenFlow rules occupy \SI{6}{$\! \times$} the space of standard rules---commercial switches only have TCAM space for \SIrange{2}{20}{\kilo} rules \cite{DBLP:journals/comsur/NguyenSBT16}.
 Our approach consumes a rule for each active flow (the host density), and by the end of an experiment a switch can accrue around \num{900} rules.
 While we use a default fallback action to maintain connectivity, eviction of high-value decisions which filter high-bandwidth attackers poses a significant risk.
 Given that most flows are small (with the majority of bytes coming from a few ``heavy-hitters'') \cite{DBLP:journals/ccr/PanBPS03}, it may suffice to only apply RL-based analysis to larger flows.
@@ -1580,7 +1583,7 @@ Given that most flows are small (with the majority of bytes coming from a few ``
 OpenFlow rules have an \emph{importance}, controlling which rules may be evicted by a new entry (preventing entries from evicting those with higher importance).
 If an agent is to act on all flows, a solution is to assign an importance of 0 to mice flows, 1 to elephant flows, and 2 to total filtering (leaving agents to time out and remove elephant flow rules to prevent bloat).
 Given the high churn and prevalence of mice flows, eviction here is most likely to affect flows which are complete.
-In both cases, extra rules can be made available by upgrading rules which completely filter a flow into upstream blackholing (as in collaborative approaches \cite{DBLP:conf/acsac/RamanathanMYZ18}), having the agent remove this rule once blackholing is active.
+In both cases, extra rules can be made available by upgrading rules which completely filter a flow into upstream blackholing (as in collaborative approaches \cite{DBLP:conf/acsac/RamanathanMYZ18}), having the agent remove this rule once blackholing is active.}
 \cbend
 
 \section{Related Work}\label{sec:related-work}
@@ -1602,8 +1605,8 @@ Our results show that their technique underperforms at high host density and whe
 %Unlike our approach (and due to the class of attacks it is designed to defend against), SPIFFY is intended to be deployed within ASes, although .
 A weakness of their approach is that computing a route to measure bandwidth expansion on real networks can be costly (up to \SI{14}{\second} for the Cogent topology), and that the low expansion factors in real network can require more ``rounds'' of filtering.
 \cbstart
-By contrast, our approach takes a constant time to compute an action for a flow regardless of topology size.
-Their assumptions about traffic response to such bandwidth expansion do not hold for constant bitrate flows (e.g., VoIP) and may not extend to HTTP DASH flows, both of which make up a sizeable proportion of network \cbend traffic.
+{\color{uofgcobalt}By contrast, our approach takes a constant time to compute an action for a flow regardless of topology size.
+Their assumptions about traffic response to such bandwidth expansion do not hold for constant bitrate flows (e.g., VoIP) and may not extend to HTTP DASH flows, both of which make up a sizeable proportion of network \cbend traffic.}
 
 \emph{Athena} \cite{DBLP:conf/dsn/LeeKSPY17} is a generalised SDN framework for intrusion detection, but has shown the use of a \emph{k-nearest neighbours} classifier to detect individual attack flows.
 Although heavyweight (and proven to be effective compared with \textcite{DBLP:conf/lcn/BragaMP10}), their comparison against SPIFFY lacks the quantitative evidence required to understand how the system compares.
