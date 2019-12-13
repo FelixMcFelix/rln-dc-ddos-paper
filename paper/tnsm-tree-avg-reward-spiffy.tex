@@ -1,0 +1,13 @@
+\begin{tabular}{@{}ccSSSSSS@{}}
+\toprule\multicolumn{1}{c}{Traffic} & \multicolumn{1}{c}{$n$} & \multicolumn{1}{c}{SPIFFY} & \multicolumn{1}{c}{Marl} & \multicolumn{2}{c}{Instant} & \multicolumn{2}{c}{Guarded} \\
+\cmidrule(lr){5-6}\cmidrule(lr){7-8}  & & & & \multicolumn{1}{c}{Separate} & \multicolumn{1}{c}{Single} & \multicolumn{1}{c}{Separate} & \multicolumn{1}{c}{Single} \\ \midrule
+OPUS & 2 & 0.043 & 0.628 & \bfseries \uline{0.629} & 0.448 & 0.430 & 0.629 \\ 
+ & 4 & 0.069 & 0.538 & \bfseries \uline{0.653} & 0.449 & 0.308 & 0.571 \\ 
+ & 8 & 0.065 & 0.468 & \bfseries \uline{0.533} & 0.516 & 0.398 & 0.507 \\ 
+ & 16 & 0.053 & 0.460 & 0.438 & 0.452 & 0.347 & \bfseries \uline{0.504} \\ 
+TCP & 2 & \bfseries 0.799 & \uline{0.305} & 0.061 & 0.068 & 0.241 & 0.196 \\ 
+ & 4 & \bfseries 0.953 & 0.359 & 0.191 & 0.097 & 0.278 & \uline{0.504} \\ 
+ & 8 & \bfseries 0.995 & 0.362 & 0.376 & 0.201 & 0.357 & \uline{0.605} \\ 
+ & 16 & \bfseries 0.999 & 0.320 & 0.316 & 0.302 & 0.478 & \uline{0.708} \\ 
+\bottomrule
+\end{tabular}

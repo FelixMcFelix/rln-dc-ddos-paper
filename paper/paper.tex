@@ -1,4 +1,5 @@
 % !TeX document-id = {b3181d9a-ffe0-4331-a65c-c7fb8f275531}
+% !TeX program = pdflatex
 % !BIB program = biber
 \documentclass[10pt, times, comsoc]{IEEEtran}
 \usepackage{nopageno}
@@ -159,7 +160,7 @@ uniquelist=false]{biblatex}
 	pdfauthor={Kyle A. Simpson, Simon Rogers, Dimitrios P. Pezaros}
 %	pdfauthor={Anonymous Giraffe, Anonymous Badger, Anonymous Ibex}
 }
-\newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}} } 
+\newcommand*{\email}[1]{\href{mailto:#1}{\nolinkurl{#1}}} 
 
 \usepackage{titling}
 %\settowidth{\thanksmarkwidth}{*}
@@ -250,11 +251,11 @@ uniquelist=false]{biblatex}
 %	Kyle~A.~Simpson,
 	Simon~Rogers\protect\orcidicon{0000-0003-3578-4477},
 %	Simon~Rogers,
-	Dimitrios~P.~Pezaros\protect\orcidicon{0000-0003-0939-378X},~\IEEEmembership{Senior~Member,~IEEE,},\\
+	Dimitrios~P.~Pezaros\protect\orcidicon{0000-0003-0939-378X},~\IEEEmembership{Senior~Member,~IEEE},\\
 %	Dimitrios~P.~Pezaros,~\IEEEmembership{Senior~Member,~IEEE,},\\
 	School of Computing Science, University of Glasgow, Glasgow, G12 8RZ, UK\\
 %	University of Glasgow, Glasgow, Scotland,\\
-	\email{k.simpson.1@research.gla.ac.uk}
+	\email{k.simpson.1@research.gla.ac.uk}, \email{Simon.Rogers@glasgow.ac.uk}, \email{Dimitrios.Pezaros@glasgow.ac.uk}
 %Anonymous Giraffe,
 %Anonymous Badger,
 %Anonymous Ibex\\
@@ -904,7 +905,7 @@ We expect this should be tuned based on the frequency at which statistics arrive
 
 \begin{figure}
 	\centering
-	\includegraphics[width=0.65\linewidth]{../plots/ftprep-cap-box}
+	\includegraphics[width=0.65\linewidth]{ftprep-cap-box}
 	\vspace{-0.75cm}
 	\caption{
 		Learned performance of Instant Control agents when benign traffic is UDP-like, using only a single feature as a basis for decisions.
@@ -926,7 +927,7 @@ We expect this should be tuned based on the frequency at which statistics arrive
 
 \begin{figure}
 	\centering
-	\includegraphics[width=0.65\linewidth]{../plots/ftprep-tcp-cap-box}
+	\includegraphics[width=0.65\linewidth]{ftprep-tcp-cap-box}
 	\vspace{-0.75cm}
 	\caption{
 		Learned performance of Instant Control agents when benign traffic is TCP-like, using only a single feature as a basis for decisions.
@@ -940,7 +941,7 @@ We expect this should be tuned based on the frequency at which statistics arrive
 \begin{figure}
 	\centering
 %	\vspace{-0.25cm}
-	\includegraphics[width=0.65\linewidth]{../plots/ftprep-tcp-laf-cap-box}
+	\includegraphics[width=0.65\linewidth]{ftprep-tcp-laf-cap-box}
 	\vspace{-0.75cm}
 	\caption{
 		Learned performance of Instant Control agents when benign traffic is TCP-like, combining each feature with the last action taken as a basis for decisions.
@@ -1245,7 +1246,7 @@ Several plots augment this, illustrating peak performance or the amount of time 
 	
 	\cbstart
 	\resizebox{0.8\linewidth}{!}{
-		\expandableinput ../tables/tnsm-tree-avg-reward-spiffy.tex
+		\expandableinput tnsm-tree-avg-reward-spiffy.tex
 	}
 	\cbend
 \vspace{-0.25cm}
@@ -1256,7 +1257,7 @@ Several plots augment this, illustrating peak performance or the amount of time 
 	
 	\cbstart
 	\resizebox{0.8\linewidth}{!}{
-		\expandableinput ../tables/tnsm-ecmp-avg-reward-spiffy.tex
+		\expandableinput tnsm-ecmp-avg-reward-spiffy.tex
 	}
 	\cbend
 \vspace{-0.5cm}
@@ -1289,7 +1290,7 @@ Several plots augment this, illustrating peak performance or the amount of time 
 \begin{figure}
 	\centering
 	\cbstart
-	\includegraphics[width=0.75\linewidth]{../plots/tnsm-udp-box-separate}
+	\includegraphics[width=0.75\linewidth]{tnsm-udp-box-separate}
 	\cbend
 	\vspace{-0.3cm}
 	\caption{
@@ -1364,7 +1365,7 @@ Our new agent designs become more effective as $n$ increases, while Marl's effec
 %	\vspace{-0.5cm}
 	\centering
 	\cbstart
-	\includegraphics[width=0.75\linewidth]{../plots/tnsm-tcp-box-single}
+	\includegraphics[width=0.75\linewidth]{tnsm-tcp-box-single}
 	\cbend
 	\vspace{-0.3cm}
 	\caption{
@@ -1389,7 +1390,7 @@ Our new agent designs become more effective as $n$ increases, while Marl's effec
 \begin{figure}
 	\centering
 	\vspace{-0.8cm}
-	\includegraphics[width=0.75\linewidth]{../plots/tnsm-tcp-16-single}
+	\includegraphics[width=0.75\linewidth]{tnsm-tcp-16-single}
 	\vspace{-0.35cm}
 	\caption{
 		Online performance of standard and single-agent models in a single-destination network with $n=16$ hosts per egress point, HTTP traffic.
@@ -1720,11 +1721,11 @@ It's hoped that more research in this direction will open the door to works whic
 \vspace{-0.2cm}
 \section*{Acknowledgements}
 \vspace{-0.1cm}
-Our thanks go to Colin Perkins, Mircea Iordache, Qianru Zhou, Charles Rutherford, Marco Cook and Cristian Urlea for their advice and technical assistance, and to our anonymous reviewers.
+The authors would like to thank Colin Perkins, Mircea Iordache, Qianru Zhou, Charles Rutherford, Marco Cook and Cristian Urlea for their advice and technical assistance, and their anonymous reviewers.
 %Our thanks go to Anonymous, Anonymous, Anonymous, Anonymous and Anonymous for their advice, comments and technical assistance.
 %This work was supported by a nameless funder [grant number 0].
-This work was supported in part by the Engineering and Physical Sciences Research Council [grants EP/M508056/1, EP/N033957/1 and EP/P004024/1] and European Cooperation in Science and Technology (COST) Action CA15127: RECODIS---Resilient communication and services.
-\vspace{-0.2cm}
+This work has been supported in part by the UK Engineering and Physical Sciences Research Council [grants EP/N509668/1, EP/N033957/1 and EP/P004024/1] and European Cooperation in Science and Technology (COST) Action CA15127: RECODIS---Resilient communication and services.
+\vspace{-0.55cm}
 
 \renewcommand*{\bibfont}{\footnotesize}
 \printbibliography
@@ -1732,27 +1733,22 @@ This work was supported in part by the Engineering and Physical Sciences Researc
 \vspace{-1.1cm}
 \vskip -6pt plus -1fil
 \begin{IEEEbiography}
-	[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{authorpics/kyle}}]{Kyle A. Simpson}
+	[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{authorpics/kyle}}]{Kyle~A.~Simpson}
 	received the MSci degree in computing science from the University of Glasgow in 2017.
 	He is currently a PhD student within the Networked Systems Research Laboratory at the School of Computing Science, University of Glasgow.
-	
-	Mr.\ Kyle Simpson's research focusses on the use of machine learning and reinforcement learning techniques in cybersecurity and network management, with a core interest in evolving problems and defences.
+	His research focusses on the use of machine learning and reinforcement learning techniques in cybersecurity and network management, with a core interest in evolving problems and defences.
 \end{IEEEbiography}
-\vspace{-1.3cm}
+\vspace{-1.1cm}
 \vskip 0pt plus -1fil
 \begin{IEEEbiography}
-	[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{authorpics/sdr}}]{Simon Rogers}
-	received the PhD degree from University of Bristol in 2006. Now he is a Senior Lecturer in the School of Computing Science at the University of Glasgow. Before starting a permanent post in Glasgow he did a couple of Post Doctoral positions (under Mark Girolami).
-	
-	Dr.\ Simon Rogers’s research involves the development of machine learning and statistical techniques to help with the analysis of complex datasets, particularly within the field of metabolomics, human-computer interaction and information retrieval.
+	[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{authorpics/sdr}}]{Simon~Rogers}
+	is a senior lecturer in the School of Computing Science, University of Glasgow. He received his PhD from the department of Engineering mathematics at the University of Bristol in 2005 and has been a permanent member of academic staff at the University of Glasgow since 2009. His work focuses on the development of machine learning and statistical methods for the analysis of complex data, particularly within the field of computational biology.
 \end{IEEEbiography}
-\vspace{-1.25cm}
+\vspace{-1.1cm}
 \vskip 0pt plus -1fil
 \begin{IEEEbiography}
-	[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{authorpics/dimitris}}]{Dimitrios P.\ Pezaros}
-	(S’01–M’04–SM’14) received the B.Sc. and Ph.D. degrees in computer science from Lancaster University. He is currently a Professor and the Founding Director of the Networked Systems Research Laboratory at the School of Computing Science, University of Glasgow. He is also a visiting Professor at the University of Athens, Department of Informatics and Telecommunications.
-	
-	Professor Pezaros has published widely (over 80 peer-reviewed contributions to top-tier international conferences and journals) in the areas of computer communications, network and service management, and resilience of future networked infrastructures, and has received significant funding for his research in the above areas from public funding agencies and the industry. He is a Chartered Engineer, and a senior member of the IEEE and the ACM.
+	[{\includegraphics[width=1in,height=1.25in,clip]{authorpics/dimitris}}]{Dimitrios~P.~Pezaros}
+	(S’01–M’04–SM’14) received the B.Sc. and Ph.D. degrees in Computer Science from Lancaster University. He is currently (full) Professor and the founding director of the Networked Systems Research Laboratory at the School of Computing Science, University of Glasgow. He is also a visiting Professor at the University of Athens, Department of Informatics and Telecommunications. Professor Pezaros has published widely in the areas of computer communications, network and service management, and resilience of future networked infrastructures, and has received significant funding for his research from public funding agencies and the industry. He is a Chartered Engineer, and a senior member of the IEEE and the ACM.
 	
 \end{IEEEbiography}
 \vskip 0pt plus -1fil
